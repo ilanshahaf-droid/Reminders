@@ -33,19 +33,16 @@ object Scheduler {
 object Reminders {
     private val zone get() = ZoneId.systemDefault()
 
-    fun parseTimes(s: String): List<LocalTime> =
-        s.split(",").filter { it.isNotBlank() }.map { LocalTime.parse(it.trim()) }.sorted()
-
-    /** Next moment after [after] that matches the task's weekdays and times. */
+    /** Next moment after [after] that matches one of the task's weekday/time slots. */
     fun nextOccurrence(t: Task, after: Long): Long? {
-        val times = parseTimes(t.times)
-        if (t.days == 0 || times.isEmpty()) return null
+        val sch = t.schedule()
+        if (sch.isEmpty()) return null
         val start = Instant.ofEpochMilli(after).atZone(zone).toLocalDate()
         for (d in 0..8) {
             val date = start.plusDays(d.toLong())
             val bit = date.dayOfWeek.value % 7 // Sunday(7) -> 0, Monday -> 1 ... Saturday -> 6
-            if (t.days and (1 shl bit) == 0) continue
-            for (tm in times) {
+            val times = sch[bit] ?: continue
+            for (tm in times.map { LocalTime.parse(it) }.sorted()) {
                 val ms = date.atTime(tm).atZone(zone).toInstant().toEpochMilli()
                 if (ms > after) return ms
             }

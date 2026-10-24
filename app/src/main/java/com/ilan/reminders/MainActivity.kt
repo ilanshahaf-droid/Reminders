@@ -22,10 +22,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -78,6 +83,7 @@ private fun newTask(): Task {
 private fun batteryOk(c: Context) =
     c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Root() {
     val ctx = LocalContext.current
@@ -90,6 +96,10 @@ fun Root() {
     var showSettings by remember { mutableStateOf(false) }
     var showCats by remember { mutableStateOf(false) }
     var tick by remember { mutableIntStateOf(0) }
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var showBulkSchedule by remember { mutableStateOf(false) }
+    var showBulkCat by remember { mutableStateOf(false) }
+    var showBulkDelete by remember { mutableStateOf(false) }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     LaunchedEffect(Unit) {
@@ -113,7 +123,9 @@ fun Root() {
         lifecycle.addObserver(obs)
         onDispose { lifecycle.removeObserver(obs) }
     }
-    BackHandler(enabled = editor != null) { editor = null }
+    BackHandler(enabled = editor != null || selected.isNotEmpty()) {
+        if (editor != null) editor = null else selected = emptySet()
+    }
     val healthy = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() && batteryOk(ctx) }
 
     val e = editor
@@ -144,7 +156,13 @@ fun Root() {
                 Modifier.padding(pad).fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 110.dp)
             ) {
-                item {
+                if (selected.isNotEmpty()) item {
+                    SelectionBar(
+                        selected.size, onClose = { selected = emptySet() },
+                        onSchedule = { showBulkSchedule = true }, onCategory = { showBulkCat = true },
+                        onDelete = { showBulkDelete = true }
+                    )
+                } else item {
                     Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("תזכורות", style = MaterialTheme.typography.headlineLarge)
@@ -192,8 +210,12 @@ fun Root() {
                     }
                     items(list.sortedBy { it.triggerAt }, key = { it.id }) { t ->
                         TaskCard(
-                            t, catById[t.categoryId], overdue = k == 0,
-                            onClick = { editor = t },
+                            t, catById[t.categoryId], overdue = k == 0, selected = t.id in selected,
+                            onClick = {
+                                if (selected.isNotEmpty()) selected = if (t.id in selected) selected - t.id else selected + t.id
+                                else editor = t
+                            },
+                            onLongClick = { selected = selected + t.id },
                             onToggle = { scope.launch { Reminders.setDone(ctx, t, !t.done) } }
                         )
                     }
@@ -203,6 +225,55 @@ fun Root() {
     }
 
     if (showSettings) SettingsDialog(tick) { showSettings = false }
+    if (showBulkSchedule) {
+        val sel = tasks.filter { it.id in selected }
+        val init = if (sel.isNotEmpty() && sel.all { it.repeat == "SCHEDULE" } && sel.map { it.schedule() }.distinct().size == 1)
+            sel[0].schedule() else emptyMap()
+        BulkScheduleDialog(sel.size, init, onDismiss = { showBulkSchedule = false }, onApply = { m ->
+            showBulkSchedule = false; selected = emptySet()
+            scope.launch {
+                sel.forEach {
+                    Reminders.save(ctx, it.copy(
+                        repeat = "SCHEDULE", slots = encodeSchedule(m), times = "",
+                        days = m.keys.fold(0) { a, d -> a or (1 shl d) }
+                    ))
+                }
+            }
+        })
+    }
+    if (showBulkCat) {
+        AlertDialog(
+            onDismissRequest = { showBulkCat = false },
+            title = { Text("קטגוריה ל-${selected.size} תזכורות") },
+            text = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val choose = { id: Long ->
+                        val sel = tasks.filter { it.id in selected }
+                        showBulkCat = false; selected = emptySet()
+                        scope.launch { sel.forEach { dao.upsert(it.copy(categoryId = id)) } }
+                        Unit
+                    }
+                    FilterChip(false, { choose(0L) }, label = { Text("ללא") })
+                    categories.forEach { c -> FilterChip(false, { choose(c.id) }, label = { Text(c.name) }, leadingIcon = { Dot(c.color) }) }
+                }
+            },
+            confirmButton = { TextButton({ showBulkCat = false }) { Text("סגור") } }
+        )
+    }
+    if (showBulkDelete) {
+        AlertDialog(
+            onDismissRequest = { showBulkDelete = false },
+            title = { Text("למחוק ${selected.size} תזכורות?") },
+            confirmButton = {
+                TextButton({
+                    val sel = tasks.filter { it.id in selected }
+                    showBulkDelete = false; selected = emptySet()
+                    scope.launch { sel.forEach { Reminders.delete(ctx, it) } }
+                }) { Text("מחק", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton({ showBulkDelete = false }) { Text("ביטול") } }
+        )
+    }
     if (showCats) CategoriesDialog(
         categories,
         onAdd = { n, c -> scope.launch { dao.addCategory(Category(name = n, color = c)) } },
@@ -212,13 +283,28 @@ fun Root() {
 }
 
 @Composable
-private fun TaskCard(t: Task, cat: Category?, overdue: Boolean, onClick: () -> Unit, onToggle: () -> Unit) {
+private fun SelectionBar(count: Int, onClose: () -> Unit, onSchedule: () -> Unit, onCategory: () -> Unit, onDelete: () -> Unit) {
+    Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClose) { Icon(Icons.Default.Close, "בטל בחירה") }
+        Text("$count נבחרו", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        IconButton(onSchedule) { Icon(Icons.Default.Edit, "ימים ושעות") }
+        TextButton(onCategory) { Text("קטגוריה") }
+        IconButton(onDelete) { Icon(Icons.Default.Delete, "מחק", tint = MaterialTheme.colorScheme.error) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TaskCard(
+    t: Task, cat: Category?, overdue: Boolean, selected: Boolean,
+    onClick: () -> Unit, onLongClick: () -> Unit, onToggle: () -> Unit
+) {
     val cs = MaterialTheme.colorScheme
-    Card(
-        onClick = onClick,
+    Surface(
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = cs.surface),
+        color = if (selected) cs.primaryContainer else cs.surface,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp)).combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             if (t.repeat == "NONE") {

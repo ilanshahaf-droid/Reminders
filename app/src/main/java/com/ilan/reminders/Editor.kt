@@ -39,6 +39,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
+val DAY_NAMES = listOf("ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת")
 val PALETTE = listOf(0xFF6366F1, 0xFF0EA5E9, 0xFF10B981, 0xFFF59E0B, 0xFFEF4444, 0xFFEC4899, 0xFF8B5CF6)
 private val VIBRATIONS = listOf("STRONG" to "חזק", "SHORT" to "קצר", "PULSE" to "פולסים", "NONE" to "ללא")
 
@@ -54,10 +55,9 @@ fun whenText(ms: Long): String {
 }
 
 fun recurrenceText(t: Task): String = when (t.repeat) {
-    "SCHEDULE" -> {
-        val ds = if (t.days == 127) "כל יום"
-        else (0..6).filter { t.days and (1 shl it) != 0 }.joinToString(" ") { DAY_LETTERS[it] + "׳" }
-        ds + " · " + t.times.replace(",", "  ")
+    "SCHEDULE" -> t.schedule().entries.groupBy({ it.value }, { it.key }).entries.joinToString("\n") { (ts, ds) ->
+        val dt = if (ds.size == 7) "כל יום" else ds.sorted().joinToString(" ") { DAY_LETTERS[it] + "׳" }
+        dt + " · " + ts.joinToString("  ")
     }
     "MONTHLY" -> "כל חודש"
     else -> ""
@@ -116,14 +116,13 @@ fun Editor(
     var notes by remember { mutableStateOf(initial.notes) }
     var repeat by remember { mutableStateOf(initial.repeat) }
     var at by remember { mutableLongStateOf(initial.triggerAt.takeIf { it > 0 } ?: System.currentTimeMillis() + 3_600_000) }
-    var days by remember { mutableIntStateOf(initial.days) }
-    val times = remember { mutableStateListOf<String>().apply { addAll(initial.times.split(",").filter { it.isNotBlank() }) } }
+    val sch = remember { ScheduleState(initial.schedule()) }
     var categoryId by remember { mutableLongStateOf(initial.categoryId) }
     var sound by remember { mutableStateOf(initial.sound) }
     var vibration by remember { mutableStateOf(initial.vibration) }
     var confirmDelete by remember { mutableStateOf(false) }
     val z = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault())
-    val valid = title.isNotBlank() && (repeat != "SCHEDULE" || (days != 0 && times.isNotEmpty()))
+    val valid = title.isNotBlank() && (repeat != "SCHEDULE" || sch.valid())
 
     val soundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
@@ -152,8 +151,8 @@ fun Editor(
                         initial.copy(
                             title = title.trim(), notes = notes.trim(), categoryId = categoryId,
                             triggerAt = if (sched) 0L else at, repeat = repeat,
-                            days = if (sched) days else 0,
-                            times = if (sched) times.sorted().joinToString(",") else "",
+                            days = if (sched) sch.days else 0, times = "",
+                            slots = if (sched) encodeSchedule(sch.build()) else "",
                             sound = sound, vibration = vibration
                         )
                     )
@@ -185,38 +184,11 @@ fun Editor(
             Section("מתי") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(repeat == "NONE", { repeat = "NONE" }, label = { Text("חד-פעמי") })
-                    FilterChip(repeat == "SCHEDULE", {
-                        repeat = "SCHEDULE"
-                        if (days == 0) days = 127
-                        if (times.isEmpty()) times.add("%02d:%02d".format(z.hour, z.minute))
-                    }, label = { Text("ימים ושעות") })
+                    FilterChip(repeat == "SCHEDULE", { repeat = "SCHEDULE" }, label = { Text("ימים ושעות") })
                     FilterChip(repeat == "MONTHLY", { repeat = "MONTHLY" }, label = { Text("חודשי") })
                 }
                 if (repeat == "SCHEDULE") {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        for (i in 0..6) DayCircle(DAY_LETTERS[i], days and (1 shl i) != 0) { days = days xor (1 shl i) }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton({ days = 127 }) { Text("כל יום") }
-                        TextButton({ days = 31 }) { Text("א׳–ה׳") }
-                        TextButton({ days = 96 }) { Text("ו׳–ש׳") }
-                    }
-                    Text("שעות", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        times.sorted().forEach { s ->
-                            InputChip(false, { times.remove(s) }, label = { Text(s) },
-                                trailingIcon = { Icon(Icons.Default.Close, "הסר", Modifier.size(16.dp)) })
-                        }
-                        AssistChip(onClick = {
-                            pickTime(8, 0) { h, m ->
-                                val s = "%02d:%02d".format(h, m)
-                                if (s !in times) times.add(s)
-                            }
-                        }, label = { Text("＋ הוסף שעה") })
-                    }
-                    if (!valid && title.isNotBlank()) {
-                        Text("בחר לפחות יום אחד ושעה אחת", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
+                    ScheduleEditor(sch)
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = {
@@ -326,5 +298,117 @@ fun CategoriesDialog(
             }
         },
         confirmButton = { TextButton(onDismiss) { Text("סגור") } }
+    )
+}
+
+class ScheduleState(initial: Map<Int, List<String>>) {
+    var days by mutableIntStateOf(initial.keys.fold(0) { a, d -> a or (1 shl d) })
+    var diff by mutableStateOf(initial.values.distinct().size > 1)
+    val shared = mutableStateListOf<String>().apply { addAll(initial.values.firstOrNull() ?: emptyList()) }
+    val perDay = mutableStateMapOf<Int, List<String>>().apply { putAll(initial) }
+
+    fun setDays(mask: Int) {
+        days = mask
+        if (diff) for (i in 0..6) {
+            if (mask and (1 shl i) != 0) {
+                if (i !in perDay) perDay[i] = shared.toList()
+            } else perDay.remove(i)
+        }
+    }
+
+    fun toggle(i: Int) = setDays(days xor (1 shl i))
+
+    fun setDiff(v: Boolean) {
+        if (v == diff) return
+        if (v) {
+            for (i in 0..6) if (days and (1 shl i) != 0 && i !in perDay) perDay[i] = shared.toList()
+        } else {
+            val u = perDay.values.flatten().distinct().sorted()
+            shared.clear(); shared.addAll(u)
+        }
+        diff = v
+    }
+
+    fun valid(): Boolean = days != 0 && (
+        if (diff) (0..6).filter { days and (1 shl it) != 0 }.all { perDay[it]?.isNotEmpty() == true }
+        else shared.isNotEmpty()
+    )
+
+    fun build(): Map<Int, List<String>> = (0..6).filter { days and (1 shl it) != 0 }
+        .associateWith { if (diff) (perDay[it] ?: emptyList()).sorted() else shared.sorted() }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TimeChips(times: List<String>, onRemove: (String) -> Unit, onAdd: () -> Unit, modifier: Modifier = Modifier) {
+    FlowRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        times.forEach { s ->
+            InputChip(false, { onRemove(s) }, label = { Text(s) },
+                trailingIcon = { Icon(Icons.Default.Close, "הסר", Modifier.size(16.dp)) })
+        }
+        AssistChip(onClick = onAdd, label = { Text("＋ שעה") })
+    }
+}
+
+@Composable
+fun ScheduleEditor(s: ScheduleState) {
+    val ctx = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    fun pick(onPicked: (String) -> Unit) {
+        TimePickerDialog(ctx, { _, h, m -> onPicked("%02d:%02d".format(h, m)) }, 8, 0, true).show()
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        for (i in 0..6) DayCircle(DAY_LETTERS[i], s.days and (1 shl i) != 0) { s.toggle(i) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton({ s.setDays(127) }) { Text("כל יום") }
+        TextButton({ s.setDays(31) }) { Text("א׳–ה׳") }
+        TextButton({ s.setDays(96) }) { Text("ו׳–ש׳") }
+        TextButton({ s.setDays(0) }) { Text("נקה") }
+    }
+    if (s.days == 0) {
+        Text("בחר את הימים שבהם התזכורת תפעל", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        return
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("שעות שונות לכל יום", Modifier.weight(1f))
+        Switch(s.diff, { s.setDiff(it) })
+    }
+    if (!s.diff) {
+        TimeChips(s.shared.sorted(), onRemove = { s.shared.remove(it) },
+            onAdd = { pick { t -> if (t !in s.shared) s.shared.add(t) } })
+    } else {
+        for (i in 0..6) if (s.days and (1 shl i) != 0) {
+            val list = s.perDay[i] ?: emptyList()
+            Row(verticalAlignment = Alignment.Top) {
+                Text("יום ${DAY_NAMES[i]}", Modifier.width(76.dp).padding(top = 8.dp), fontWeight = FontWeight.SemiBold)
+                TimeChips(list, onRemove = { r -> s.perDay[i] = list - r },
+                    onAdd = { pick { t -> if (t !in list) s.perDay[i] = (list + t).sorted() } }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+    if (!s.valid()) {
+        Text(
+            if (s.diff) "הוסף שעה אחת לפחות לכל יום שנבחר" else "הוסף שעה אחת לפחות",
+            color = cs.error, style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+fun BulkScheduleDialog(count: Int, initial: Map<Int, List<String>>, onApply: (Map<Int, List<String>>) -> Unit, onDismiss: () -> Unit) {
+    val sch = remember { ScheduleState(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ימים ושעות ל-$count תזכורות") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("התזכורות שנבחרו יהפכו לתזכורות שבועיות לפי ההגדרה כאן.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ScheduleEditor(sch)
+            }
+        },
+        confirmButton = { TextButton(enabled = sch.valid(), onClick = { onApply(sch.build()) }) { Text("החל") } },
+        dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
     )
 }

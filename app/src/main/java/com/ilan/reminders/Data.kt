@@ -2,6 +2,8 @@ package com.ilan.reminders
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "categories")
@@ -25,7 +27,9 @@ data class Task(
     val vibration: String = "STRONG",// STRONG, SHORT, PULSE, NONE
     val done: Boolean = false,
     val fired: Boolean = false,
-    val snoozeUntil: Long = 0
+    val snoozeUntil: Long = 0,
+    // per-day schedule: "0=08:00,20:00;2=09:00" (0 = Sunday)
+    @ColumnInfo(defaultValue = "''") val slots: String = ""
 )
 
 @Dao
@@ -58,7 +62,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 2, exportSchema = false)
+@Database(entities = [Task::class, Category::class], version = 3, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
 
@@ -66,8 +70,31 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
+                .addMigrations(MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
     }
 }
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN slots TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+/** weekday (0 = Sunday) -> times. Falls back to the older days + times fields. */
+fun Task.schedule(): Map<Int, List<String>> {
+    if (slots.isNotBlank()) {
+        return slots.split(";").filter { it.contains("=") }.associate {
+            val p = it.split("=", limit = 2)
+            p[0].toInt() to p[1].split(",").filter { x -> x.isNotBlank() }.sorted()
+        }
+    }
+    val ts = times.split(",").filter { it.isNotBlank() }.sorted()
+    return (0..6).filter { days and (1 shl it) != 0 }.associateWith { ts }
+}
+
+fun encodeSchedule(m: Map<Int, List<String>>): String =
+    m.toSortedMap().filter { it.value.isNotEmpty() }.entries
+        .joinToString(";") { "${it.key}=${it.value.sorted().joinToString(",")}" }
