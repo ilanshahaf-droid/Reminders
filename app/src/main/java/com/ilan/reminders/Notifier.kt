@@ -2,34 +2,58 @@ package com.ilan.reminders
 
 import android.Manifest
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import kotlin.math.abs
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
-        Notifier.ensureChannel(this)
+        getSystemService(NotificationManager::class.java).deleteNotificationChannel("reminders_v1")
     }
 }
 
 object Notifier {
-    private const val CH = "reminders_v1"
+    fun patternOf(v: String): LongArray? = when (v) {
+        "STRONG" -> longArrayOf(0, 800, 200, 800, 200, 800)
+        "SHORT" -> longArrayOf(0, 300)
+        "PULSE" -> longArrayOf(0, 150, 100, 150, 100, 150, 100, 150)
+        else -> null
+    }
 
-    fun ensureChannel(c: Context) {
-        val ch = NotificationChannel(CH, "תזכורות", NotificationManager.IMPORTANCE_HIGH).apply {
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 500, 250, 500, 250, 500)
-            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+    /** Android fixes sound and vibration per channel, so each combination gets its own channel. */
+    private fun channelFor(c: Context, t: Task): String {
+        val id = "rem_${t.vibration}_${if (t.sound.isBlank()) "def" else abs(t.sound.hashCode()).toString()}"
+        val nm = c.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(id) == null) {
+            val ch = NotificationChannel(id, "תזכורות (${t.vibration})", NotificationManager.IMPORTANCE_HIGH)
+            val p = patternOf(t.vibration)
+            ch.enableVibration(p != null)
+            if (p != null) ch.vibrationPattern = p
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+            when {
+                t.sound == "silent" -> ch.setSound(null, null)
+                t.sound.isBlank() -> ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), attrs)
+                else -> ch.setSound(Uri.parse(t.sound), attrs)
+            }
+            ch.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            nm.createNotificationChannel(ch)
         }
-        c.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
+        return id
     }
 
     private fun action(c: Context, t: Task, act: String, minutes: Int, n: Int): PendingIntent {
@@ -44,9 +68,8 @@ object Notifier {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
-        ensureChannel(c)
         val open = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(c, CH)
+        val n = NotificationCompat.Builder(c, channelFor(c, t))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(t.title)
             .setContentText(t.notes.ifBlank { "תזכורת" })

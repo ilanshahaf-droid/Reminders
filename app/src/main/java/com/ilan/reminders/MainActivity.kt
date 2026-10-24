@@ -1,8 +1,6 @@
 package com.ilan.reminders
 
 import android.Manifest
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,64 +9,96 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { Root() }
-            }
-        }
+        enableEdgeToEdge()
+        setContent { AppTheme { Root() } }
     }
 }
 
-private val REPEATS = listOf("NONE" to "ללא", "DAILY" to "יומי", "WEEKLY" to "שבועי", "MONTHLY" to "חודשי")
-private val FMT = DateTimeFormatter.ofPattern("EEE, d/M/yyyy HH:mm", Locale("he"))
-private fun fmt(ms: Long) = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).format(FMT)
+private val BUCKETS = listOf("באיחור", "היום", "מחר", "השבוע", "בהמשך", "הושלמו")
+private val SEED = listOf("אישי" to 0xFF6366F1, "עבודה" to 0xFF0EA5E9, "משפחה" to 0xFFF59E0B, "בריאות" to 0xFF10B981)
+
+private fun bucket(t: Task, now: Long): Int {
+    if (t.done) return 5
+    if (t.repeat == "NONE" && t.triggerAt < now) return 0
+    val today = LocalDate.now()
+    val d = Instant.ofEpochMilli(t.triggerAt).atZone(ZoneId.systemDefault()).toLocalDate()
+    return when {
+        d <= today -> 1
+        d == today.plusDays(1) -> 2
+        d < today.plusDays(7) -> 3
+        else -> 4
+    }
+}
+
+private fun newTask(): Task {
+    val z = ZonedDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0)
+    return Task(title = "", triggerAt = z.toInstant().toEpochMilli())
+}
 
 private fun batteryOk(c: Context) =
     c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Root() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = remember { AppDb.get(ctx).dao() }
     val tasks by dao.all().collectAsState(initial = emptyList())
-    var editing by remember { mutableStateOf<Task?>(null) }
+    val categories by dao.categories().collectAsState(initial = emptyList())
+    var editor by remember { mutableStateOf<Task?>(null) }
+    var filter by remember { mutableStateOf<Long?>(null) }
     var showSettings by remember { mutableStateOf(false) }
+    var showCats by remember { mutableStateOf(false) }
     var tick by remember { mutableIntStateOf(0) }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33) permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        val p = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
+        if (!p.getBoolean("seeded", false)) {
+            SEED.forEach { (n, c) -> dao.addCategory(Category(name = n, color = c)) }
+            p.edit().putBoolean("seeded", true).apply()
+        }
     }
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -78,98 +108,155 @@ fun Root() {
         lifecycle.addObserver(obs)
         onDispose { lifecycle.removeObserver(obs) }
     }
+    BackHandler(enabled = editor != null) { editor = null }
     val healthy = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() && batteryOk(ctx) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("תזכורות") },
-                actions = { TextButton(onClick = { showSettings = true }) { Text(if (healthy) "הגדרות" else "⚠ הגדרות") } }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = {
-                val z = ZonedDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0)
-                editing = Task(title = "", triggerAt = z.toInstant().toEpochMilli())
-            }) { Icon(Icons.Default.Add, "הוסף") }
-        }
-    ) { pad ->
-        if (tasks.isEmpty()) {
-            Box(Modifier.padding(pad).fillMaxSize(), Alignment.Center) { Text("אין משימות. לחץ + להוספה") }
-        } else LazyColumn(Modifier.padding(pad)) {
-            items(tasks, key = { it.id }) { t ->
-                ListItem(
-                    modifier = Modifier.clickable { editing = t },
-                    leadingContent = {
-                        Checkbox(checked = t.done, onCheckedChange = { scope.launch { Reminders.setDone(ctx, t, it) } })
-                    },
-                    headlineContent = { Text(t.title) },
-                    supportingContent = {
-                        val rep = REPEATS.first { it.first == t.repeat }.second
-                        Text(fmt(t.triggerAt) + if (t.repeat != "NONE") " · $rep" else "")
-                    },
-                    trailingContent = {
-                        IconButton(onClick = { scope.launch { Reminders.delete(ctx, t) } }) {
-                            Icon(Icons.Default.Delete, "מחק")
+    val e = editor
+    if (e != null) {
+        Editor(
+            initial = e, categories = categories,
+            onManageCategories = { showCats = true },
+            onBack = { editor = null },
+            onSave = { t -> editor = null; scope.launch { Reminders.save(ctx, t) } },
+            onDelete = if (e.id != 0L) ({ editor = null; scope.launch { Reminders.delete(ctx, e) } }) else null
+        )
+    } else {
+        val now = System.currentTimeMillis()
+        val shown = tasks.filter { filter == null || it.categoryId == filter }
+        val groups = shown.groupBy { bucket(it, now) }.toSortedMap()
+        val catById = categories.associateBy { it.id }
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    onClick = { editor = newTask() },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("תזכורת חדשה") }
+                )
+            }
+        ) { pad ->
+            LazyColumn(
+                Modifier.padding(pad).fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 110.dp)
+            ) {
+                item {
+                    Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("תזכורות", style = MaterialTheme.typography.headlineLarge)
+                            val n = tasks.count { !it.done }
+                            Text(
+                                if (n == 0) "אין תזכורות פעילות" else "$n תזכורות פעילות",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton({ showSettings = true }) {
+                            Icon(
+                                if (healthy) Icons.Default.Settings else Icons.Default.Warning, "הגדרות",
+                                tint = if (healthy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+                            )
                         }
                     }
-                )
-                HorizontalDivider()
+                }
+                item {
+                    LazyRow(
+                        Modifier.padding(vertical = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item { FilterChip(filter == null, { filter = null }, label = { Text("הכל") }) }
+                        items(categories, key = { it.id }) { c ->
+                            FilterChip(filter == c.id, { filter = c.id }, label = { Text(c.name) }, leadingIcon = { Dot(c.color) })
+                        }
+                        item { AssistChip(onClick = { showCats = true }, label = { Text("ניהול") }) }
+                    }
+                }
+                if (shown.isEmpty()) {
+                    item {
+                        Box(Modifier.fillParentMaxWidth().padding(top = 80.dp), Alignment.Center) {
+                            Text("אין תזכורות כאן. לחץ על ״תזכורת חדשה״", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                for ((k, list) in groups) {
+                    item(key = "h$k") {
+                        Text(
+                            BUCKETS[k], Modifier.padding(horizontal = 24.dp).padding(top = 12.dp, bottom = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (k == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    items(list.sortedBy { it.triggerAt }, key = { it.id }) { t ->
+                        TaskCard(
+                            t, catById[t.categoryId], overdue = k == 0,
+                            onClick = { editor = t },
+                            onToggle = { scope.launch { Reminders.setDone(ctx, t, !t.done) } }
+                        )
+                    }
+                }
             }
         }
     }
 
-    editing?.let { t ->
-        EditDialog(t, onDismiss = { editing = null }) { saved ->
-            editing = null
-            scope.launch { Reminders.save(ctx, saved) }
-        }
-    }
     if (showSettings) SettingsDialog(tick) { showSettings = false }
+    if (showCats) CategoriesDialog(
+        categories,
+        onAdd = { n, c -> scope.launch { dao.addCategory(Category(name = n, color = c)) } },
+        onDelete = { c -> scope.launch { dao.clearCategory(c.id); dao.deleteCategory(c.id); if (filter == c.id) filter = null } },
+        onDismiss = { showCats = false }
+    )
 }
 
 @Composable
-fun EditDialog(initial: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit) {
-    val ctx = LocalContext.current
-    var title by remember { mutableStateOf(initial.title) }
-    var notes by remember { mutableStateOf(initial.notes) }
-    var at by remember { mutableLongStateOf(initial.triggerAt) }
-    var repeat by remember { mutableStateOf(initial.repeat) }
-    val z = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault())
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (initial.id == 0L) "משימה חדשה" else "עריכה") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("כותרת") }, singleLine = true)
-                OutlinedTextField(notes, { notes = it }, label = { Text("הערות") })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        DatePickerDialog(ctx, { _, y, m, d ->
-                            at = z.withYear(y).withMonth(m + 1).withDayOfMonth(d).toInstant().toEpochMilli()
-                        }, z.year, z.monthValue - 1, z.dayOfMonth).show()
-                    }) { Text("${z.dayOfMonth}/${z.monthValue}/${z.year}") }
-                    OutlinedButton(onClick = {
-                        TimePickerDialog(ctx, { _, h, min ->
-                            at = z.withHour(h).withMinute(min).withSecond(0).withNano(0).toInstant().toEpochMilli()
-                        }, z.hour, z.minute, true).show()
-                    }) { Text("%02d:%02d".format(z.hour, z.minute)) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    REPEATS.forEach { (k, label) ->
-                        FilterChip(selected = repeat == k, onClick = { repeat = k }, label = { Text(label) })
-                    }
+private fun TaskCard(t: Task, cat: Category?, overdue: Boolean, onClick: () -> Unit, onToggle: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = cs.surface),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (t.repeat == "NONE") {
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape)
+                        .background(if (t.done) cs.primary else Color.Transparent)
+                        .border(2.dp, if (t.done) cs.primary else cs.outline, CircleShape)
+                        .clickable(onClick = onToggle),
+                    contentAlignment = Alignment.Center
+                ) { if (t.done) Icon(Icons.Default.Check, null, tint = cs.onPrimary, modifier = Modifier.size(18.dp)) }
+            } else {
+                Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                    Text("↻", color = cs.primary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = title.isNotBlank(), onClick = {
-                onSave(initial.copy(title = title.trim(), notes = notes.trim(), triggerAt = at, repeat = repeat))
-            }) { Text("שמור") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } }
-    )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    t.title, style = MaterialTheme.typography.titleMedium,
+                    textDecoration = if (t.done) TextDecoration.LineThrough else null,
+                    color = if (t.done) cs.onSurfaceVariant else cs.onSurface
+                )
+                Text(
+                    (if (t.repeat != "NONE") "הבא: " else "") + whenText(t.triggerAt),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (overdue) cs.error else cs.onSurfaceVariant
+                )
+                if (t.repeat != "NONE") {
+                    Text(recurrenceText(t), style = MaterialTheme.typography.bodySmall, color = cs.primary)
+                }
+            }
+            if (cat != null) {
+                Row(
+                    Modifier.clip(RoundedCornerShape(50)).background(Color(cat.color).copy(alpha = 0.16f)).padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Dot(cat.color, 8)
+                    Spacer(Modifier.width(6.dp))
+                    Text(cat.name, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
 }
 
 @Composable

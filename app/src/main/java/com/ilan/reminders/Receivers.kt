@@ -26,9 +26,9 @@ class AlarmReceiver : BroadcastReceiver() {
             when {
                 snooze -> dao.upsert(t.copy(snoozeUntil = 0))
                 t.repeat != "NONE" -> {
-                    val next = Reminders.nextAfter(t.triggerAt, t.repeat, System.currentTimeMillis())
-                    dao.upsert(t.copy(triggerAt = next))
-                    Scheduler.set(c, id, next, false)
+                    val n = Reminders.advance(t, System.currentTimeMillis())
+                    dao.upsert(n)
+                    Scheduler.set(c, id, n.triggerAt, false)
                 }
                 else -> dao.upsert(t.copy(fired = true))
             }

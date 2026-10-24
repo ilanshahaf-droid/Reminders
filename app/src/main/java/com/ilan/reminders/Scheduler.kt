@@ -5,10 +5,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 
-/** One main alarm and one snooze alarm per task. Uses setAlarmClock: exempt from Doze and
- *  battery restrictions, and needs no exact-alarm permission. */
+/** One main alarm and one snooze alarm per task. setAlarmClock is exempt from Doze and
+ *  battery restrictions and needs no exact-alarm permission. */
 object Scheduler {
     private fun pi(c: Context, id: Long, snooze: Boolean): PendingIntent {
         val i = Intent(c, AlarmReceiver::class.java)
@@ -30,16 +31,39 @@ object Scheduler {
 }
 
 object Reminders {
-    fun nextAfter(base: Long, repeat: String, now: Long): Long {
-        var z = Instant.ofEpochMilli(base).atZone(ZoneId.systemDefault())
-        do {
-            z = when (repeat) {
-                "DAILY" -> z.plusDays(1)
-                "WEEKLY" -> z.plusWeeks(1)
-                else -> z.plusMonths(1)
+    private val zone get() = ZoneId.systemDefault()
+
+    fun parseTimes(s: String): List<LocalTime> =
+        s.split(",").filter { it.isNotBlank() }.map { LocalTime.parse(it.trim()) }.sorted()
+
+    /** Next moment after [after] that matches the task's weekdays and times. */
+    fun nextOccurrence(t: Task, after: Long): Long? {
+        val times = parseTimes(t.times)
+        if (t.days == 0 || times.isEmpty()) return null
+        val start = Instant.ofEpochMilli(after).atZone(zone).toLocalDate()
+        for (d in 0..8) {
+            val date = start.plusDays(d.toLong())
+            val bit = date.dayOfWeek.value % 7 // Sunday(7) -> 0, Monday -> 1 ... Saturday -> 6
+            if (t.days and (1 shl bit) == 0) continue
+            for (tm in times) {
+                val ms = date.atTime(tm).atZone(zone).toInstant().toEpochMilli()
+                if (ms > after) return ms
             }
-        } while (z.toInstant().toEpochMilli() <= now)
+        }
+        return null
+    }
+
+    private fun monthlyAfter(base: Long, now: Long): Long {
+        var z = Instant.ofEpochMilli(base).atZone(zone)
+        do { z = z.plusMonths(1) } while (z.toInstant().toEpochMilli() <= now)
         return z.toInstant().toEpochMilli()
+    }
+
+    /** Moves a recurring task to its next occurrence. */
+    fun advance(t: Task, now: Long): Task = when (t.repeat) {
+        "SCHEDULE" -> nextOccurrence(t, maxOf(now, t.triggerAt))?.let { t.copy(triggerAt = it) } ?: t
+        "MONTHLY" -> t.copy(triggerAt = monthlyAfter(t.triggerAt, now))
+        else -> t
     }
 
     private fun scheduleMain(c: Context, t: Task) {
@@ -49,7 +73,10 @@ object Reminders {
 
     suspend fun save(c: Context, task: Task) {
         val dao = AppDb.get(c).dao()
-        val t = task.copy(done = false, fired = false, snoozeUntil = 0)
+        val now = System.currentTimeMillis()
+        var t = task.copy(done = false, fired = false, snoozeUntil = 0)
+        if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
+        if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
         val id = dao.upsert(t)
         val saved = t.copy(id = id)
         Scheduler.cancel(c, id, true)
@@ -84,7 +111,7 @@ object Reminders {
         for (t0 in dao.active()) {
             var t = t0
             if (t.repeat != "NONE" && t.triggerAt <= now) {
-                t = t.copy(triggerAt = nextAfter(t.triggerAt, t.repeat, now))
+                t = advance(t, now)
                 dao.upsert(t)
             }
             if (t.repeat != "NONE" || !t.fired) scheduleMain(c, t) // missed one-offs fire right away
