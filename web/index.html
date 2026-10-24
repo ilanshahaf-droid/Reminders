@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>תזכורות</title>
+<style>
+:root{--bg1:#f8f8fd;--bg2:#ebe9fa;--card:#fdfdff;--text:#14161f;--sub:#626880;--accent:#4f46e5;--err:#dc2626;--line:#d9dbe6}
+@media (prefers-color-scheme:dark){:root{--bg1:#0e1015;--bg2:#15142a;--card:#1a1d26;--text:#e8eaf2;--sub:#9aa0b8;--accent:#9ea0ff;--err:#ff6b6b;--line:#2f3345}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:var(--text);background:linear-gradient(var(--bg1),var(--bg2)) fixed}
+.wrap{max-width:760px;margin:0 auto;padding:20px 14px 60px}
+h1{font-size:40px;margin:8px 0 2px}
+.sub{color:var(--sub);font-size:18px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:12px}
+input,button{font:inherit}
+input{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);margin:6px 0}
+button{border:0;border-radius:14px;padding:10px 16px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600}
+button.ghost{background:transparent;color:var(--accent)}
+.panel{background:var(--card);border-radius:24px;padding:20px;box-shadow:0 1px 3px #0002}
+.err{color:var(--err);min-height:1.2em}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chip{padding:8px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);cursor:pointer;display:flex;gap:6px;align-items:center}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+h2{font-size:21px;margin:22px 8px 6px}
+h2.late{color:var(--err)}
+.card{background:var(--card);border-radius:26px;padding:18px 20px;margin:8px 0;display:flex;gap:16px;align-items:flex-start;box-shadow:0 1px 3px #0001}
+.ck{flex:none;width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700}
+.ck.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.main{flex:1;min-width:0}
+.title{font-size:23px}
+.done .title{text-decoration:line-through;color:var(--sub)}
+.when{font-size:18px;color:var(--sub)}
+.when.late{color:var(--err)}
+.rec{font-size:16px;color:var(--accent);white-space:pre-line}
+.notes{font-size:16px;color:var(--sub)}
+.tag{flex:none;font-size:14px;padding:5px 12px;border-radius:999px;display:flex;gap:6px;align-items:center}
+.empty{text-align:center;color:var(--sub);padding:50px 0;font-size:18px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="setup" class="panel hide">
+  <h1 style="font-size:30px">הגדרה ראשונית</h1>
+  <p class="sub">הדבק את הפרטים מ-Supabase (Project Settings ← API). הם נשמרים בדפדפן הזה בלבד.</p>
+  <input id="cfgUrl" placeholder="Project URL (https://xxxx.supabase.co)" dir="ltr">
+  <input id="cfgKey" placeholder="anon / publishable key" dir="ltr">
+  <button onclick="saveCfg()">המשך</button>
+</div>
+
+<div id="login" class="panel hide">
+  <h1 style="font-size:30px">התחברות</h1>
+  <input id="em" type="email" placeholder="אימייל" dir="ltr" autocomplete="username">
+  <input id="pw" type="password" placeholder="סיסמה" dir="ltr" autocomplete="current-password">
+  <div class="err" id="loginErr"></div>
+  <button onclick="doLogin()">התחבר</button>
+  <button class="ghost" onclick="resetCfg()">שינוי פרטי חיבור</button>
+</div>
+
+<div id="app" class="hide">
+  <div class="top">
+    <div><h1>תזכורות</h1><div class="sub" id="count"></div></div>
+    <button class="ghost" onclick="logout()">התנתק</button>
+  </div>
+  <input id="q" placeholder="חיפוש" oninput="render()">
+  <div class="chips" id="chips"></div>
+  <div id="list"></div>
+  <div class="sub" id="upd" style="text-align:center;margin-top:20px;font-size:14px"></div>
+</div>
+
+</div>
+<script>
+const LS = localStorage;
+let cfg = JSON.parse(LS.getItem('cfg') || '{}');
+let sess = JSON.parse(LS.getItem('sess') || 'null');
+let tasks = [], cats = [], filter = null, timer = null;
+const $ = id => document.getElementById(id);
+const DAY_L = ['א','ב','ג','ד','ה','ו','ש'];
+const BUCKETS = ['באיחור','היום','מחר','השבוע','בהמשך','הושלמו'];
+
+function view(name){ for (const v of ['setup','login','app']) $(v).classList.toggle('hide', v !== name); }
+function saveCfg(){
+  const u = $('cfgUrl').value.trim().replace(/\/+$/,''), k = $('cfgKey').value.trim();
+  if(!u || !k) return;
+  cfg = {url:u, key:k}; LS.setItem('cfg', JSON.stringify(cfg)); start();
+}
+function resetCfg(){ LS.removeItem('cfg'); LS.removeItem('sess'); cfg = {}; sess = null; start(); }
+function logout(){ LS.removeItem('sess'); sess = null; clearInterval(timer); start(); }
+
+async function tokenCall(grant, body){
+  const r = await fetch(cfg.url + '/auth/v1/token?grant_type=' + grant, {
+    method:'POST', headers:{apikey:cfg.key,'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(!r.ok) return null;
+  sess = await r.json(); LS.setItem('sess', JSON.stringify(sess)); return sess;
+}
+async function doLogin(){
+  $('loginErr').textContent = '';
+  const ok = await tokenCall('password', {email:$('em').value.trim(), password:$('pw').value});
+  if(!ok){ $('loginErr').textContent = 'התחברות נכשלה'; return; }
+  start();
+}
+async function api(path, retry = true){
+  const r = await fetch(cfg.url + path, {headers:{apikey:cfg.key, Authorization:'Bearer ' + (sess ? sess.access_token : '')}});
+  if(r.status === 401 && retry && sess && sess.refresh_token){
+    if(await tokenCall('refresh_token', {refresh_token:sess.refresh_token})) return api(path, false);
+    sess = null; LS.removeItem('sess');
+  }
+  return r;
+}
+async function load(){
+  try{
+    const [t, c] = await Promise.all([api('/rest/v1/rem_tasks?select=*&order=trigger_at'), api('/rest/v1/rem_categories?select=*&order=id')]);
+    if(!t.ok || !c.ok){ view('login'); return; }
+    tasks = await t.json(); cats = await c.json();
+    $('upd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+    render();
+  }catch(e){ $('upd').textContent = 'שגיאת רשת'; }
+}
+function start(){
+  clearInterval(timer);
+  if(!cfg.url){ view('setup'); return; }
+  if(!sess){ view('login'); return; }
+  view('app'); load(); timer = setInterval(load, 30000);
+}
+
+function schedule(t){
+  if(t.slots){
+    const m = {};
+    t.slots.split(';').forEach(p => { const [d, ts] = p.split('='); if(ts) m[+d] = ts.split(',').filter(Boolean); });
+    return m;
+  }
+  const ts = (t.times || '').split(',').filter(Boolean), m = {};
+  for(let i = 0; i < 7; i++) if(t.days & (1 << i)) m[i] = ts;
+  return m;
+}
+function recText(t){
+  if(t.repeat_mode === 'MONTHLY') return 'כל חודש';
+  if(t.repeat_mode !== 'SCHEDULE') return '';
+  const groups = {};
+  Object.entries(schedule(t)).forEach(([d, ts]) => { const k = ts.join('  '); (groups[k] = groups[k] || []).push(+d); });
+  return Object.entries(groups).map(([k, ds]) => (ds.length === 7 ? 'כל יום' : ds.sort().map(d => DAY_L[d] + '׳').join(' ')) + ' · ' + k).join('\n');
+}
+const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+function whenText(ms){
+  const d = new Date(ms), diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 864e5);
+  const time = d.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', hour12:false});
+  if(diff === 0) return 'היום ' + time;
+  if(diff === 1) return 'מחר ' + time;
+  return d.toLocaleDateString('he-IL', {weekday:'short', day:'numeric', month:'numeric'}) + ' ' + time;
+}
+function bucket(t, now){
+  if(t.done) return 5;
+  if(t.repeat_mode === 'NONE' && t.trigger_at < now) return 0;
+  const diff = Math.round((startOfDay(new Date(t.trigger_at)) - startOfDay(new Date())) / 864e5);
+  return diff <= 0 ? 1 : diff === 1 ? 2 : diff < 7 ? 3 : 4;
+}
+function colorOf(n){ return '#' + (Number(BigInt.asUintN(32, BigInt(n)) & 0xFFFFFFn)).toString(16).padStart(6, '0'); }
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+
+function render(){
+  const now = Date.now(), q = $('q').value.trim().toLowerCase();
+  $('count').textContent = tasks.filter(t => !t.done).length + ' תזכורות פעילות';
+  const chips = $('chips'); chips.innerHTML = '';
+  const mk = (label, id, color) => {
+    const c = el('div', 'chip' + (filter === id ? ' on' : ''));
+    if(color){ const d = el('span', 'dot'); d.style.background = color; c.appendChild(d); }
+    c.appendChild(document.createTextNode(label)); c.onclick = () => { filter = id; render(); }; chips.appendChild(c);
+  };
+  mk('הכל', null); cats.forEach(c => mk(c.name, c.id, colorOf(c.color)));
+  const byCat = Object.fromEntries(cats.map(c => [c.id, c]));
+  const shown = tasks.filter(t => (filter === null || t.category_id === filter) &&
+    (!q || (t.title + ' ' + t.notes).toLowerCase().includes(q)));
+  const list = $('list'); list.innerHTML = '';
+  if(!shown.length){ list.appendChild(el('div', 'empty', 'אין תזכורות')); return; }
+  const groups = {};
+  shown.forEach(t => (groups[bucket(t, now)] = groups[bucket(t, now)] || []).push(t));
+  Object.keys(groups).sort().forEach(k => {
+    list.appendChild(el('h2', k == 0 ? 'late' : '', BUCKETS[k]));
+    groups[k].sort((a, b) => a.trigger_at - b.trigger_at).forEach(t => {
+      const card = el('div', 'card' + (t.done ? ' done' : ''));
+      card.appendChild(el('div', 'ck' + (t.done ? ' done' : ''), t.done ? '✓' : (t.repeat_mode !== 'NONE' ? '↻' : '')));
+      const main = el('div', 'main');
+      main.appendChild(el('div', 'title', t.title));
+      main.appendChild(el('div', 'when' + (k == 0 ? ' late' : ''), (t.repeat_mode !== 'NONE' ? 'הבא: ' : '') + whenText(t.trigger_at)));
+      const rec = recText(t); if(rec) main.appendChild(el('div', 'rec', '↻ ' + rec));
+      if(t.notes) main.appendChild(el('div', 'notes', t.notes));
+      card.appendChild(main);
+      const cat = byCat[t.category_id];
+      if(cat){
+        const tag = el('div', 'tag'); const col = colorOf(cat.color);
+        tag.style.background = col + '29';
+        const d = el('span', 'dot'); d.style.background = col; tag.appendChild(d); tag.appendChild(document.createTextNode(cat.name));
+        card.appendChild(tag);
+      }
+      list.appendChild(card);
+    });
+  });
+}
+start();
+</script>
+</body>
+</html>

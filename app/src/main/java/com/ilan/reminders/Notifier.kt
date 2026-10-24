@@ -70,7 +70,7 @@ object Notifier {
         ) return
         val open = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(c, channelFor(c, t))
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_stat)
             .setContentTitle(t.title)
             .setContentText(t.notes.ifBlank { "תזכורת" })
             .setPriority(NotificationCompat.PRIORITY_HIGH)

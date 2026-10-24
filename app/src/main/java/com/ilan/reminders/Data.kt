@@ -52,6 +52,12 @@ interface TaskDao {
     @Query("SELECT * FROM categories ORDER BY id")
     fun categories(): Flow<List<Category>>
 
+    @Query("SELECT * FROM tasks")
+    suspend fun allNow(): List<Task>
+
+    @Query("SELECT * FROM categories")
+    suspend fun categoriesNow(): List<Category>
+
     @Insert
     suspend fun addCategory(c: Category): Long
 

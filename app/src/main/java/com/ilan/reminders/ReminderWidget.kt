@@ -20,6 +20,7 @@ class ReminderWidget : AppWidgetProvider() {
             val m = AppWidgetManager.getInstance(c)
             val ids = m.getAppWidgetIds(ComponentName(c, ReminderWidget::class.java))
             if (ids.isNotEmpty()) render(c, m, ids)
+            Sync.schedulePush(c)
         }
 
         private fun render(c: Context, m: AppWidgetManager, ids: IntArray) {
