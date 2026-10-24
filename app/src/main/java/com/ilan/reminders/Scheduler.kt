@@ -81,6 +81,7 @@ object Reminders {
         val saved = t.copy(id = id)
         Scheduler.cancel(c, id, true)
         scheduleMain(c, saved)
+        ReminderWidget.refreshNow(c)
     }
 
     suspend fun setDone(c: Context, t: Task, done: Boolean) {
@@ -95,6 +96,7 @@ object Reminders {
             dao.upsert(n)
             scheduleMain(c, n)
         }
+        ReminderWidget.refreshNow(c)
     }
 
     suspend fun delete(c: Context, t: Task) {
@@ -102,6 +104,7 @@ object Reminders {
         Scheduler.cancel(c, t.id, true)
         Notifier.cancel(c, t.id)
         AppDb.get(c).dao().delete(t.id)
+        ReminderWidget.refreshNow(c)
     }
 
     /** After boot, app update, time or timezone change. */

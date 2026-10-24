@@ -1,1 +1,4 @@
-<resources><string name="app_name">תזכורות</string></resources>
+<resources>
+    <string name="app_name">תזכורות</string>
+    <string name="widget_desc">התזכורות הקרובות שלך</string>
+</resources>

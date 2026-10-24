@@ -7,10 +7,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private fun BroadcastReceiver.async(block: suspend () -> Unit) {
+private fun BroadcastReceiver.async(c: Context, block: suspend () -> Unit) {
     val p = goAsync()
     CoroutineScope(Dispatchers.IO).launch {
-        try { block() } finally { p.finish() }
+        try { block(); ReminderWidget.refreshNow(c) } finally { p.finish() }
     }
 }
 
@@ -18,7 +18,7 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val id = i.getLongExtra("id", -1)
         val snooze = i.getBooleanExtra("snooze", false)
-        async {
+        async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
             if (t.done) return@async
@@ -41,7 +41,7 @@ class ActionReceiver : BroadcastReceiver() {
         val id = i.getLongExtra("id", -1)
         val minutes = i.getIntExtra("minutes", 10)
         val act = i.action
-        async {
+        async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
             Notifier.cancel(c, id)
@@ -62,6 +62,6 @@ class ActionReceiver : BroadcastReceiver() {
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
-        async { Reminders.rescheduleAll(c) }
+        async(c) { Reminders.rescheduleAll(c) }
     }
 }

@@ -94,6 +94,11 @@ fun Root() {
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33) permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        val act = ctx as? android.app.Activity
+        if (act?.intent?.getBooleanExtra("new", false) == true) {
+            act.intent.removeExtra("new")
+            editor = newTask()
+        }
         val p = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
         if (!p.getBoolean("seeded", false)) {
             SEED.forEach { (n, c) -> dao.addCategory(Category(name = n, color = c)) }
