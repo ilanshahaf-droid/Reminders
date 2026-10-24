@@ -307,7 +307,7 @@ class ScheduleState(initial: Map<Int, List<String>>) {
     val shared = mutableStateListOf<String>().apply { addAll(initial.values.firstOrNull() ?: emptyList()) }
     val perDay = mutableStateMapOf<Int, List<String>>().apply { putAll(initial) }
 
-    fun setDays(mask: Int) {
+    fun applyDays(mask: Int) {
         days = mask
         if (diff) for (i in 0..6) {
             if (mask and (1 shl i) != 0) {
@@ -316,9 +316,9 @@ class ScheduleState(initial: Map<Int, List<String>>) {
         }
     }
 
-    fun toggle(i: Int) = setDays(days xor (1 shl i))
+    fun toggle(i: Int) = applyDays(days xor (1 shl i))
 
-    fun setDiff(v: Boolean) {
+    fun applyDiff(v: Boolean) {
         if (v == diff) return
         if (v) {
             for (i in 0..6) if (days and (1 shl i) != 0 && i !in perDay) perDay[i] = shared.toList()
@@ -361,10 +361,10 @@ fun ScheduleEditor(s: ScheduleState) {
         for (i in 0..6) DayCircle(DAY_LETTERS[i], s.days and (1 shl i) != 0) { s.toggle(i) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton({ s.setDays(127) }) { Text("כל יום") }
-        TextButton({ s.setDays(31) }) { Text("א׳–ה׳") }
-        TextButton({ s.setDays(96) }) { Text("ו׳–ש׳") }
-        TextButton({ s.setDays(0) }) { Text("נקה") }
+        TextButton({ s.applyDays(127) }) { Text("כל יום") }
+        TextButton({ s.applyDays(31) }) { Text("א׳–ה׳") }
+        TextButton({ s.applyDays(96) }) { Text("ו׳–ש׳") }
+        TextButton({ s.applyDays(0) }) { Text("נקה") }
     }
     if (s.days == 0) {
         Text("בחר את הימים שבהם התזכורת תפעל", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -372,7 +372,7 @@ fun ScheduleEditor(s: ScheduleState) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("שעות שונות לכל יום", Modifier.weight(1f))
-        Switch(s.diff, { s.setDiff(it) })
+        Switch(s.diff, { s.applyDiff(it) })
     }
     if (!s.diff) {
         TimeChips(s.shared.sorted(), onRemove = { s.shared.remove(it) },
