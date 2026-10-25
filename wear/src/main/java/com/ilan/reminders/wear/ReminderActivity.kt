@@ -100,6 +100,7 @@ class ReminderActivity : ComponentActivity() {
             title = "נדחה ל-${f.snooze} דק׳"
             sub = "יופיע שוב ב-%02d:%02d".format(at.hour, at.minute)
         }
+        if (action != "DONE") postSnoozeNote(f, sub)
         if (leaving) {
             android.widget.Toast.makeText(applicationContext, if (sub.isEmpty()) title else "$title · $sub", android.widget.Toast.LENGTH_LONG).show()
             finish()
@@ -107,6 +108,26 @@ class ReminderActivity : ComponentActivity() {
             result.value = title to sub
             android.os.Handler(mainLooper).postDelayed({ finish() }, 1800)
         }
+    }
+
+    private fun postSnoozeNote(f: Fire, sub: String) {
+        val nm = getSystemService(NotificationManager::class.java)
+        val ch = "watch_snooze"
+        if (nm.getNotificationChannel(ch) == null) {
+            val c = android.app.NotificationChannel(ch, "תזכורות בנודניק", NotificationManager.IMPORTANCE_LOW)
+            c.setSound(null, null); c.enableVibration(false)
+            nm.createNotificationChannel(c)
+        }
+        val at = sub.removePrefix("יופיע שוב ב-")
+        val n = androidx.core.app.NotificationCompat.Builder(this, ch)
+            .setSmallIcon(R.drawable.ic_stat)
+            .setColor(0xFF6D4AFF.toInt())
+            .setContentTitle(f.title)
+            .setContentText("(במצב נודניק עד $at)")
+            .setSilent(true)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(ReminderListenerService.snoozeNoteId(f.id), n)
     }
 
     companion object {

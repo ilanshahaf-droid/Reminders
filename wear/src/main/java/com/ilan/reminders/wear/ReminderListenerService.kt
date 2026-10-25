@@ -18,7 +18,7 @@ class ReminderListenerService : WearableListenerService() {
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
         when (e.path) {
             "/reminder/fire" -> fire(j)
-            "/reminder/dismiss" -> dismiss(j.optLong("id"))
+            "/reminder/dismiss" -> dismiss(j.optLong("id"), j.optBoolean("done"))
         }
     }
 
@@ -33,6 +33,7 @@ class ReminderListenerService : WearableListenerService() {
 
     private fun fire(j: JSONObject) {
         val id = j.optLong("id")
+        getSystemService(NotificationManager::class.java).cancel(snoozeNoteId(id))
         val intent = Intent(this, ReminderActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .putExtra("id", id)
@@ -68,8 +69,10 @@ class ReminderListenerService : WearableListenerService() {
         runCatching { startActivity(intent) }
     }
 
-    private fun dismiss(id: Long) {
-        getSystemService(NotificationManager::class.java).cancel(id.toInt())
+    private fun dismiss(id: Long, done: Boolean) {
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.cancel(id.toInt())
+        if (done) nm.cancel(snoozeNoteId(id))
         ReminderActivity.current?.get()?.let { a ->
             if (a.shows(id)) a.runOnUiThread { a.finish() }
         }
@@ -77,5 +80,6 @@ class ReminderListenerService : WearableListenerService() {
 
     companion object {
         private const val CH = "watch_reminders"
+        fun snoozeNoteId(id: Long) = id.toInt() xor 0x40000000
     }
 }

@@ -45,6 +45,7 @@ class ActionReceiver : BroadcastReceiver() {
         async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
+            Notifier.dismissReminder(c, id)
             if (act == "DONE") {
                 Scheduler.cancel(c, id, true)
                 if (t.repeat == "NONE") {
@@ -59,7 +60,7 @@ class ActionReceiver : BroadcastReceiver() {
                 val hm = java.time.LocalTime.now().plusMinutes(minutes.toLong())
                 Notifier.showResult(c, t, "נדחה ל-$minutes דק׳ · יופיע שוב ב-%02d:%02d".format(hm.hour, hm.minute))
             }
-            WearBridge.dismiss(c, id)
+            WearBridge.dismiss(c, id, act == "DONE")
         }
     }
 }

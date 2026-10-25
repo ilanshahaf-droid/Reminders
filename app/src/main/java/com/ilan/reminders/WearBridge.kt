@@ -59,7 +59,8 @@ object WearBridge {
         }
     }
 
-    fun dismiss(c: Context, id: Long) = send(c, "/reminder/dismiss", JSONObject().put("id", id).toString())
+    fun dismiss(c: Context, id: Long, done: Boolean = false) =
+        send(c, "/reminder/dismiss", JSONObject().put("id", id).put("done", done).toString())
 }
 
 /** Receives "done" / "snooze" taps made on the watch and reuses the notification action logic. */

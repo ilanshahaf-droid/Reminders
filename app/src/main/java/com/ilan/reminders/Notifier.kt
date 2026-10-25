@@ -112,6 +112,7 @@ object Notifier {
             .addAction(done)
             .addAction(snooze)
             .build()
+        NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
     }
 
@@ -129,12 +130,20 @@ object Notifier {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSilent(true)
             .setOnlyAlertOnce(true)
-            .setTimeoutAfter(10_000)
+            .setLocalOnly(true)
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()
-        NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
+        NotificationManagerCompat.from(c).notify(resultId(t.id), n)
     }
 
-    fun cancel(c: Context, id: Long) = NotificationManagerCompat.from(c).cancel(id.toInt())
+    /** Separate id from the reminder itself, so the watch cancelling the reminder (same package+id) can't remove it. */
+    private fun resultId(id: Long) = id.toInt() xor 0x20000000
+
+    fun dismissReminder(c: Context, id: Long) = NotificationManagerCompat.from(c).cancel(id.toInt())
+
+    fun cancel(c: Context, id: Long) {
+        NotificationManagerCompat.from(c).cancel(id.toInt())
+        NotificationManagerCompat.from(c).cancel(resultId(id))
+    }
 }
