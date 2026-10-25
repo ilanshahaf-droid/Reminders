@@ -9,6 +9,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Path
+import android.graphics.RectF
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.net.Uri
@@ -64,22 +68,49 @@ object Notifier {
         )
     }
 
+    /** App icon (violet rounded square with the bell) for the large notification icon. */
+    private fun largeIcon(c: Context): Bitmap {
+        val size = 192
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val cv = Canvas(bmp)
+        val clip = Path()
+        clip.addRoundRect(RectF(0f, 0f, size.toFloat(), size.toFloat()), 44f, 44f, Path.Direction.CW)
+        cv.clipPath(clip)
+        ContextCompat.getDrawable(c, R.drawable.ic_launcher_background)?.let {
+            it.setBounds(0, 0, size, size); it.draw(cv)
+        }
+        val pad = (size * 0.2).toInt()
+        ContextCompat.getDrawable(c, R.drawable.ic_launcher_foreground)?.let {
+            it.setBounds(-pad, -pad, size + pad, size + pad); it.draw(cv)
+        }
+        return bmp
+    }
+
     fun show(c: Context, t: Task) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
         val open = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val minutes = c.getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
+        val now = java.time.LocalTime.now()
+        val time = "%02d:%02d".format(now.hour, now.minute)
+        val text = if (t.notes.isBlank()) time else "$time · ${t.notes}"
+        val done = NotificationCompat.Action.Builder(R.drawable.ic_check, "הושלמה", action(c, t, "DONE", 0, 1)).build()
+        val snooze = NotificationCompat.Action.Builder(R.drawable.ic_snooze, "נודניק", action(c, t, "SNOOZE", minutes, 2)).build()
         val n = NotificationCompat.Builder(c, channelFor(c, t))
             .setSmallIcon(R.drawable.ic_stat)
+            .setColor(0xFF6D4AFF.toInt())
+            .setLargeIcon(largeIcon(c))
             .setContentTitle(t.title)
-            .setContentText(t.notes.ifBlank { "תזכורת" })
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(open)
-            .addAction(0, "בוצע", action(c, t, "DONE", 0, 1))
-            .addAction(0, "דחה 10 דק׳", action(c, t, "SNOOZE", 10, 2))
-            .addAction(0, "דחה שעה", action(c, t, "SNOOZE", 60, 3))
+            .setAutoCancel(true)
+            .addAction(done)
+            .addAction(snooze)
             .build()
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
     }

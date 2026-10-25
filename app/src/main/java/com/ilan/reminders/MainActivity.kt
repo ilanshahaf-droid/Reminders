@@ -22,6 +22,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -435,6 +437,7 @@ private fun TaskCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
@@ -444,7 +447,16 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text("הגדרות אמינות") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
+                var snooze by remember { mutableIntStateOf(prefs.getInt("snoozeMin", 10)) }
+                Text("נודניק (בדקות)")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 15, 30, 60).forEach { m ->
+                        FilterChip(snooze == m, { snooze = m; prefs.edit().putInt("snoozeMin", m).apply() }, label = { Text("$m") })
+                    }
+                }
+                HorizontalDivider()
                 Text((if (notifOk) "✅" else "❌") + " התראות מופעלות")
                 if (!notifOk) Button(onClick = {
                     ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
