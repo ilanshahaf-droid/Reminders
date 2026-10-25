@@ -21,6 +21,7 @@ class ReminderWidget : AppWidgetProvider() {
             val ids = m.getAppWidgetIds(ComponentName(c, ReminderWidget::class.java))
             if (ids.isNotEmpty()) render(c, m, ids)
             Sync.schedulePush(c)
+            WearBridge.pushList(c)
         }
 
         private fun render(c: Context, m: AppWidgetManager, ids: IntArray) {

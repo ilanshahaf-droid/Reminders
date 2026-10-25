@@ -129,6 +129,7 @@ fun Root() {
             p.edit().putBoolean("seeded", true).apply()
         }
         Sync.schedulePush(ctx)
+        WearBridge.pushList(ctx)
     }
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {

@@ -6,6 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONObject
@@ -16,6 +19,15 @@ class ReminderListenerService : WearableListenerService() {
         when (e.path) {
             "/reminder/fire" -> fire(j)
             "/reminder/dismiss" -> dismiss(j.optLong("id"))
+        }
+    }
+
+    override fun onDataChanged(events: DataEventBuffer) {
+        for (ev in events) {
+            if (ev.type == DataEvent.TYPE_CHANGED && ev.dataItem.uri.path == "/tasks") {
+                val json = DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
+                TaskStore.update(this, json)
+            }
         }
     }
 

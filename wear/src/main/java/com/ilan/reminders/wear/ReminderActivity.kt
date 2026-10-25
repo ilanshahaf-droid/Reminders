@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ data class Fire(val id: Long, val title: String, val notes: String, val time: St
 
 class ReminderActivity : ComponentActivity() {
     private val fire = mutableStateOf<Fire?>(null)
+    private var acted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +45,13 @@ class ReminderActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         fire.value = parse(intent)
         current = WeakReference(this)
+        // the watch's Back button counts as "snooze"
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val f = fire.value
+                if (f != null) act(f, "SNOOZE") else finish()
+            }
+        })
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -57,7 +66,15 @@ class ReminderActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        acted = false
         fire.value = parse(intent)
+    }
+
+    // pressing the Home button (leaving the screen without choosing) also counts as "snooze"
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        val f = fire.value
+        if (f != null && !acted) act(f, "SNOOZE")
     }
 
     override fun onDestroy() {
@@ -68,6 +85,8 @@ class ReminderActivity : ComponentActivity() {
     fun shows(id: Long) = fire.value?.id == id
 
     private fun act(f: Fire, action: String) {
+        if (acted) return
+        acted = true
         WatchBridge.send(this, "/reminder/action", JSONObject().put("id", f.id).put("action", action).toString())
         getSystemService(NotificationManager::class.java).cancel(f.id.toInt())
         finish()

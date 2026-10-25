@@ -3,8 +3,13 @@ package com.ilan.reminders
 import android.content.Context
 import android.content.Intent
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalTime
 
@@ -30,12 +35,36 @@ object WearBridge {
         )
     }
 
+    /** Sends the active task list to the watch as a Data Layer item (delivered even if the watch is offline now). */
+    fun pushList(c: Context) {
+        val app = c.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val now = System.currentTimeMillis()
+                val arr = JSONArray()
+                AppDb.get(app).dao().active().sortedBy { it.triggerAt }.take(30).forEach { t ->
+                    arr.put(
+                        JSONObject().put("id", t.id).put("title", t.title).put("when", whenText(t.triggerAt))
+                            .put("rec", recurrenceText(t).replace("\n", " | "))
+                            .put("overdue", t.repeat == "NONE" && t.triggerAt < now)
+                    )
+                }
+                val req = PutDataMapRequest.create("/tasks").apply {
+                    dataMap.putString("json", arr.toString())
+                    dataMap.putLong("ts", now)
+                }.asPutDataRequest().setUrgent()
+                Wearable.getDataClient(app).putDataItem(req)
+            }
+        }
+    }
+
     fun dismiss(c: Context, id: Long) = send(c, "/reminder/dismiss", JSONObject().put("id", id).toString())
 }
 
 /** Receives "done" / "snooze" taps made on the watch and reuses the notification action logic. */
 class WearActionService : WearableListenerService() {
     override fun onMessageReceived(e: MessageEvent) {
+        if (e.path == "/tasks/request") { WearBridge.pushList(this); return }
         if (e.path != "/reminder/action") return
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
         val minutes = getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
