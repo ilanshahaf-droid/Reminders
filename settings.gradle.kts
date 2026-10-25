@@ -7,3 +7,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Reminders"
 include(":app")
+include(":wear")

@@ -15,8 +15,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - run: gradle assembleDebug --no-daemon
+      - name: Build phone app
+        run: gradle :app:assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: reminders-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Build watch app
+        id: wear
+        continue-on-error: true
+        run: gradle :wear:assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: steps.wear.outcome == 'success'
+        with:
+          name: reminders-watch-apk
+          path: wear/build/outputs/apk/debug/wear-debug.apk
+      - name: Fail if the watch build failed
+        if: steps.wear.outcome == 'failure'
+        run: echo "watch build failed - phone APK is still available" && exit 1

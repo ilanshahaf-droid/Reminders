@@ -23,6 +23,7 @@ class AlarmReceiver : BroadcastReceiver() {
             val t = dao.get(id) ?: return@async
             if (t.done) return@async
             Notifier.show(c, t)
+            WearBridge.fire(c, t)
             when {
                 snooze -> dao.upsert(t.copy(snoozeUntil = 0))
                 t.repeat != "NONE" -> {
@@ -56,6 +57,7 @@ class ActionReceiver : BroadcastReceiver() {
                 dao.upsert(t.copy(snoozeUntil = at))
                 Scheduler.set(c, id, at, true)
             }
+            WearBridge.dismiss(c, id)
         }
     }
 }
