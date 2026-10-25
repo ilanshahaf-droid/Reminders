@@ -28,9 +28,10 @@ object WearBridge {
 
     fun fire(c: Context, t: Task) {
         val now = LocalTime.now()
+        val snoozeMin = c.getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
         send(
             c, "/reminder/fire",
-            JSONObject().put("id", t.id).put("title", t.title).put("notes", t.notes)
+            JSONObject().put("id", t.id).put("title", t.title).put("notes", t.notes).put("snooze", snoozeMin)
                 .put("time", "%02d:%02d".format(now.hour, now.minute)).toString()
         )
     }

@@ -39,6 +39,7 @@ class ReminderListenerService : WearableListenerService() {
             .putExtra("title", j.optString("title"))
             .putExtra("notes", j.optString("notes"))
             .putExtra("time", j.optString("time"))
+            .putExtra("snooze", j.optInt("snooze", 10))
         val pi = PendingIntent.getActivity(
             this, id.toInt(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )

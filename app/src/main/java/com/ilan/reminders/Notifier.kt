@@ -115,5 +115,26 @@ object Notifier {
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
     }
 
+    /** Replaces the reminder notification with a short confirmation (snooze set / done). */
+    fun showResult(c: Context, t: Task, text: String) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val open = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val n = NotificationCompat.Builder(c, channelFor(c, t))
+            .setSmallIcon(R.drawable.ic_stat)
+            .setColor(0xFF6D4AFF.toInt())
+            .setContentTitle(t.title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setTimeoutAfter(10_000)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
+    }
+
     fun cancel(c: Context, id: Long) = NotificationManagerCompat.from(c).cancel(id.toInt())
 }

@@ -45,17 +45,19 @@ class ActionReceiver : BroadcastReceiver() {
         async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
-            Notifier.cancel(c, id)
             if (act == "DONE") {
                 Scheduler.cancel(c, id, true)
                 if (t.repeat == "NONE") {
                     Scheduler.cancel(c, id, false)
                     dao.upsert(t.copy(done = true, snoozeUntil = 0))
                 } else dao.upsert(t.copy(snoozeUntil = 0))
+                Notifier.showResult(c, t, "הושלמה ✓")
             } else {
                 val at = System.currentTimeMillis() + minutes * 60_000L
                 dao.upsert(t.copy(snoozeUntil = at))
                 Scheduler.set(c, id, at, true)
+                val hm = java.time.LocalTime.now().plusMinutes(minutes.toLong())
+                Notifier.showResult(c, t, "נדחה ל-$minutes דק׳ · יופיע שוב ב-%02d:%02d".format(hm.hour, hm.minute))
             }
             WearBridge.dismiss(c, id)
         }

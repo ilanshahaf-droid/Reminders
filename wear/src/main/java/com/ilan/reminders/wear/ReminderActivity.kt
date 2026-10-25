@@ -32,11 +32,12 @@ import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 
-data class Fire(val id: Long, val title: String, val notes: String, val time: String)
+data class Fire(val id: Long, val title: String, val notes: String, val time: String, val snooze: Int = 10)
 
 class ReminderActivity : ComponentActivity() {
     private val fire = mutableStateOf<Fire?>(null)
     private var acted = false
+    private val result = mutableStateOf<Pair<String, String>?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,7 +56,9 @@ class ReminderActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    fire.value?.let { f ->
+                    val r = result.value
+                    if (r != null) ConfirmScreen(r.first, r.second)
+                    else fire.value?.let { f ->
                         ReminderScreen(f, onDone = { act(f, "DONE") }, onSnooze = { act(f, "SNOOZE") })
                     }
                 }
@@ -67,6 +70,7 @@ class ReminderActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         acted = false
+        result.value = null
         fire.value = parse(intent)
     }
 
@@ -74,7 +78,7 @@ class ReminderActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         val f = fire.value
-        if (f != null && !acted) act(f, "SNOOZE")
+        if (f != null && !acted) act(f, "SNOOZE", leaving = true)
     }
 
     override fun onDestroy() {
@@ -84,12 +88,25 @@ class ReminderActivity : ComponentActivity() {
 
     fun shows(id: Long) = fire.value?.id == id
 
-    private fun act(f: Fire, action: String) {
+    private fun act(f: Fire, action: String, leaving: Boolean = false) {
         if (acted) return
         acted = true
         WatchBridge.send(this, "/reminder/action", JSONObject().put("id", f.id).put("action", action).toString())
         getSystemService(NotificationManager::class.java).cancel(f.id.toInt())
-        finish()
+        val title: String
+        val sub: String
+        if (action == "DONE") { title = "הושלמה"; sub = "" } else {
+            val at = java.time.LocalTime.now().plusMinutes(f.snooze.toLong())
+            title = "נדחה ל-${f.snooze} דק׳"
+            sub = "יופיע שוב ב-%02d:%02d".format(at.hour, at.minute)
+        }
+        if (leaving) {
+            android.widget.Toast.makeText(applicationContext, if (sub.isEmpty()) title else "$title · $sub", android.widget.Toast.LENGTH_LONG).show()
+            finish()
+        } else {
+            result.value = title to sub
+            android.os.Handler(mainLooper).postDelayed({ finish() }, 1800)
+        }
     }
 
     companion object {
@@ -97,7 +114,8 @@ class ReminderActivity : ComponentActivity() {
 
         fun parse(i: Intent) = Fire(
             i.getLongExtra("id", 0), i.getStringExtra("title") ?: "",
-            i.getStringExtra("notes") ?: "", i.getStringExtra("time") ?: ""
+            i.getStringExtra("notes") ?: "", i.getStringExtra("time") ?: "",
+            i.getIntExtra("snooze", 10)
         )
     }
 }
@@ -145,5 +163,22 @@ private fun ActionButton(symbol: String, label: String, bg: Color, fg: Color, on
             contentAlignment = Alignment.Center
         ) { Text(symbol, color = fg, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
         Text(label, color = Color.White, fontSize = 11.sp)
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun ConfirmScreen(title: String, sub: String) {
+    Box(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF7C5CFF), Color(0xFF4B3BD6)))),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(20.dp)) {
+            Box(Modifier.size(56.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                Text("✓", color = Color(0xFF4B3BD6), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, textAlign = TextAlign.Center)
+        }
     }
 }
