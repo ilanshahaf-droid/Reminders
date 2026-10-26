@@ -56,8 +56,20 @@ object Reminders {
         return z.toInstant().toEpochMilli()
     }
 
+    fun nextList(t: Task, after: Long): Long? = t.dateList().firstOrNull { it > after }
+
+    /** LIST tasks: point at the next date, or at the last one (already fired) when none is left. */
+    private fun settleList(t: Task, now: Long): Task {
+        val nx = nextList(t, now)
+        return t.copy(triggerAt = nx ?: (t.dateList().lastOrNull() ?: now), fired = nx == null)
+    }
+
+    /** Whether the main alarm must be armed for this task. */
+    fun needsAlarm(t: Task): Boolean = if (t.repeat == "NONE" || t.repeat == "LIST") !t.fired else true
+
     /** Moves a recurring task to its next occurrence. */
     fun advance(t: Task, now: Long): Task = when (t.repeat) {
+        "LIST" -> settleList(t, now)
         "SCHEDULE" -> nextOccurrence(t, maxOf(now, t.triggerAt))?.let { t.copy(triggerAt = it) } ?: t
         "MONTHLY" -> t.copy(triggerAt = monthlyAfter(t.triggerAt, now))
         else -> t
@@ -74,10 +86,11 @@ object Reminders {
         var t = task.copy(done = false, fired = false, snoozeUntil = 0)
         if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
         if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
+        if (t.repeat == "LIST") t = settleList(t, now)
         val id = dao.upsert(t.touch())
         val saved = t.copy(id = id)
         Scheduler.cancel(c, id, true)
-        scheduleMain(c, saved)
+        if (needsAlarm(saved)) scheduleMain(c, saved)
         ReminderWidget.refreshNow(c)
     }
 
@@ -89,9 +102,11 @@ object Reminders {
             Scheduler.cancel(c, t.id, true)
             Notifier.cancel(c, t.id)
         } else {
-            val n = t.copy(done = false, fired = false).touch()
+            var n = t.copy(done = false, fired = false)
+            if (n.repeat == "LIST") n = settleList(n, System.currentTimeMillis())
+            n = n.touch()
             dao.upsert(n)
-            scheduleMain(c, n)
+            if (needsAlarm(n)) scheduleMain(c, n)
         }
         ReminderWidget.refreshNow(c)
     }
@@ -124,8 +139,9 @@ object Reminders {
         }
         if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
         else if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
+        else if (t.repeat == "LIST") t = settleList(t, now)
         dao.upsert(t)
-        if (t.repeat != "NONE" || !t.fired) scheduleMain(c, t)
+        if (needsAlarm(t)) scheduleMain(c, t)
         if (t.snoozeUntil > 0) Scheduler.set(c, t.id, if (t.snoozeUntil > now) t.snoozeUntil else now + 3000, true)
     }
 
@@ -139,7 +155,7 @@ object Reminders {
                 t = advance(t, now)
                 dao.upsert(t)
             }
-            if (t.repeat != "NONE" || !t.fired) scheduleMain(c, t) // missed one-offs fire right away
+            if (needsAlarm(t)) scheduleMain(c, t) // missed one-offs fire right away
             if (t.snoozeUntil > 0) {
                 Scheduler.set(c, t.id, if (t.snoozeUntil > now) t.snoozeUntil else now + 3000, true)
             }

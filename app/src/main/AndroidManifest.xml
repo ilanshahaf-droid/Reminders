@@ -32,6 +32,8 @@
             </intent-filter>
         </service>
 
+        <activity android:name=".SnoozePickActivity" android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" />
         <receiver android:name=".AlarmReceiver" android:exported="false" />
         <receiver android:name=".ActionReceiver" android:exported="false" />
         <receiver android:name=".ReminderWidget" android:exported="true">

@@ -22,17 +22,17 @@ class AlarmReceiver : BroadcastReceiver() {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
             if (t.done) return@async
-            Notifier.show(c, t)
-            WearBridge.fire(c, t)
-            when {
-                snooze -> dao.upsert(t.copy(snoozeUntil = 0))
-                t.repeat != "NONE" -> {
-                    val n = Reminders.advance(t, System.currentTimeMillis())
-                    dao.upsert(n)
-                    Scheduler.set(c, id, n.triggerAt, false)
-                }
-                else -> dao.upsert(t.copy(fired = true))
+            if (t.alertMode != "NONE") {
+                Notifier.show(c, t)
+                WearBridge.fire(c, t)
             }
+            if (snooze) {
+                dao.upsert(t.copy(snoozeUntil = 0))
+                return@async
+            }
+            val n = if (t.repeat == "NONE") t.copy(fired = true) else Reminders.advance(t, System.currentTimeMillis())
+            dao.upsert(n)
+            if (t.repeat != "NONE" && Reminders.needsAlarm(n)) Scheduler.set(c, id, n.triggerAt, false)
         }
     }
 }
@@ -48,7 +48,9 @@ class ActionReceiver : BroadcastReceiver() {
             Notifier.dismissReminder(c, id)
             if (act == "DONE") {
                 Scheduler.cancel(c, id, true)
-                if (t.repeat == "NONE") {
+                val finished = t.repeat == "NONE" ||
+                    (t.repeat == "LIST" && Reminders.nextList(t, System.currentTimeMillis()) == null)
+                if (finished) {
                     Scheduler.cancel(c, id, false)
                     dao.upsert(t.copy(done = true, snoozeUntil = 0).touch())
                 } else dao.upsert(t.copy(snoozeUntil = 0).touch())

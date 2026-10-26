@@ -11,6 +11,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ class ReminderActivity : ComponentActivity() {
     private val fire = mutableStateOf<Fire?>(null)
     private var acted = false
     private val result = mutableStateOf<Pair<String, String>?>(null)
+    private val picking = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,8 +60,9 @@ class ReminderActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     val r = result.value
                     if (r != null) ConfirmScreen(r.first, r.second)
+                    else if (picking.value) PickScreen(onPick = { m -> fire.value?.let { f -> act(f, "SNOOZE", minutes = m) } })
                     else fire.value?.let { f ->
-                        ReminderScreen(f, onDone = { act(f, "DONE") }, onSnooze = { act(f, "SNOOZE") })
+                        ReminderScreen(f, onDone = { act(f, "DONE") }, onSnooze = { act(f, "SNOOZE") }, onPick = { picking.value = true })
                     }
                 }
             }
@@ -71,6 +74,7 @@ class ReminderActivity : ComponentActivity() {
         setIntent(intent)
         acted = false
         result.value = null
+        picking.value = false
         fire.value = parse(intent)
     }
 
@@ -99,16 +103,16 @@ class ReminderActivity : ComponentActivity() {
 
     fun shows(id: Long) = fire.value?.id == id
 
-    private fun act(f: Fire, action: String, leaving: Boolean = false) {
+    private fun act(f: Fire, action: String, leaving: Boolean = false, minutes: Int = f.snooze) {
         if (acted) return
         acted = true
-        WatchBridge.send(this, "/reminder/action", JSONObject().put("id", f.id).put("action", action).toString())
+        WatchBridge.send(this, "/reminder/action", JSONObject().put("id", f.id).put("action", action).put("minutes", minutes).toString())
         getSystemService(NotificationManager::class.java).cancel(f.id.toInt())
         val title: String
         val sub: String
         if (action == "DONE") { title = "הושלמה"; sub = "" } else {
-            val at = java.time.LocalTime.now().plusMinutes(f.snooze.toLong())
-            title = "נדחה ל-${f.snooze} דק׳"
+            val at = java.time.LocalTime.now().plusMinutes(minutes.toLong())
+            title = "נדחה ל-$minutes דק׳"
             sub = "יופיע שוב ב-%02d:%02d".format(at.hour, at.minute)
         }
         if (action != "DONE") postSnoozeNote(f, sub)
@@ -153,7 +157,7 @@ class ReminderActivity : ComponentActivity() {
 }
 
 @androidx.compose.runtime.Composable
-private fun ReminderScreen(f: Fire, onDone: () -> Unit, onSnooze: () -> Unit) {
+private fun ReminderScreen(f: Fire, onDone: () -> Unit, onSnooze: () -> Unit, onPick: () -> Unit) {
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF7C5CFF), Color(0xFF4B3BD6)))),
         contentAlignment = Alignment.Center
@@ -179,8 +183,9 @@ private fun ReminderScreen(f: Fire, onDone: () -> Unit, onSnooze: () -> Unit) {
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(26.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
                 ActionButton("✓", "הושלמה", Color.White.copy(alpha = 0.22f), Color.White, onDone)
+                ActionButton("⏱", "בחר זמן", Color.White.copy(alpha = 0.22f), Color.White, onPick, size = 36)
                 ActionButton("✕", "נודניק", Color.White, Color(0xFF4B3BD6), onSnooze)
             }
         }
@@ -188,12 +193,12 @@ private fun ReminderScreen(f: Fire, onDone: () -> Unit, onSnooze: () -> Unit) {
 }
 
 @androidx.compose.runtime.Composable
-private fun ActionButton(symbol: String, label: String, bg: Color, fg: Color, onClick: () -> Unit) {
+private fun ActionButton(symbol: String, label: String, bg: Color, fg: Color, onClick: () -> Unit, size: Int = 44) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            Modifier.size(52.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
+            Modifier.size(size.dp).clip(CircleShape).background(bg).clickable(onClick = onClick),
             contentAlignment = Alignment.Center
-        ) { Text(symbol, color = fg, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+        ) { Text(symbol, color = fg, fontSize = (size / 2).sp, fontWeight = FontWeight.Bold) }
         Text(label, color = Color.White, fontSize = 11.sp)
     }
 }
@@ -211,6 +216,33 @@ private fun ConfirmScreen(title: String, sub: String) {
             Spacer(Modifier.height(10.dp))
             Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun PickScreen(onPick: (Int) -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF7C5CFF), Color(0xFF4B3BD6)))),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 26.dp, vertical = 34.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("נודניק לכמה דקות?", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            (5..60 step 15).forEach { start ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (start until minOf(start + 15, 65) step 5).forEach { m ->
+                        Box(
+                            Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.25f)).clickable { onPick(m) },
+                            contentAlignment = Alignment.Center
+                        ) { Text("$m", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
         }
     }
 }

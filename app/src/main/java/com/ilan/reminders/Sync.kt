@@ -101,7 +101,8 @@ object Sync {
         repeat = r.optString("repeat_mode", "NONE"), days = r.optInt("days"), times = r.optString("times"),
         sound = r.optString("sound"), vibration = r.optString("vibration", "STRONG"),
         done = r.optBoolean("done"), fired = r.optBoolean("fired"), snoozeUntil = r.optLong("snooze_until"),
-        slots = r.optString("slots"), updatedAt = r.optLong("updated_at")
+        slots = r.optString("slots"), updatedAt = r.optLong("updated_at"),
+        alertMode = r.optString("alert_mode", "ONCE")
     )
 
     private fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
@@ -110,6 +111,7 @@ object Sync {
         .put("slots", it.slots).put("sound", it.sound).put("vibration", it.vibration)
         .put("done", it.done).put("fired", it.fired).put("snooze_until", it.snoozeUntil)
         .put("updated_at", it.updatedAt).put("deleted", false)
+        .put("alert_mode", it.alertMode)
 
     suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) { mutex.withLock {
         val p = prefs(c)

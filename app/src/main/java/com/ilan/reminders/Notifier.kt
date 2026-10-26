@@ -104,6 +104,13 @@ object Notifier {
         val text = if (t.notes.isBlank()) time else "$time · ${t.notes}"
         val done = NotificationCompat.Action.Builder(R.drawable.ic_check, "הושלמה", action(c, t, "DONE", 0, 1)).build()
         val snooze = NotificationCompat.Action.Builder(R.drawable.ic_snooze, "נודניק", action(c, t, "SNOOZE", minutes, 2)).build()
+        val pickPi = PendingIntent.getActivity(
+            c, t.id.toInt() * 10 + 3,
+            Intent(c, SnoozePickActivity::class.java).putExtra("id", t.id)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val pick = NotificationCompat.Action.Builder(R.drawable.ic_snooze, "בחר זמן", pickPi).build()
         val n = NotificationCompat.Builder(c, channelFor(c, t))
             .setSmallIcon(R.drawable.ic_stat)
             .setColor(0xFF6D4AFF.toInt())
@@ -118,6 +125,7 @@ object Notifier {
             .setAutoCancel(true)
             .addAction(done)
             .addAction(snooze)
+            .addAction(pick)
             .build()
         NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)

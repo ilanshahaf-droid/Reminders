@@ -60,6 +60,11 @@ fun recurrenceText(t: Task): String = when (t.repeat) {
         dt + " · " + ts.joinToString("  ")
     }
     "MONTHLY" -> "כל חודש"
+    "LIST" -> t.dateList().let { l ->
+        "${l.size} התראות: " + l.joinToString("  ·  ") {
+            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d/M HH:mm"))
+        }
+    }
     else -> ""
 }
 
@@ -120,6 +125,21 @@ fun Editor(
     var categoryId by remember { mutableLongStateOf(initial.categoryId) }
     var sound by remember { mutableStateOf(initial.sound) }
     var vibration by remember { mutableStateOf(initial.vibration) }
+    var alertMode by remember { mutableStateOf(initial.alertMode) }
+    val dates = remember {
+        mutableStateListOf<Long>().apply {
+            val saved = initial.dateList()
+            if (saved.isNotEmpty()) addAll(saved)
+            else {
+                val base = initial.triggerAt.takeIf { it > 0 } ?: (System.currentTimeMillis() + 3_600_000)
+                for (i in 0 until 3) add(base + i * 86_400_000L)
+            }
+        }
+    }
+    fun setCount(n: Int) {
+        while (dates.size < n) dates.add((dates.lastOrNull() ?: System.currentTimeMillis()) + 86_400_000L)
+        while (dates.size > n) dates.removeAt(dates.size - 1)
+    }
     var confirmDelete by remember { mutableStateOf(false) }
     val z = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault())
     val valid = title.isNotBlank() && (repeat != "SCHEDULE" || sch.valid())
@@ -150,10 +170,15 @@ fun Editor(
                     onSave(
                         initial.copy(
                             title = title.trim(), notes = notes.trim(), categoryId = categoryId,
-                            triggerAt = if (sched) 0L else at, repeat = repeat,
+                            triggerAt = if (sched) 0L else if (repeat == "LIST") (dates.minOrNull() ?: at) else at, repeat = repeat,
                             days = if (sched) sch.days else 0, times = "",
-                            slots = if (sched) encodeSchedule(sch.build()) else "",
-                            sound = sound, vibration = vibration
+                            slots = when {
+                                sched -> encodeSchedule(sch.build())
+                                repeat == "LIST" -> dates.sorted().joinToString(",")
+                                else -> ""
+                            },
+                            sound = sound, vibration = vibration,
+                            alertMode = alertMode
                         )
                     )
                 }) { Text("שמור") }
@@ -186,9 +211,31 @@ fun Editor(
                     FilterChip(repeat == "NONE", { repeat = "NONE" }, label = { Text("חד-פעמי") })
                     FilterChip(repeat == "SCHEDULE", { repeat = "SCHEDULE" }, label = { Text("ימים ושעות") })
                     FilterChip(repeat == "MONTHLY", { repeat = "MONTHLY" }, label = { Text("חודשי") })
+                    FilterChip(repeat == "LIST", { repeat = "LIST" }, label = { Text("מספר חזרות מוגדר") })
                 }
                 if (repeat == "SCHEDULE") {
                     ScheduleEditor(sch)
+                } else if (repeat == "LIST") {
+                    Text("כמה התראות?", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (1..10).forEach { n -> FilterChip(dates.size == n, { setCount(n) }, label = { Text("$n") }) }
+                    }
+                    dates.forEachIndexed { i, ms ->
+                        val zi = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("התראה ${i + 1}", modifier = Modifier.width(78.dp))
+                            OutlinedButton(onClick = {
+                                DatePickerDialog(ctx, { _, y, m, d ->
+                                    dates[i] = zi.withYear(y).withMonth(m + 1).withDayOfMonth(d).toInstant().toEpochMilli()
+                                }, zi.year, zi.monthValue - 1, zi.dayOfMonth).show()
+                            }) { Text("${zi.dayOfMonth}/${zi.monthValue}/${zi.year}") }
+                            OutlinedButton(onClick = {
+                                pickTime(zi.hour, zi.minute) { h, m ->
+                                    dates[i] = zi.withHour(h).withMinute(m).withSecond(0).withNano(0).toInstant().toEpochMilli()
+                                }
+                            }) { Text("%02d:%02d".format(zi.hour, zi.minute)) }
+                        }
+                    }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = {
@@ -217,6 +264,12 @@ fun Editor(
             }
 
             Section("התראה") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("ONCE" to "עם התראה", "NONE" to "ללא התראה (רק ברשימה)").forEach { (k, l) ->
+                        FilterChip(alertMode == k, { alertMode = k }, label = { Text(l) })
+                    }
+                }
+                if (alertMode != "NONE") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("צליל", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -245,6 +298,7 @@ fun Editor(
                     VIBRATIONS.forEach { (k, label) ->
                         FilterChip(vibration == k, { vibration = k; previewVibration(ctx, k) }, label = { Text(label) })
                     }
+                }
                 }
             }
             Spacer(Modifier.height(24.dp))

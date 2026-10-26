@@ -70,7 +70,7 @@ private val SEED = listOf("אישי" to 0xFF6366F1, "עבודה" to 0xFF0EA5E9, 
 
 private fun bucket(t: Task, now: Long): Int {
     if (t.done) return 5
-    if (t.repeat == "NONE" && t.triggerAt < now) return 0
+    if ((t.repeat == "NONE" || (t.repeat == "LIST" && t.fired)) && t.triggerAt < now) return 0
     val today = LocalDate.now()
     val d = Instant.ofEpochMilli(t.triggerAt).atZone(ZoneId.systemDefault()).toLocalDate()
     return when {
@@ -442,7 +442,7 @@ private fun TaskCard(
                     color = if (t.done) cs.onSurfaceVariant else cs.onSurface
                 )
                 Text(
-                    (if (t.repeat != "NONE") "הבא: " else "") + whenText(t.triggerAt),
+                    (if (t.repeat != "NONE" && !(t.repeat == "LIST" && t.fired)) "הבא: " else "") + whenText(t.triggerAt),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (overdue) cs.error else cs.onSurfaceVariant
                 )

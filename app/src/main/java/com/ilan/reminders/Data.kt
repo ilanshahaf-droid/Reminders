@@ -31,7 +31,9 @@ data class Task(
     // per-day schedule: "0=08:00,20:00;2=09:00" (0 = Sunday)
     @ColumnInfo(defaultValue = "''") val slots: String = "",
     // last user/web edit time (ms), used to decide who wins when the phone and the web both changed a task
-    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
+    // ONCE = normal alert, NONE = shown in the list only, no notification at all
+    @ColumnInfo(defaultValue = "'ONCE'") val alertMode: String = "ONCE"
 )
 
 fun Task.touch() = copy(updatedAt = System.currentTimeMillis())
@@ -72,7 +74,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 4, exportSchema = false)
+@Database(entities = [Task::class, Category::class], version = 5, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
 
@@ -80,7 +82,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -99,6 +101,12 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
 /** weekday (0 = Sunday) -> times. Falls back to the older days + times fields. */
 fun Task.schedule(): Map<Int, List<String>> {
     if (slots.isNotBlank()) {
@@ -110,6 +118,10 @@ fun Task.schedule(): Map<Int, List<String>> {
     val ts = times.split(",").filter { it.isNotBlank() }.sorted()
     return (0..6).filter { days and (1 shl it) != 0 }.associateWith { ts }
 }
+
+/** For repeat == "LIST": the exact alert moments (epoch ms), stored comma separated in [slots]. */
+fun Task.dateList(): List<Long> =
+    if (repeat != "LIST") emptyList() else slots.split(",").mapNotNull { it.trim().toLongOrNull() }.sorted()
 
 fun encodeSchedule(m: Map<Int, List<String>>): String =
     m.toSortedMap().filter { it.value.isNotEmpty() }.entries

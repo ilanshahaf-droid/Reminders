@@ -102,7 +102,9 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
     <div class="lbl">קטגוריה</div><div class="chips" id="edCats"></div>
     <div class="lbl">חזרה</div><div class="chips" id="edRep"></div>
     <div id="edOnce"><div class="lbl">תאריך ושעה</div><input id="edDt" type="datetime-local"></div>
+    <div id="edList"><div class="lbl">כמה התראות?</div><div class="chips" id="edCnt"></div><div id="edDates"></div></div>
     <div id="edSch"><div class="lbl">ימים ושעות</div><div class="days" id="edDays"></div><div id="edTimes"></div></div>
+    <div class="lbl">מצב התראה</div><div class="chips" id="edAlert"></div>
     <div class="lbl">רטט</div><div class="chips" id="edVib"></div>
     <div class="err" id="edErr"></div>
     <div class="actions">
@@ -179,8 +181,11 @@ function schedule(t){
   for(let i = 0; i < 7; i++) if(t.days & (1 << i)) m[i] = ts;
   return m;
 }
+function dateList(t){ return (t.slots || '').split(',').map(x => +x.trim()).filter(Boolean).sort((a, b) => a - b); }
+function fmtShort(ms){ const d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 function recText(t){
   if(t.repeat_mode === 'MONTHLY') return 'כל חודש';
+  if(t.repeat_mode === 'LIST'){ const l = dateList(t); return l.length + ' התראות: ' + l.map(fmtShort).join('  ·  '); }
   if(t.repeat_mode !== 'SCHEDULE') return '';
   const groups = {};
   Object.entries(schedule(t)).forEach(([d, ts]) => { const k = ts.join('  '); (groups[k] = groups[k] || []).push(+d); });
@@ -196,7 +201,7 @@ function whenText(ms){
 }
 function bucket(t, now){
   if(t.done) return 5;
-  if(t.repeat_mode === 'NONE' && t.trigger_at < now) return 0;
+  if((t.repeat_mode === 'NONE' || (t.repeat_mode === 'LIST' && t.fired)) && t.trigger_at < now) return 0;
   const diff = Math.round((startOfDay(new Date(t.trigger_at)) - startOfDay(new Date())) / 864e5);
   return diff <= 0 ? 1 : diff === 1 ? 2 : diff < 7 ? 3 : 4;
 }
@@ -232,7 +237,7 @@ function render(){
       card.appendChild(ck);
       const main = el('div', 'main');
       main.appendChild(el('div', 'title', t.title));
-      main.appendChild(el('div', 'when' + (k == 0 ? ' late' : ''), (t.repeat_mode !== 'NONE' ? 'הבא: ' : '') + whenText(t.trigger_at)));
+      main.appendChild(el('div', 'when' + (k == 0 ? ' late' : ''), (t.repeat_mode !== 'NONE' && !(t.repeat_mode === 'LIST' && t.fired) ? 'הבא: ' : '') + whenText(t.trigger_at)));
       const rec = recText(t); if(rec) main.appendChild(el('div', 'rec', '↻ ' + rec));
       if(t.notes) main.appendChild(el('div', 'notes', t.notes));
       card.appendChild(main);
@@ -248,7 +253,7 @@ function render(){
   });
 }
 const VIBS = [['STRONG','חזק'],['SHORT','קצר'],['PULSE','פולסים'],['NONE','ללא']];
-const REPS = [['NONE','ללא חזרה'],['SCHEDULE','בימים ושעות'],['MONTHLY','חודשי']];
+const REPS = [['NONE','ללא חזרה'],['SCHEDULE','בימים ושעות'],['MONTHLY','חודשי'],['LIST','מספר חזרות מוגדר']];
 const DAY_N = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const rid = () => Math.floor(1e9 + Math.random() * 1.0e9);
 
@@ -309,8 +314,8 @@ function openEd(t){
   const isNew = !t;
   const now = new Date(); now.setHours(now.getHours() + 1, 0, 0, 0);
   ed = isNew
-    ? {id:rid(), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
-    : {id:t.id, title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false};
+    ? {id:rid(), alert:'ONCE', dates:[0,1,2].map(i => toLocalInput(now.getTime() + i * 864e5)), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
+    : {id:t.id, alert:t.alert_mode || 'ONCE', dates:(t.repeat_mode === 'LIST' && dateList(t).length ? dateList(t) : [0,1,2].map(i => t.trigger_at + i * 864e5)).map(toLocalInput), title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false};
   $('edTitleH').textContent = isNew ? 'תזכורת חדשה' : 'עריכת תזכורת';
   $('edTitle').value = ed.title; $('edNotes').value = ed.notes; $('edDt').value = ed.dt; $('edErr').textContent = '';
   $('edDel').classList.toggle('hide', isNew); $('edDone').classList.toggle('hide', isNew);
@@ -329,9 +334,24 @@ function renderEd(){
   cats.forEach(c => cc.appendChild(chip(c.name, ed.cat === c.id, () => { ed.cat = c.id; renderEd(); }, colorOf(c.color))));
   const rr = $('edRep'); rr.innerHTML = '';
   REPS.forEach(([k, l]) => rr.appendChild(chip(l, ed.rep === k, () => { syncEdInputs(); ed.rep = k; renderEd(); })));
+  const al = $('edAlert'); al.innerHTML = '';
+  [['ONCE','עם התראה'],['NONE','ללא התראה (רק ברשימה)']].forEach(([k, l]) => al.appendChild(chip(l, ed.alert === k, () => { syncEdInputs(); ed.alert = k; renderEd(); })));
+  $('edList').classList.toggle('hide', ed.rep !== 'LIST');
+  const cn = $('edCnt'); cn.innerHTML = '';
+  for(let n = 1; n <= 10; n++) cn.appendChild(chip(String(n), ed.dates.length === n, () => {
+    syncEdInputs();
+    while(ed.dates.length < n){ const last = ed.dates.length ? new Date(ed.dates[ed.dates.length - 1]) : new Date(); last.setDate(last.getDate() + 1); ed.dates.push(toLocalInput(last.getTime())); }
+    ed.dates.length = n; renderEd();
+  }));
+  const dd2 = $('edDates'); dd2.innerHTML = '';
+  ed.dates.forEach((v, i) => {
+    const row = el('div', 'dayrow'); row.appendChild(el('b', '', 'התראה ' + (i + 1)));
+    const inp = el('input'); inp.type = 'datetime-local'; inp.value = v; inp.onchange = () => { ed.dates[i] = inp.value; };
+    row.appendChild(inp); dd2.appendChild(row);
+  });
   const vv = $('edVib'); vv.innerHTML = '';
   VIBS.forEach(([k, l]) => vv.appendChild(chip(l, ed.vib === k, () => { ed.vib = k; renderEd(); })));
-  $('edOnce').classList.toggle('hide', ed.rep === 'SCHEDULE');
+  $('edOnce').classList.toggle('hide', ed.rep === 'SCHEDULE' || ed.rep === 'LIST');
   $('edSch').classList.toggle('hide', ed.rep !== 'SCHEDULE');
   const dd = $('edDays'); dd.innerHTML = '';
   for(let d = 0; d < 7; d++){
@@ -359,8 +379,13 @@ async function saveEd(){
   const err = m => { $('edErr').textContent = m; };
   if(!ed.title.trim()) return err('חסרה כותרת');
   const sch = {}; Object.keys(ed.sch).forEach(d => { const ts = ed.sch[d].filter(Boolean); if(ts.length) sch[d] = ts; });
-  let trig;
-  if(ed.rep === 'SCHEDULE'){
+  let trig, slotsOut = '', fired = false;
+  if(ed.rep === 'LIST'){
+    const ms = ed.dates.map(v => new Date(v).getTime()).filter(x => x > 0).sort((a, b) => a - b);
+    if(!ms.length || ms.length !== ed.dates.length) return err('חסר תאריך באחת ההתראות');
+    slotsOut = ms.join(',');
+    const nx = ms.find(x => x > Date.now()); trig = nx || ms[ms.length - 1]; fired = !nx;
+  } else if(ed.rep === 'SCHEDULE'){
     if(!Object.keys(sch).length) return err('בחר לפחות יום אחד עם שעה');
     trig = nextOcc(sch, Date.now()) || Date.now() + 60000;
   } else {
@@ -368,8 +393,9 @@ async function saveEd(){
     trig = new Date(ed.dt).getTime();
   }
   const row = {id:ed.id, title:ed.title.trim(), notes:ed.notes.trim(), category_id:ed.cat, trigger_at:trig,
-    repeat_mode:ed.rep, days:0, times:'', slots:ed.rep === 'SCHEDULE' ? encodeSlots(sch) : '', sound:ed.sound, vibration:ed.vib,
-    done:false, fired:false, snooze_until:0, updated_at:Date.now(), deleted:false};
+    repeat_mode:ed.rep, days:0, times:'', slots:ed.rep === 'SCHEDULE' ? encodeSlots(sch) : slotsOut, sound:ed.sound, vibration:ed.vib,
+    done:false, fired:fired, snooze_until:0, updated_at:Date.now(), deleted:false,
+    alert_mode:ed.alert};
   const r = await api('/rest/v1/rem_tasks?on_conflict=id', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
   if(!r.ok) return err('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?');
   closeEd(); await load(); toast('נשמר. יגיע לטלפון בפתיחת האפליקציה או עד 15 דקות');

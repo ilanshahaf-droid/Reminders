@@ -69,7 +69,8 @@ class WearActionService : WearableListenerService() {
         if (e.path == "/tasks/request") { WearBridge.pushList(this); return }
         if (e.path != "/reminder/action") return
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
-        val minutes = getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
+        val minutes = j.optInt("minutes", 0).takeIf { it > 0 }
+            ?: getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
         sendBroadcast(
             Intent(this, ActionReceiver::class.java).setAction(j.optString("action", "SNOOZE"))
                 .putExtra("id", j.optLong("id", -1)).putExtra("minutes", minutes)
