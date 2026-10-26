@@ -38,7 +38,9 @@ data class Fire(val id: Long, val title: String, val notes: String, val time: St
 class ReminderActivity : ComponentActivity() {
     private val fire = mutableStateOf<Fire?>(null)
     private var acted = false
-    private val result = mutableStateOf<Pair<String, String>?>(null)
+    private val result = mutableStateOf<Triple<String, String, Boolean>?>(null)
+    private var addMode = false
+    private val finishLater = Runnable { finish() }
     private val picking = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,15 +54,22 @@ class ReminderActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 val f = fire.value
-                if (f != null) act(f, "SNOOZE") else finish()
+                if (f != null && !acted) act(f, "SNOOZE") else finish()
             }
         })
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     val r = result.value
-                    if (r != null) ConfirmScreen(r.first, r.second)
-                    else if (picking.value) PickScreen(onPick = { m -> fire.value?.let { f -> act(f, "SNOOZE", minutes = m) } })
+                    if (r != null) ConfirmScreen(
+                        r.first, r.second, r.third,
+                        onDone = { fire.value?.let { f -> followUp(f, "DONE") } },
+                        onAdd = { android.os.Handler(mainLooper).removeCallbacks(finishLater); addMode = true; result.value = null; picking.value = true },
+                        onCancel = { fire.value?.let { f -> followUp(f, "CANCEL_SNOOZE") } }
+                    )
+                    else if (picking.value) PickScreen(addMode, onPick = { m ->
+                        fire.value?.let { f -> if (addMode) followUp(f, "SNOOZE_ADD", m) else act(f, "SNOOZE", minutes = m) }
+                    })
                     else fire.value?.let { f ->
                         ReminderScreen(f, onDone = { act(f, "DONE") }, onSnooze = { act(f, "SNOOZE") }, onPick = { picking.value = true })
                     }
@@ -75,6 +84,7 @@ class ReminderActivity : ComponentActivity() {
         acted = false
         result.value = null
         picking.value = false
+        addMode = false
         fire.value = parse(intent)
     }
 
@@ -101,7 +111,7 @@ class ReminderActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    fun shows(id: Long) = fire.value?.id == id
+    fun shows(id: Long) = fire.value?.id == id && !acted
 
     private fun act(f: Fire, action: String, leaving: Boolean = false, minutes: Int = f.snooze) {
         if (acted) return
@@ -115,17 +125,37 @@ class ReminderActivity : ComponentActivity() {
             title = "נדחה ל-$minutes דק׳"
             sub = "יופיע שוב ב-%02d:%02d".format(at.hour, at.minute)
         }
-        if (action != "DONE") postSnoozeNote(f, sub)
+        if (action != "DONE") postSnoozeNote(f, "(במצב נודניק עד ${sub.removePrefix("יופיע שוב ב-")})")
         if (leaving) {
             android.widget.Toast.makeText(applicationContext, if (sub.isEmpty()) title else "$title · $sub", android.widget.Toast.LENGTH_LONG).show()
             finish()
         } else {
-            result.value = title to sub
-            android.os.Handler(mainLooper).postDelayed({ finish() }, 1800)
+            result.value = Triple(title, sub, action != "DONE")
+            android.os.Handler(mainLooper).postDelayed(finishLater, if (action != "DONE") 8000L else 1800L)
         }
     }
 
-    private fun postSnoozeNote(f: Fire, sub: String) {
+    /** After a snooze: mark done, cancel the snooze, or add more time. */
+    private fun followUp(f: Fire, action: String, minutes: Int = 0) {
+        val h = android.os.Handler(mainLooper)
+        h.removeCallbacks(finishLater)
+        WatchBridge.send(this, "/reminder/action", JSONObject().put("id", f.id).put("action", action).put("minutes", minutes).toString())
+        val nm = getSystemService(NotificationManager::class.java)
+        when (action) {
+            "SNOOZE_ADD" -> {
+                postSnoozeNote(f, "(במצב נודניק · נוספו $minutes דק׳)")
+                result.value = Triple("נוספו $minutes דק׳", "", false)
+            }
+            else -> {
+                nm.cancel(ReminderListenerService.snoozeNoteId(f.id))
+                result.value = Triple(if (action == "DONE") "הושלמה" else "הנודניק בוטל", "", false)
+            }
+        }
+        picking.value = false
+        h.postDelayed(finishLater, 1800)
+    }
+
+    private fun postSnoozeNote(f: Fire, noteText: String) {
         val nm = getSystemService(NotificationManager::class.java)
         val ch = "watch_snooze"
         if (nm.getNotificationChannel(ch) == null) {
@@ -133,12 +163,11 @@ class ReminderActivity : ComponentActivity() {
             c.setSound(null, null); c.enableVibration(false)
             nm.createNotificationChannel(c)
         }
-        val at = sub.removePrefix("יופיע שוב ב-")
         val n = androidx.core.app.NotificationCompat.Builder(this, ch)
             .setSmallIcon(R.drawable.ic_stat)
             .setColor(0xFF6D4AFF.toInt())
             .setContentTitle(f.title)
-            .setContentText("(במצב נודניק עד $at)")
+            .setContentText(noteText)
             .setSilent(true)
             .setAutoCancel(true)
             .build()
@@ -204,24 +233,35 @@ private fun ActionButton(symbol: String, label: String, bg: Color, fg: Color, on
 }
 
 @androidx.compose.runtime.Composable
-private fun ConfirmScreen(title: String, sub: String) {
+private fun ConfirmScreen(
+    title: String, sub: String, actions: Boolean,
+    onDone: () -> Unit, onAdd: () -> Unit, onCancel: () -> Unit
+) {
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF7C5CFF), Color(0xFF4B3BD6)))),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(20.dp)) {
-            Box(Modifier.size(56.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                Text("✓", color = Color(0xFF4B3BD6), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Box(Modifier.size(if (actions) 38.dp else 56.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                Text("✓", color = Color(0xFF4B3BD6), fontSize = if (actions) 22.sp else 30.sp, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.height(10.dp))
-            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(6.dp))
+            Text(title, color = Color.White, fontSize = if (actions) 18.sp else 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, textAlign = TextAlign.Center)
+            if (actions) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+                    ActionButton("✓", "הושלמה", Color.White.copy(alpha = 0.22f), Color.White, onDone, size = 38)
+                    ActionButton("+", "הוסף", Color.White.copy(alpha = 0.22f), Color.White, onAdd, size = 38)
+                    ActionButton("↩", "בטל", Color.White.copy(alpha = 0.22f), Color.White, onCancel, size = 38)
+                }
+            }
         }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun PickScreen(onPick: (Int) -> Unit) {
+private fun PickScreen(add: Boolean, onPick: (Int) -> Unit) {
     Box(
         Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF7C5CFF), Color(0xFF4B3BD6)))),
         contentAlignment = Alignment.Center
@@ -232,7 +272,7 @@ private fun PickScreen(onPick: (Int) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("נודניק לכמה דקות?", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(if (add) "להוסיף כמה דקות?" else "נודניק לכמה דקות?", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             (5..60 step 15).forEach { start ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (start until minOf(start + 15, 65) step 5).forEach { m ->

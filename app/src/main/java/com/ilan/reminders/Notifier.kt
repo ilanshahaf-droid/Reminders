@@ -132,7 +132,7 @@ object Notifier {
     }
 
     /** Replaces the reminder notification with a short confirmation (snooze set / done). */
-    fun showResult(c: Context, t: Task, text: String, autoHideMs: Long = 0) {
+    fun showResult(c: Context, t: Task, text: String, autoHideMs: Long = 0, snoozeActions: Boolean = false) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
@@ -148,7 +148,19 @@ object Notifier {
             .setLocalOnly(true)
             .apply { if (autoHideMs > 0) setTimeoutAfter(autoHideMs) }
             .setContentIntent(open)
-            .setAutoCancel(true)
+            .setAutoCancel(!snoozeActions)
+            .apply {
+                if (snoozeActions) {
+                    addAction(NotificationCompat.Action.Builder(R.drawable.ic_check, "הושלמה", action(c, t, "DONE", 0, 1)).build())
+                    addAction(NotificationCompat.Action.Builder(R.drawable.ic_snooze, "הוסף נודניק", PendingIntent.getActivity(
+                        c, t.id.toInt() * 10 + 5,
+                        Intent(c, SnoozePickActivity::class.java).putExtra("id", t.id).putExtra("add", true)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                    )).build())
+                    addAction(NotificationCompat.Action.Builder(R.drawable.ic_snooze, "בטל נודניק", action(c, t, "CANCEL_SNOOZE", 0, 4)).build())
+                }
+            }
             .build()
         NotificationManagerCompat.from(c).notify(resultId(t.id), n)
     }

@@ -23,19 +23,20 @@ class SnoozePickActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val id = intent.getLongExtra("id", -1)
+        val add = intent.getBooleanExtra("add", false)
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     AlertDialog(
                         onDismissRequest = { finish() },
-                        title = { Text("נודניק לכמה דקות?") },
+                        title = { Text(if (add) "להוסיף כמה דקות לנודניק?" else "נודניק לכמה דקות?") },
                         text = {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 (5..60 step 5).forEach { m ->
                                     FilterChip(false, {
                                         sendBroadcast(
                                             Intent(this@SnoozePickActivity, ActionReceiver::class.java)
-                                                .setAction("SNOOZE").putExtra("id", id).putExtra("minutes", m)
+                                                .setAction(if (add) "SNOOZE_ADD" else "SNOOZE").putExtra("id", id).putExtra("minutes", m)
                                         )
                                         finish()
                                     }, label = { Text("$m") })

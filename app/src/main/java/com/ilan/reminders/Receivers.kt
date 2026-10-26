@@ -45,24 +45,42 @@ class ActionReceiver : BroadcastReceiver() {
         async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
+            val now = System.currentTimeMillis()
             Notifier.dismissReminder(c, id)
-            if (act == "DONE") {
-                Scheduler.cancel(c, id, true)
-                val finished = t.repeat == "NONE" ||
-                    (t.repeat == "LIST" && Reminders.nextList(t, System.currentTimeMillis()) == null)
-                if (finished) {
-                    Scheduler.cancel(c, id, false)
-                    dao.upsert(t.copy(done = true, snoozeUntil = 0).touch())
-                } else dao.upsert(t.copy(snoozeUntil = 0).touch())
-                Notifier.showResult(c, t, "הושלמה ✓", 8000)
-            } else {
-                val at = System.currentTimeMillis() + minutes * 60_000L
-                dao.upsert(t.copy(snoozeUntil = at).touch())
-                Scheduler.set(c, id, at, true)
-                val hm = java.time.LocalTime.now().plusMinutes(minutes.toLong())
-                Notifier.showResult(c, t, "נדחה ל-$minutes דק׳ · יופיע שוב ב-%02d:%02d".format(hm.hour, hm.minute))
+            fun hm(at: Long): String {
+                val z = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault())
+                return "%02d:%02d".format(z.hour, z.minute)
             }
-            WearBridge.dismiss(c, id, act == "DONE")
+            when (act) {
+                "DONE" -> {
+                    Scheduler.cancel(c, id, true)
+                    val finished = t.repeat == "NONE" ||
+                        (t.repeat == "LIST" && Reminders.nextList(t, now) == null)
+                    if (finished) {
+                        Scheduler.cancel(c, id, false)
+                        dao.upsert(t.copy(done = true, snoozeUntil = 0).touch())
+                    } else dao.upsert(t.copy(snoozeUntil = 0).touch())
+                    Notifier.showResult(c, t, "הושלמה ✓", 8000)
+                }
+                "CANCEL_SNOOZE" -> {
+                    Scheduler.cancel(c, id, true)
+                    dao.upsert(t.copy(snoozeUntil = 0).touch())
+                    Notifier.showResult(c, t, "הנודניק בוטל", 6000)
+                }
+                "SNOOZE_ADD" -> {
+                    val at = maxOf(t.snoozeUntil, now) + minutes * 60_000L
+                    dao.upsert(t.copy(snoozeUntil = at).touch())
+                    Scheduler.set(c, id, at, true)
+                    Notifier.showResult(c, t, "נדחה · נוספו $minutes דק׳ · יופיע שוב ב-${hm(at)}", snoozeActions = true)
+                }
+                else -> {
+                    val at = now + minutes * 60_000L
+                    dao.upsert(t.copy(snoozeUntil = at).touch())
+                    Scheduler.set(c, id, at, true)
+                    Notifier.showResult(c, t, "נדחה ל-$minutes דק׳ · יופיע שוב ב-${hm(at)}", snoozeActions = true)
+                }
+            }
+            WearBridge.dismiss(c, id, act == "DONE" || act == "CANCEL_SNOOZE")
         }
     }
 }

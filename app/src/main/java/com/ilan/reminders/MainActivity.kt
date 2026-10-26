@@ -547,6 +547,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
                         .setData(Uri.parse("package:${ctx.packageName}")))
                 }) { Text("אפשר ללא הגבלה") }
 
+                Text("גרסה: v19", style = MaterialTheme.typography.bodySmall)
                 Text("בסמסונג: הגדרות ← סוללה ← הגבלות שימוש ברקע, והוצא את האפליקציה מ-Sleeping apps ו-Deep sleeping apps.")
                 OutlinedButton(onClick = {
                     ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
