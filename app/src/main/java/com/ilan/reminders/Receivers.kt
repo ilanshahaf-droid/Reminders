@@ -52,7 +52,7 @@ class ActionReceiver : BroadcastReceiver() {
                     Scheduler.cancel(c, id, false)
                     dao.upsert(t.copy(done = true, snoozeUntil = 0))
                 } else dao.upsert(t.copy(snoozeUntil = 0))
-                Notifier.showResult(c, t, "הושלמה ✓")
+                Notifier.showResult(c, t, "הושלמה ✓", 8000)
             } else {
                 val at = System.currentTimeMillis() + minutes * 60_000L
                 dao.upsert(t.copy(snoozeUntil = at))

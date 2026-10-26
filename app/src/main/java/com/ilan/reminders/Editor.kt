@@ -41,7 +41,7 @@ import java.util.Locale
 val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 val DAY_NAMES = listOf("ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת")
 val PALETTE = listOf(0xFF6366F1, 0xFF0EA5E9, 0xFF10B981, 0xFFF59E0B, 0xFFEF4444, 0xFFEC4899, 0xFF8B5CF6)
-private val VIBRATIONS = listOf("STRONG" to "חזק", "SHORT" to "קצר", "PULSE" to "פולסים", "NONE" to "ללא")
+internal val VIBRATIONS = listOf("STRONG" to "חזק", "SHORT" to "קצר", "PULSE" to "פולסים", "NONE" to "ללא")
 
 fun whenText(ms: Long): String {
     val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
@@ -63,13 +63,13 @@ fun recurrenceText(t: Task): String = when (t.repeat) {
     else -> ""
 }
 
-private fun soundLabel(c: Context, s: String): String = when (s) {
-    "" -> "ברירת מחדל"
+internal fun soundLabel(c: Context, s: String): String = when (s) {
+    "" -> "ברירת מחדל של האפליקציה"
     "silent" -> "ללא צליל"
     else -> runCatching { RingtoneManager.getRingtone(c, Uri.parse(s)).getTitle(c) }.getOrDefault("צליל מותאם")
 }
 
-private fun previewVibration(c: Context, v: String) {
+internal fun previewVibration(c: Context, v: String) {
     val p = Notifier.patternOf(v) ?: return
     c.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(p, -1))
 }

@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,6 +32,14 @@ jobs:
         with:
           name: reminders-watch-apk
           path: wear/build/outputs/apk/debug/wear-debug.apk
+      - name: Publish APKs to the 'latest' release (fixed download links)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FILES="app/build/outputs/apk/debug/app-debug.apk"
+          [ -f wear/build/outputs/apk/debug/wear-debug.apk ] && FILES="$FILES wear/build/outputs/apk/debug/wear-debug.apk"
+          gh release delete latest --cleanup-tag -y || true
+          gh release create latest $FILES --title "latest" --notes "Latest build: ${{ github.sha }}"
       - name: Fail if the watch build failed
         if: steps.wear.outcome == 'failure'
         run: echo "watch build failed - phone APK is still available" && exit 1

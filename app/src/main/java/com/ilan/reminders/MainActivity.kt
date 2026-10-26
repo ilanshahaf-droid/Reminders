@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -80,9 +81,10 @@ private fun bucket(t: Task, now: Long): Int {
     }
 }
 
-private fun newTask(): Task {
+private fun newTask(c: Context): Task {
     val z = ZonedDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0)
-    return Task(title = "", triggerAt = z.toInstant().toEpochMilli())
+    val vib = c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defVibration", "STRONG") ?: "STRONG"
+    return Task(title = "", triggerAt = z.toInstant().toEpochMilli(), vibration = vib)
 }
 
 private fun batteryOk(c: Context) =
@@ -110,18 +112,22 @@ fun Root() {
     var showBulkSchedule by remember { mutableStateOf(false) }
     var showBulkCat by remember { mutableStateOf(false) }
     var showBulkDelete by remember { mutableStateOf(false) }
+    var showDone by remember {
+        mutableStateOf(ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getBoolean("showDone", false))
+    }
+    var showClearDone by remember { mutableStateOf(false) }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val text = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        if (r.resultCode == Activity.RESULT_OK && !text.isNullOrBlank()) editor = newTask().copy(title = text)
+        if (r.resultCode == Activity.RESULT_OK && !text.isNullOrBlank()) editor = newTask(ctx).copy(title = text)
     }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33) permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         val act = ctx as? Activity
         if (act?.intent?.getBooleanExtra("new", false) == true) {
             act.intent.removeExtra("new")
-            editor = newTask()
+            editor = newTask(ctx)
         }
         val p = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
         if (!p.getBoolean("seeded", false)) {
@@ -162,7 +168,7 @@ fun Root() {
             val now = System.currentTimeMillis()
             val q = query.trim()
             val shown = tasks.filter {
-                (filter == null || it.categoryId == filter) &&
+                (showDone || !it.done) && (filter == null || it.categoryId == filter) &&
                     (q.isEmpty() || it.title.contains(q, true) || it.notes.contains(q, true))
             }
             val groups = shown.groupBy { bucket(it, now) }.toSortedMap()
@@ -205,6 +211,19 @@ fun Root() {
                                                 DropdownMenuItem(
                                                     text = { Text((if (healthy) "" else "⚠ ") + "הגדרות אמינות") },
                                                     onClick = { menuOpen = false; showSettings = true }
+                                                )
+                                                val doneCount = tasks.count { it.done }
+                                                DropdownMenuItem(
+                                                    text = { Text((if (showDone) "הסתר" else "הצג") + " משימות שהושלמו ($doneCount)") },
+                                                    onClick = {
+                                                        menuOpen = false; showDone = !showDone
+                                                        ctx.getSharedPreferences("app", Context.MODE_PRIVATE).edit().putBoolean("showDone", showDone).apply()
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("נקה משימות שהושלמו") },
+                                                    enabled = doneCount > 0,
+                                                    onClick = { menuOpen = false; showClearDone = true }
                                                 )
                                                 DropdownMenuItem(
                                                     text = { Text("קטגוריות") },
@@ -269,7 +288,7 @@ fun Root() {
                     }
 
                     Surface(
-                        onClick = { editor = newTask() },
+                        onClick = { editor = newTask(ctx) },
                         shape = RoundedCornerShape(32.dp), color = cs.surface, shadowElevation = 10.dp,
                         modifier = Modifier.align(Alignment.BottomCenter)
                             .padding(horizontal = 28.dp, vertical = 16.dp).fillMaxWidth().height(64.dp)
@@ -331,6 +350,20 @@ fun Root() {
                 }
             },
             confirmButton = { TextButton({ showBulkCat = false }) { Text("סגור") } }
+        )
+    }
+    if (showClearDone) {
+        AlertDialog(
+            onDismissRequest = { showClearDone = false },
+            title = { Text("למחוק את כל המשימות שהושלמו (${tasks.count { it.done }})?") },
+            confirmButton = {
+                TextButton({
+                    val done = tasks.filter { it.done }
+                    showClearDone = false
+                    scope.launch { done.forEach { Reminders.delete(ctx, it) }; Sync.schedulePush(ctx) }
+                }) { Text("מחק", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton({ showClearDone = false }) { Text("ביטול") } }
         )
     }
     if (showBulkDelete) {
@@ -446,7 +479,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות אמינות") },
+        title = { Text("הגדרות") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -457,6 +490,50 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
                         FilterChip(snooze == m, { snooze = m; prefs.edit().putInt("snoozeMin", m).apply() }, label = { Text("$m") })
                     }
                 }
+                HorizontalDivider()
+                Text("ברירת מחדל להתראות חדשות", fontWeight = FontWeight.Bold)
+                var defSound by remember { mutableStateOf(prefs.getString("defSound", "") ?: "") }
+                var defVib by remember { mutableStateOf(prefs.getString("defVibration", "STRONG") ?: "STRONG") }
+                val soundPick = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+                    if (r.resultCode == Activity.RESULT_OK) {
+                        @Suppress("DEPRECATION")
+                        val uri = r.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+                        defSound = uri?.toString() ?: "silent"
+                        prefs.edit().putString("defSound", defSound).apply()
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("צליל", style = MaterialTheme.typography.bodySmall)
+                        Text(soundLabel(ctx, defSound).replace("ברירת מחדל של האפליקציה", "ברירת המחדל של המכשיר"))
+                    }
+                    if (defSound != "silent") TextButton({
+                        val uri = if (defSound.isBlank()) RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) else Uri.parse(defSound)
+                        runCatching { RingtoneManager.getRingtone(ctx, uri).play() }
+                    }) { Text("נגן") }
+                    TextButton({
+                        val cur: Uri? = when (defSound) {
+                            "" -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                            "silent" -> null
+                            else -> Uri.parse(defSound)
+                        }
+                        soundPick.launch(Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION or RingtoneManager.TYPE_ALARM)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, cur)
+                        })
+                    }) { Text("שנה") }
+                }
+                Text("רטט", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VIBRATIONS.forEach { (k, label) ->
+                        FilterChip(defVib == k, {
+                            defVib = k; prefs.edit().putString("defVibration", k).apply(); previewVibration(ctx, k)
+                        }, label = { Text(label) })
+                    }
+                }
+                Text("הצליל חל על תזכורות ללא צליל משלהן; הרטט חל על תזכורות חדשות.", style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider()
                 Text((if (notifOk) "✅" else "❌") + " התראות מופעלות")
                 if (!notifOk) Button(onClick = {

@@ -37,9 +37,15 @@ object Notifier {
         else -> null
     }
 
+    /** A task with no sound of its own uses the default chosen in the app settings. */
+    private fun effectiveSound(c: Context, t: Task): String =
+        if (t.sound.isNotBlank()) t.sound
+        else c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defSound", "") ?: ""
+
     /** Android fixes sound and vibration per channel, so each combination gets its own channel. */
     private fun channelFor(c: Context, t: Task): String {
-        val id = "rem_${t.vibration}_${if (t.sound.isBlank()) "def" else abs(t.sound.hashCode()).toString()}"
+        val snd = effectiveSound(c, t)
+        val id = "rem_${t.vibration}_${if (snd.isBlank()) "def" else abs(snd.hashCode()).toString()}"
         val nm = c.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(id) == null) {
             val ch = NotificationChannel(id, "תזכורות (${t.vibration})", NotificationManager.IMPORTANCE_HIGH)
@@ -50,9 +56,9 @@ object Notifier {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
             when {
-                t.sound == "silent" -> ch.setSound(null, null)
-                t.sound.isBlank() -> ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), attrs)
-                else -> ch.setSound(Uri.parse(t.sound), attrs)
+                snd == "silent" -> ch.setSound(null, null)
+                snd.isBlank() -> ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), attrs)
+                else -> ch.setSound(Uri.parse(snd), attrs)
             }
             ch.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             nm.createNotificationChannel(ch)
@@ -117,7 +123,7 @@ object Notifier {
     }
 
     /** Replaces the reminder notification with a short confirmation (snooze set / done). */
-    fun showResult(c: Context, t: Task, text: String) {
+    fun showResult(c: Context, t: Task, text: String, autoHideMs: Long = 0) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
@@ -131,6 +137,7 @@ object Notifier {
             .setSilent(true)
             .setOnlyAlertOnce(true)
             .setLocalOnly(true)
+            .apply { if (autoHideMs > 0) setTimeoutAfter(autoHideMs) }
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

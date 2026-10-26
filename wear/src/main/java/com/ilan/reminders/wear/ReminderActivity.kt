@@ -77,8 +77,19 @@ class ReminderActivity : ComponentActivity() {
     // pressing the Home button (leaving the screen without choosing) also counts as "snooze"
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        val f = fire.value
-        if (f != null && !acted) act(f, "SNOOZE", leaving = true)
+        // ignore screen timeouts / wrist-down / just-opened screens: only a real Home press while the screen is on counts
+        if (System.currentTimeMillis() - shownAt < 3000) return
+        val f = fire.value ?: return
+        android.os.Handler(mainLooper).postDelayed({
+            val pm = getSystemService(android.os.PowerManager::class.java)
+            if (!acted && !isFinishing && pm.isInteractive && fire.value === f) act(f, "SNOOZE", leaving = true)
+        }, 500)
+    }
+
+    private var shownAt = 0L
+    override fun onResume() {
+        super.onResume()
+        shownAt = System.currentTimeMillis()
     }
 
     override fun onDestroy() {
