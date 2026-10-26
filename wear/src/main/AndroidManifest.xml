@@ -15,6 +15,8 @@
         android:theme="@android:style/Theme.DeviceDefault">
 
         <meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
+        <!-- the watch app posts its own notifications; do not mirror the phone ones (avoids duplicates) -->
+        <meta-data android:name="com.google.android.wearable.notificationBridgeMode" android:value="NO_BRIDGING" />
 
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
