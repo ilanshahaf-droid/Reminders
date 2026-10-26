@@ -22,8 +22,14 @@ create table if not exists public.rem_tasks (
   vibration text not null default 'STRONG',
   done boolean not null default false,
   fired boolean not null default false,
-  snooze_until bigint not null default 0
+  snooze_until bigint not null default 0,
+  updated_at bigint not null default 0,
+  deleted boolean not null default false
 );
+
+-- for tables created before two-way sync (safe to run more than once)
+alter table public.rem_tasks add column if not exists updated_at bigint not null default 0;
+alter table public.rem_tasks add column if not exists deleted boolean not null default false;
 
 alter table public.rem_categories enable row level security;
 alter table public.rem_tasks enable row level security;

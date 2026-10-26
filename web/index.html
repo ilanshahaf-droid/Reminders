@@ -37,7 +37,26 @@ h2.late{color:var(--err)}
 .notes{font-size:16px;color:var(--sub)}
 .tag{flex:none;font-size:14px;padding:5px 12px;border-radius:999px;display:flex;gap:6px;align-items:center}
 .empty{text-align:center;color:var(--sub);padding:50px 0;font-size:18px}
-.hide{display:none}
+.hide,#modal.hide{display:none}
+.ck{cursor:pointer}.ck.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+.card{cursor:pointer}.card.sel{outline:2px solid var(--accent)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.selbar{position:sticky;top:0;z-index:5;background:var(--card);border-radius:18px;padding:10px 14px;box-shadow:0 2px 8px #0003;margin:8px 0}
+.selbar b{margin-inline-end:auto}
+button.sec{background:var(--card);color:var(--accent);border:1px solid var(--line)}
+button.danger{background:var(--err)}
+select{font:inherit;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+#modal{position:fixed;inset:0;background:#0007;z-index:10;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 10px}
+#modal .panel{width:100%;max-width:560px}
+.lbl{color:var(--sub);font-size:14px;margin:14px 0 4px}
+textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;min-height:64px;margin:6px 0}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--card)}
+.day.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dayrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;padding:8px 10px;border:1px solid var(--line);border-radius:14px}
+.dayrow input{width:auto;margin:0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:14px;z-index:20}
 </style>
 </head>
 <body>
@@ -63,20 +82,42 @@ h2.late{color:var(--err)}
 <div id="app" class="hide">
   <div class="top">
     <div><h1>תזכורות</h1><div class="sub" id="count"></div></div>
-    <button class="ghost" onclick="logout()">התנתק</button>
+    <div class="bar" style="margin:0"><button onclick="openEd()">+ תזכורת</button><button class="ghost" onclick="logout()">התנתק</button></div>
   </div>
+  <div id="selbar" class="selbar bar hide"></div>
   <input id="q" placeholder="חיפוש" oninput="render()">
   <div class="chips" id="chips"></div>
+  <div class="bar"><button class="sec" id="doneToggle" onclick="toggleDone()"></button><button class="sec" onclick="clearDone()">נקה משימות שהושלמו</button></div>
   <div id="list"></div>
   <div class="sub" id="upd" style="text-align:center;margin-top:20px;font-size:14px"></div>
 </div>
 
 </div>
+
+<div id="modal" class="hide" onclick="if(event.target===this)closeEd()">
+  <div class="panel">
+    <h1 style="font-size:28px" id="edTitleH">תזכורת</h1>
+    <input id="edTitle" placeholder="כותרת">
+    <textarea id="edNotes" placeholder="הערות"></textarea>
+    <div class="lbl">קטגוריה</div><div class="chips" id="edCats"></div>
+    <div class="lbl">חזרה</div><div class="chips" id="edRep"></div>
+    <div id="edOnce"><div class="lbl">תאריך ושעה</div><input id="edDt" type="datetime-local"></div>
+    <div id="edSch"><div class="lbl">ימים ושעות</div><div class="days" id="edDays"></div><div id="edTimes"></div></div>
+    <div class="lbl">רטט</div><div class="chips" id="edVib"></div>
+    <div class="err" id="edErr"></div>
+    <div class="actions">
+      <button onclick="saveEd()">שמור</button>
+      <button class="sec" onclick="closeEd()">ביטול</button>
+      <button class="sec" id="edDone" onclick="edToggleDone()"></button>
+      <button class="danger" id="edDel" onclick="edDelete()">מחק</button>
+    </div>
+  </div>
+</div>
 <script>
 const LS = localStorage;
 let cfg = JSON.parse(LS.getItem('cfg') || '{}');
 let sess = JSON.parse(LS.getItem('sess') || 'null');
-let tasks = [], cats = [], filter = null, timer = null;
+let tasks = [], cats = [], filter = null, timer = null, sel = new Set(), showDone = LS.getItem('showDone') === '1', ed = null;
 const $ = id => document.getElementById(id);
 const DAY_L = ['א','ב','ג','ד','ה','ו','ש'];
 const BUCKETS = ['באיחור','היום','מחר','השבוע','בהמשך','הושלמו'];
@@ -102,19 +143,21 @@ async function doLogin(){
   if(!ok){ $('loginErr').textContent = 'התחברות נכשלה'; return; }
   start();
 }
-async function api(path, retry = true){
-  const r = await fetch(cfg.url + path, {headers:{apikey:cfg.key, Authorization:'Bearer ' + (sess ? sess.access_token : '')}});
+async function api(path, opt = {}, retry = true){
+  const headers = Object.assign({apikey:cfg.key, Authorization:'Bearer ' + (sess ? sess.access_token : ''), 'Content-Type':'application/json'}, opt.headers || {});
+  const r = await fetch(cfg.url + path, {method:opt.method || 'GET', headers, body:opt.body});
   if(r.status === 401 && retry && sess && sess.refresh_token){
-    if(await tokenCall('refresh_token', {refresh_token:sess.refresh_token})) return api(path, false);
+    if(await tokenCall('refresh_token', {refresh_token:sess.refresh_token})) return api(path, opt, false);
     sess = null; LS.removeItem('sess');
   }
   return r;
 }
+function toast(msg){ const t = el('div', 'toast', msg); document.body.appendChild(t); setTimeout(() => t.remove(), 3500); }
 async function load(){
   try{
     const [t, c] = await Promise.all([api('/rest/v1/rem_tasks?select=*&order=trigger_at'), api('/rest/v1/rem_categories?select=*&order=id')]);
     if(!t.ok || !c.ok){ view('login'); return; }
-    tasks = await t.json(); cats = await c.json();
+    tasks = (await t.json()).filter(x => !x.deleted); cats = await c.json(); sel = new Set([...sel].filter(id => tasks.some(x => x.id === id)));
     $('upd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
     render();
   }catch(e){ $('upd').textContent = 'שגיאת רשת'; }
@@ -171,7 +214,9 @@ function render(){
   };
   mk('הכל', null); cats.forEach(c => mk(c.name, c.id, colorOf(c.color)));
   const byCat = Object.fromEntries(cats.map(c => [c.id, c]));
-  const shown = tasks.filter(t => (filter === null || t.category_id === filter) &&
+  $('doneToggle').textContent = (showDone ? 'הסתר' : 'הצג') + ' משימות שהושלמו (' + tasks.filter(t => t.done).length + ')';
+  renderSelBar();
+  const shown = tasks.filter(t => (showDone || !t.done) && (filter === null || t.category_id === filter) &&
     (!q || (t.title + ' ' + t.notes).toLowerCase().includes(q)));
   const list = $('list'); list.innerHTML = '';
   if(!shown.length){ list.appendChild(el('div', 'empty', 'אין תזכורות')); return; }
@@ -180,8 +225,11 @@ function render(){
   Object.keys(groups).sort().forEach(k => {
     list.appendChild(el('h2', k == 0 ? 'late' : '', BUCKETS[k]));
     groups[k].sort((a, b) => a.trigger_at - b.trigger_at).forEach(t => {
-      const card = el('div', 'card' + (t.done ? ' done' : ''));
-      card.appendChild(el('div', 'ck' + (t.done ? ' done' : ''), t.done ? '✓' : (t.repeat_mode !== 'NONE' ? '↻' : '')));
+      const card = el('div', 'card' + (t.done ? ' done' : '') + (sel.has(t.id) ? ' sel' : ''));
+      card.onclick = () => { if(sel.size) toggleSel(t.id); else openEd(t); };
+      const ck = el('div', 'ck' + (t.done ? ' done' : '') + (sel.has(t.id) ? ' sel' : ''), sel.has(t.id) ? '✓' : (t.done ? '✓' : (t.repeat_mode !== 'NONE' ? '↻' : '')));
+      ck.onclick = ev => { ev.stopPropagation(); toggleSel(t.id); };
+      card.appendChild(ck);
       const main = el('div', 'main');
       main.appendChild(el('div', 'title', t.title));
       main.appendChild(el('div', 'when' + (k == 0 ? ' late' : ''), (t.repeat_mode !== 'NONE' ? 'הבא: ' : '') + whenText(t.trigger_at)));
@@ -199,6 +247,143 @@ function render(){
     });
   });
 }
+const VIBS = [['STRONG','חזק'],['SHORT','קצר'],['PULSE','פולסים'],['NONE','ללא']];
+const REPS = [['NONE','ללא חזרה'],['SCHEDULE','בימים ושעות'],['MONTHLY','חודשי']];
+const DAY_N = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const rid = () => Math.floor(1e9 + Math.random() * 1.0e9);
+
+function toggleDone(){ showDone = !showDone; LS.setItem('showDone', showDone ? '1' : '0'); render(); }
+function toggleSel(id){ sel.has(id) ? sel.delete(id) : sel.add(id); render(); }
+
+async function patch(ids, fields){
+  const r = await api('/rest/v1/rem_tasks?id=in.(' + ids.join(',') + ')', {method:'PATCH', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify(Object.assign({updated_at:Date.now()}, fields))});
+  if(!r.ok){ toast('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?'); return false; }
+  return true;
+}
+async function bulk(fields, ok){
+  if(await patch([...sel], fields)){ sel = new Set(); await load(); if(ok) toast(ok); }
+}
+function renderSelBar(){
+  const b = $('selbar'); b.innerHTML = '';
+  b.classList.toggle('hide', !sel.size);
+  if(!sel.size) return;
+  b.appendChild(el('b', '', sel.size + ' נבחרו'));
+  const add = (label, fn, cls) => { const x = el('button', cls || 'sec', label); x.onclick = fn; b.appendChild(x); };
+  add('הושלמו', () => bulk({done:true}));
+  add('בטל השלמה', () => bulk({done:false, fired:false}));
+  const s = el('select'); s.appendChild(new Option('קטגוריה…', ''));
+  s.appendChild(new Option('ללא קטגוריה', '0'));
+  cats.forEach(c => s.appendChild(new Option(c.name, String(c.id))));
+  s.onchange = () => { if(s.value !== '') bulk({category_id:+s.value}); };
+  b.appendChild(s);
+  add('מחק', () => { if(confirm('למחוק ' + sel.size + ' תזכורות?')) bulk({deleted:true}); }, 'danger');
+  add('ביטול', () => { sel = new Set(); render(); });
+}
+async function clearDone(){
+  const ids = tasks.filter(t => t.done).map(t => t.id);
+  if(!ids.length){ toast('אין משימות שהושלמו'); return; }
+  if(!confirm('למחוק ' + ids.length + ' משימות שהושלמו?')) return;
+  if(await patch(ids, {deleted:true})) await load();
+}
+
+// ---------- editor
+function nextOcc(m, after){
+  const base = new Date(after); base.setHours(0,0,0,0);
+  for(let d = 0; d <= 8; d++){
+    const day = new Date(base); day.setDate(base.getDate() + d);
+    const ts = m[day.getDay()]; if(!ts) continue;
+    for(const t of [...ts].sort()){
+      const [h, mi] = t.split(':'); const x = new Date(day); x.setHours(+h, +mi, 0, 0);
+      if(x.getTime() > after) return x.getTime();
+    }
+  }
+  return null;
+}
+const pad = n => String(n).padStart(2, '0');
+function toLocalInput(ms){ const d = new Date(ms); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function encodeSlots(m){
+  return Object.keys(m).map(Number).sort().filter(d => m[d].length).map(d => d + '=' + [...m[d]].sort().join(',')).join(';');
+}
+function openEd(t){
+  const isNew = !t;
+  const now = new Date(); now.setHours(now.getHours() + 1, 0, 0, 0);
+  ed = isNew
+    ? {id:rid(), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
+    : {id:t.id, title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false};
+  $('edTitleH').textContent = isNew ? 'תזכורת חדשה' : 'עריכת תזכורת';
+  $('edTitle').value = ed.title; $('edNotes').value = ed.notes; $('edDt').value = ed.dt; $('edErr').textContent = '';
+  $('edDel').classList.toggle('hide', isNew); $('edDone').classList.toggle('hide', isNew);
+  $('edDone').textContent = ed.done ? 'בטל השלמה' : 'סמן כהושלמה';
+  renderEd(); $('modal').classList.remove('hide');
+}
+function closeEd(){ $('modal').classList.add('hide'); ed = null; }
+function chip(label, on, fn, color){
+  const c = el('div', 'chip' + (on ? ' on' : ''));
+  if(color){ const d = el('span', 'dot'); d.style.background = color; c.appendChild(d); }
+  c.appendChild(document.createTextNode(label)); c.onclick = fn; return c;
+}
+function renderEd(){
+  const cc = $('edCats'); cc.innerHTML = '';
+  cc.appendChild(chip('ללא', !ed.cat, () => { ed.cat = 0; renderEd(); }));
+  cats.forEach(c => cc.appendChild(chip(c.name, ed.cat === c.id, () => { ed.cat = c.id; renderEd(); }, colorOf(c.color))));
+  const rr = $('edRep'); rr.innerHTML = '';
+  REPS.forEach(([k, l]) => rr.appendChild(chip(l, ed.rep === k, () => { syncEdInputs(); ed.rep = k; renderEd(); })));
+  const vv = $('edVib'); vv.innerHTML = '';
+  VIBS.forEach(([k, l]) => vv.appendChild(chip(l, ed.vib === k, () => { ed.vib = k; renderEd(); })));
+  $('edOnce').classList.toggle('hide', ed.rep === 'SCHEDULE');
+  $('edSch').classList.toggle('hide', ed.rep !== 'SCHEDULE');
+  const dd = $('edDays'); dd.innerHTML = '';
+  for(let d = 0; d < 7; d++){
+    const x = el('div', 'day' + (ed.sch[d] ? ' on' : ''), DAY_L[d]);
+    x.title = DAY_N[d];
+    x.onclick = () => { syncEdInputs(); if(ed.sch[d]) delete ed.sch[d]; else ed.sch[d] = ['08:00']; renderEd(); };
+    dd.appendChild(x);
+  }
+  const tt = $('edTimes'); tt.innerHTML = '';
+  Object.keys(ed.sch).map(Number).sort().forEach(d => {
+    const row = el('div', 'dayrow'); row.appendChild(el('b', '', 'יום ' + DAY_N[d]));
+    ed.sch[d].forEach((tm, i) => {
+      const inp = el('input'); inp.type = 'time'; inp.value = tm; inp.dir = 'ltr';
+      inp.onchange = () => { ed.sch[d][i] = inp.value; };
+      const rm = el('button', 'ghost', '✕'); rm.onclick = () => { syncEdInputs(); ed.sch[d].splice(i, 1); if(!ed.sch[d].length) delete ed.sch[d]; renderEd(); };
+      row.appendChild(inp); row.appendChild(rm);
+    });
+    const add = el('button', 'sec', '+ שעה'); add.onclick = () => { syncEdInputs(); ed.sch[d].push('12:00'); renderEd(); };
+    row.appendChild(add); tt.appendChild(row);
+  });
+}
+function syncEdInputs(){ ed.title = $('edTitle').value; ed.notes = $('edNotes').value; ed.dt = $('edDt').value; }
+async function saveEd(){
+  syncEdInputs();
+  const err = m => { $('edErr').textContent = m; };
+  if(!ed.title.trim()) return err('חסרה כותרת');
+  const sch = {}; Object.keys(ed.sch).forEach(d => { const ts = ed.sch[d].filter(Boolean); if(ts.length) sch[d] = ts; });
+  let trig;
+  if(ed.rep === 'SCHEDULE'){
+    if(!Object.keys(sch).length) return err('בחר לפחות יום אחד עם שעה');
+    trig = nextOcc(sch, Date.now()) || Date.now() + 60000;
+  } else {
+    if(!ed.dt) return err('חסר תאריך ושעה');
+    trig = new Date(ed.dt).getTime();
+  }
+  const row = {id:ed.id, title:ed.title.trim(), notes:ed.notes.trim(), category_id:ed.cat, trigger_at:trig,
+    repeat_mode:ed.rep, days:0, times:'', slots:ed.rep === 'SCHEDULE' ? encodeSlots(sch) : '', sound:ed.sound, vibration:ed.vib,
+    done:false, fired:false, snooze_until:0, updated_at:Date.now(), deleted:false};
+  const r = await api('/rest/v1/rem_tasks?on_conflict=id', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
+  if(!r.ok) return err('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?');
+  closeEd(); await load(); toast('נשמר. יגיע לטלפון בפתיחת האפליקציה או עד 15 דקות');
+}
+async function edToggleDone(){
+  const id = ed.id, done = !ed.done; closeEd();
+  if(await patch([id], done ? {done:true} : {done:false, fired:false})) await load();
+}
+async function edDelete(){
+  if(!confirm('למחוק את התזכורת?')) return;
+  const id = ed.id; closeEd();
+  if(await patch([id], {deleted:true})) await load();
+}
+
 start();
 </script>
 </body>

@@ -50,12 +50,12 @@ class ActionReceiver : BroadcastReceiver() {
                 Scheduler.cancel(c, id, true)
                 if (t.repeat == "NONE") {
                     Scheduler.cancel(c, id, false)
-                    dao.upsert(t.copy(done = true, snoozeUntil = 0))
-                } else dao.upsert(t.copy(snoozeUntil = 0))
+                    dao.upsert(t.copy(done = true, snoozeUntil = 0).touch())
+                } else dao.upsert(t.copy(snoozeUntil = 0).touch())
                 Notifier.showResult(c, t, "הושלמה ✓", 8000)
             } else {
                 val at = System.currentTimeMillis() + minutes * 60_000L
-                dao.upsert(t.copy(snoozeUntil = at))
+                dao.upsert(t.copy(snoozeUntil = at).touch())
                 Scheduler.set(c, id, at, true)
                 val hm = java.time.LocalTime.now().plusMinutes(minutes.toLong())
                 Notifier.showResult(c, t, "נדחה ל-$minutes דק׳ · יופיע שוב ב-%02d:%02d".format(hm.hour, hm.minute))

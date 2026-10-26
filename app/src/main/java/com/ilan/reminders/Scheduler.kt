@@ -74,7 +74,7 @@ object Reminders {
         var t = task.copy(done = false, fired = false, snoozeUntil = 0)
         if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
         if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
-        val id = dao.upsert(t)
+        val id = dao.upsert(t.touch())
         val saved = t.copy(id = id)
         Scheduler.cancel(c, id, true)
         scheduleMain(c, saved)
@@ -84,24 +84,49 @@ object Reminders {
     suspend fun setDone(c: Context, t: Task, done: Boolean) {
         val dao = AppDb.get(c).dao()
         if (done) {
-            dao.upsert(t.copy(done = true, snoozeUntil = 0))
+            dao.upsert(t.copy(done = true, snoozeUntil = 0).touch())
             Scheduler.cancel(c, t.id, false)
             Scheduler.cancel(c, t.id, true)
             Notifier.cancel(c, t.id)
         } else {
-            val n = t.copy(done = false, fired = false)
+            val n = t.copy(done = false, fired = false).touch()
             dao.upsert(n)
             scheduleMain(c, n)
         }
         ReminderWidget.refreshNow(c)
     }
 
+    /** User deletion: removes locally and tells the cloud copy (the web viewer) it was deleted. */
     suspend fun delete(c: Context, t: Task) {
+        deleteLocal(c, t)
+        Sync.markDeleted(c, t.id)
+    }
+
+    suspend fun deleteLocal(c: Context, t: Task) {
         Scheduler.cancel(c, t.id, false)
         Scheduler.cancel(c, t.id, true)
         Notifier.cancel(c, t.id)
         AppDb.get(c).dao().delete(t.id)
         ReminderWidget.refreshNow(c)
+    }
+
+    /** A task changed on the web: store it as is (keeping its edit time) and re-arm its alarms. */
+    suspend fun applyRemote(c: Context, remote: Task) {
+        val dao = AppDb.get(c).dao()
+        val now = System.currentTimeMillis()
+        var t = remote
+        Scheduler.cancel(c, t.id, false)
+        Scheduler.cancel(c, t.id, true)
+        if (t.done) {
+            dao.upsert(t.copy(snoozeUntil = 0))
+            Notifier.cancel(c, t.id)
+            return
+        }
+        if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
+        else if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
+        dao.upsert(t)
+        if (t.repeat != "NONE" || !t.fired) scheduleMain(c, t)
+        if (t.snoozeUntil > 0) Scheduler.set(c, t.id, if (t.snoozeUntil > now) t.snoozeUntil else now + 3000, true)
     }
 
     /** After boot, app update, time or timezone change. */

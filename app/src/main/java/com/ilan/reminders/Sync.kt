@@ -7,7 +7,17 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import androidx.work.Constraints
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import java.util.concurrent.TimeUnit
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -15,7 +25,7 @@ import java.net.URL
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-/** One-way mirror of the local database to Supabase, so the list can be viewed from a computer. */
+/** Two-way sync with Supabase: the phone is the master of alarms, the web page can view and edit. */
 object Sync {
     fun prefs(c: Context) = c.getSharedPreferences("sync", Context.MODE_PRIVATE)
 
@@ -23,7 +33,31 @@ object Sync {
         prefs(c).edit()
             .putString("url", url.trim().trimEnd('/')).putString("key", key.trim())
             .putString("email", email.trim()).putString("pass", pass).apply()
+        ensurePeriodic(c)
     }
+
+    /** Background pull every 15 minutes (the minimum WorkManager allows). */
+    fun ensurePeriodic(c: Context) {
+        if (!configured(c)) return
+        val req = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(c.applicationContext)
+            .enqueueUniquePeriodicWork("cloud_sync", ExistingPeriodicWorkPolicy.KEEP, req)
+    }
+
+    /** Deleted tasks are remembered until the cloud copy has been marked as deleted. */
+    fun markDeleted(c: Context, id: Long) {
+        val p = prefs(c)
+        val set = (p.getStringSet("pendingDel", emptySet()) ?: emptySet()).toMutableSet()
+        set.add(id.toString())
+        p.edit().putStringSet("pendingDel", set).apply()
+        schedulePush(c)
+    }
+    private fun pendingDeleted(c: Context): Set<Long> =
+        (prefs(c).getStringSet("pendingDel", emptySet()) ?: emptySet()).mapNotNull { it.toLongOrNull() }.toSet()
+
+    private val mutex = Mutex()
 
     fun configured(c: Context) = listOf("url", "key", "email", "pass").all { !prefs(c).getString(it, "").isNullOrBlank() }
 
@@ -61,10 +95,26 @@ object Sync {
         }
     }
 
-    suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) {
+    private fun fromJson(r: JSONObject) = Task(
+        id = r.getLong("id"), title = r.optString("title"), notes = r.optString("notes"),
+        categoryId = r.optLong("category_id"), triggerAt = r.optLong("trigger_at"),
+        repeat = r.optString("repeat_mode", "NONE"), days = r.optInt("days"), times = r.optString("times"),
+        sound = r.optString("sound"), vibration = r.optString("vibration", "STRONG"),
+        done = r.optBoolean("done"), fired = r.optBoolean("fired"), snoozeUntil = r.optLong("snooze_until"),
+        slots = r.optString("slots"), updatedAt = r.optLong("updated_at")
+    )
+
+    private fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
+        .put("category_id", it.categoryId).put("trigger_at", it.triggerAt)
+        .put("repeat_mode", it.repeat).put("days", it.days).put("times", it.times)
+        .put("slots", it.slots).put("sound", it.sound).put("vibration", it.vibration)
+        .put("done", it.done).put("fired", it.fired).put("snooze_until", it.snoozeUntil)
+        .put("updated_at", it.updatedAt).put("deleted", false)
+
+    suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) { mutex.withLock {
         val p = prefs(c)
         val status = try {
-            if (!configured(c)) return@withContext "חסרים פרטי חיבור"
+            if (!configured(c)) return@withLock "חסרים פרטי חיבור"
             val base = p.getString("url", "")!!
             val key = p.getString("key", "")!!
             val login = http(
@@ -76,8 +126,6 @@ object Sync {
             val token = JSONObject(login.second).getString("access_token")
             val h = mapOf("apikey" to key, "Authorization" to "Bearer $token", "Content-Type" to "application/json")
             val dao = AppDb.get(c).dao()
-            val tasks = dao.allNow()
-            val cats = dao.categoriesNow()
 
             fun upsert(table: String, arr: JSONArray) {
                 if (arr.length() == 0) return
@@ -85,33 +133,73 @@ object Sync {
                     h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), arr.toString())
                 if (r.first !in 200..299) error("$table: ${r.first} ${r.second.take(160)}")
             }
-            fun prune(table: String, ids: List<Long>) {
-                val filter = if (ids.isEmpty()) "id=gt.0" else "id=not.in.(${ids.joinToString(",")})"
-                val r = http("DELETE", "$base/rest/v1/$table?$filter", h, null)
-                if (r.first !in 200..299) error("$table delete: ${r.first} ${r.second.take(160)}")
+
+            // 1) pull: what changed on the web since the phone last touched each task
+            val rr = http("GET", "$base/rest/v1/rem_tasks?select=*", h, null)
+            if (rr.first !in 200..299) error("rem_tasks: ${rr.first} ${rr.second.take(160)}")
+            val remote = JSONArray(rr.second)
+            val pending = pendingDeleted(c)
+            val local0 = dao.allNow().associateBy { it.id }
+            val remoteUpdated = HashMap<Long, Long>()
+            val remoteDeleted = HashSet<Long>()
+            var changed = false
+            for (i in 0 until remote.length()) {
+                val r = remote.getJSONObject(i)
+                val id = r.getLong("id")
+                if (id in pending) continue
+                val ru = r.optLong("updated_at")
+                remoteUpdated[id] = ru
+                val deleted = r.optBoolean("deleted", false)
+                if (deleted) remoteDeleted.add(id)
+                val l = local0[id]
+                if (deleted) {
+                    if (l != null && ru > l.updatedAt) { Reminders.deleteLocal(c, l); changed = true }
+                } else if (l == null || ru > l.updatedAt) {
+                    Reminders.applyRemote(c, fromJson(r)); changed = true
+                }
             }
 
+            // 2) push: everything the phone has that is not older than the cloud copy
+            val tasks = dao.allNow()
+            val cats = dao.categoriesNow()
+            val taskArr = JSONArray()
+            tasks.forEach { t ->
+                val ru = remoteUpdated[t.id]
+                if (ru == null || t.updatedAt >= ru) taskArr.put(toJson(t))
+            }
+            upsert("rem_tasks", taskArr)
+            if (pending.isNotEmpty()) {
+                val r = http("PATCH", "$base/rest/v1/rem_tasks?id=in.(${pending.joinToString(",")})", h + ("Prefer" to "return=minimal"),
+                    JSONObject().put("deleted", true).put("updated_at", System.currentTimeMillis()).toString())
+                if (r.first !in 200..299) error("rem_tasks delete: ${r.first} ${r.second.take(160)}")
+                val left = (p.getStringSet("pendingDel", emptySet()) ?: emptySet()) - pending.map { it.toString() }.toSet()
+                p.edit().putStringSet("pendingDel", left).apply()
+            }
+
+            // categories stay phone-managed (mirrored one way)
             val catArr = JSONArray()
             cats.forEach { catArr.put(JSONObject().put("id", it.id).put("name", it.name).put("color", it.color)) }
-            val taskArr = JSONArray()
-            tasks.forEach {
-                taskArr.put(
-                    JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
-                        .put("category_id", it.categoryId).put("trigger_at", it.triggerAt)
-                        .put("repeat_mode", it.repeat).put("days", it.days).put("times", it.times)
-                        .put("slots", it.slots).put("sound", it.sound).put("vibration", it.vibration)
-                        .put("done", it.done).put("fired", it.fired).put("snooze_until", it.snoozeUntil)
-                )
-            }
             upsert("rem_categories", catArr)
-            upsert("rem_tasks", taskArr)
-            prune("rem_categories", cats.map { it.id })
-            prune("rem_tasks", tasks.map { it.id })
+            val filter = if (cats.isEmpty()) "id=gt.0" else "id=not.in.(${cats.joinToString(",") { it.id.toString() }})"
+            val d = http("DELETE", "$base/rest/v1/rem_categories?$filter", h, null)
+            if (d.first !in 200..299) error("rem_categories delete: ${d.first} ${d.second.take(160)}")
+
+            if (changed) {
+                ReminderWidget.refreshNow(c)
+                WearBridge.pushList(c)
+            }
             "✅ סונכרן ב-" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
         } catch (e: Exception) {
             "❌ " + (e.message ?: e.javaClass.simpleName)
         }
         p.edit().putString("status", status).apply()
         status
+    } }
+}
+
+class SyncWorker(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
+    override suspend fun doWork(): Result {
+        if (Sync.configured(applicationContext)) Sync.syncNow(applicationContext)
+        return Result.success()
     }
 }

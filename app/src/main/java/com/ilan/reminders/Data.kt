@@ -29,8 +29,12 @@ data class Task(
     val fired: Boolean = false,
     val snoozeUntil: Long = 0,
     // per-day schedule: "0=08:00,20:00;2=09:00" (0 = Sunday)
-    @ColumnInfo(defaultValue = "''") val slots: String = ""
+    @ColumnInfo(defaultValue = "''") val slots: String = "",
+    // last user/web edit time (ms), used to decide who wins when the phone and the web both changed a task
+    @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0
 )
+
+fun Task.touch() = copy(updatedAt = System.currentTimeMillis())
 
 @Dao
 interface TaskDao {
@@ -68,7 +72,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 3, exportSchema = false)
+@Database(entities = [Task::class, Category::class], version = 4, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
 
@@ -76,7 +80,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -86,6 +90,12 @@ abstract class AppDb : RoomDatabase() {
 val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN slots TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
     }
 }
 

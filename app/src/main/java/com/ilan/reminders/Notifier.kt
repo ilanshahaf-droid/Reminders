@@ -26,6 +26,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).deleteNotificationChannel("reminders_v1")
+        runCatching { Sync.ensurePeriodic(this) }
     }
 }
 

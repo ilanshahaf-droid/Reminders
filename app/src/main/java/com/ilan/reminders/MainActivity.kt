@@ -342,7 +342,7 @@ fun Root() {
                     val choose = { id: Long ->
                         val sel = tasks.filter { it.id in selected }
                         showBulkCat = false; selected = emptySet()
-                        scope.launch { sel.forEach { dao.upsert(it.copy(categoryId = id)) }; Sync.schedulePush(ctx) }
+                        scope.launch { sel.forEach { dao.upsert(it.copy(categoryId = id).touch()) }; Sync.schedulePush(ctx) }
                         Unit
                     }
                     FilterChip(false, { choose(0L) }, label = { Text("ללא") })
