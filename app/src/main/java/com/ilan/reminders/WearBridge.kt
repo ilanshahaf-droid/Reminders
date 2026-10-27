@@ -48,7 +48,7 @@ object WearBridge {
                         JSONObject().put("id", t.id).put("title", t.title).put("when", whenText(t.triggerAt))
                             .put("rec", recurrenceText(t).replace("\n", " | "))
                             .put("overdue", t.repeat == "NONE" && t.triggerAt < now)
-                            .put("snoozeUntil", t.snoozeUntil)
+                            .put("snoozeUntil", t.snoozeUntil).put("at", t.triggerAt)
                     )
                 }
                 val req = PutDataMapRequest.create("/tasks").apply {
@@ -68,13 +68,43 @@ object WearBridge {
 class WearActionService : WearableListenerService() {
     override fun onMessageReceived(e: MessageEvent) {
         if (e.path == "/tasks/request") { WearBridge.pushList(this); return }
-        if (e.path != "/reminder/action") return
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
+        when (e.path) {
+            "/reminder/create", "/reminder/delete", "/reminder/settime" -> { edit(e.path, j); return }
+            "/reminder/action" -> Unit
+            else -> return
+        }
         val minutes = j.optInt("minutes", 0).takeIf { it > 0 }
             ?: getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
         sendBroadcast(
             Intent(this, ActionReceiver::class.java).setAction(j.optString("action", "SNOOZE"))
                 .putExtra("id", j.optLong("id", -1)).putExtra("minutes", minutes)
         )
+    }
+
+    /** Create / delete / re-time a reminder from the watch. */
+    private fun edit(path: String, j: JSONObject) {
+        val app = applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val dao = AppDb.get(app).dao()
+                when (path) {
+                    "/reminder/create" -> {
+                        val title = j.optString("title").trim()
+                        val at = j.optLong("at")
+                        if (title.isNotEmpty() && at > 0) {
+                            val vib = app.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defVibration", "STRONG") ?: "STRONG"
+                            Reminders.save(app, Task(title = title, triggerAt = at, vibration = vib))
+                        }
+                    }
+                    "/reminder/delete" -> dao.get(j.optLong("id"))?.let { Reminders.delete(app, it) }
+                    "/reminder/settime" -> dao.get(j.optLong("id"))?.let { t ->
+                        if (t.repeat == "NONE" || t.repeat == "MONTHLY") Reminders.save(app, t.copy(triggerAt = j.optLong("at")))
+                    }
+                }
+                ReminderWidget.refreshNow(app)
+                WearBridge.pushList(app)
+            }
+        }
     }
 }
