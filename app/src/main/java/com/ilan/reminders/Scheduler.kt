@@ -65,7 +65,7 @@ object Reminders {
     }
 
     /** Whether the main alarm must be armed for this task. */
-    fun needsAlarm(t: Task): Boolean = if (t.repeat == "NONE" || t.repeat == "LIST") !t.fired else true
+    fun needsAlarm(t: Task): Boolean = if (t.alertMode == "NONE") false else if (t.repeat == "NONE" || t.repeat == "LIST") !t.fired else true
 
     /** Moves a recurring task to its next occurrence. */
     fun advance(t: Task, now: Long): Task = when (t.repeat) {
@@ -90,7 +90,7 @@ object Reminders {
         val id = dao.upsert(t.touch())
         val saved = t.copy(id = id)
         Scheduler.cancel(c, id, true)
-        if (needsAlarm(saved)) scheduleMain(c, saved)
+        if (needsAlarm(saved)) scheduleMain(c, saved) else Scheduler.cancel(c, id, false)
         ReminderWidget.refreshNow(c)
     }
 
@@ -141,7 +141,7 @@ object Reminders {
         else if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
         else if (t.repeat == "LIST") t = settleList(t, now)
         dao.upsert(t)
-        if (needsAlarm(t)) scheduleMain(c, t)
+        if (needsAlarm(t)) scheduleMain(c, t) else Scheduler.cancel(c, t.id, false)
         if (t.snoozeUntil > 0) Scheduler.set(c, t.id, if (t.snoozeUntil > now) t.snoozeUntil else now + 3000, true)
     }
 

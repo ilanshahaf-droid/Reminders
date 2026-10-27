@@ -86,6 +86,7 @@ private val SEED = listOf("אישי" to 0xFF6366F1, "עבודה" to 0xFF0EA5E9, 
 
 private fun bucket(t: Task, now: Long): Int {
     if (t.done) return 5
+    if (t.alertMode == "NONE") return 6   // list-only reminders have no time: no "overdue", no day groups
     if ((t.repeat == "NONE" || (t.repeat == "LIST" && t.fired)) && t.triggerAt < now) return 0
     val today = LocalDate.now()
     val d = Instant.ofEpochMilli(t.triggerAt).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -311,7 +312,7 @@ fun Root() {
                             }
                         }
                         for ((k, list) in groups) {
-                            item(key = "h$k") {
+                            if (k != 6) item(key = "h$k") {
                                 Text(
                                     BUCKETS[k], Modifier.padding(horizontal = 28.dp).padding(top = 16.dp, bottom = 6.dp),
                                     fontSize = 20.sp, fontWeight = FontWeight.Bold,
@@ -486,7 +487,7 @@ private fun TaskCard(
                     textDecoration = if (t.done) TextDecoration.LineThrough else null,
                     color = if (t.done) cs.onSurfaceVariant else cs.onSurface
                 )
-                Text(
+                if (t.alertMode != "NONE") Text(
                     (if (t.repeat != "NONE" && !(t.repeat == "LIST" && t.fired)) "הבא: " else "") + whenText(t.triggerAt),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (overdue) cs.error else cs.onSurfaceVariant
@@ -496,7 +497,7 @@ private fun TaskCard(
                     Text("(במצב נודניק · נדחה ל-%02d:%02d)".format(z.hour, z.minute),
                         style = MaterialTheme.typography.bodyMedium, color = cs.tertiary, fontWeight = FontWeight.Bold)
                 }
-                if (t.repeat != "NONE") {
+                if (t.repeat != "NONE" && t.alertMode != "NONE") {
                     Text("↻ " + recurrenceText(t), style = MaterialTheme.typography.bodyMedium, color = cs.primary)
                 }
                 if (t.notes.isNotBlank()) {
@@ -529,7 +530,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v31") },
+        title = { Text("הגדרות · v32") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

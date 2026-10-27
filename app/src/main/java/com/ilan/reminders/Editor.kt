@@ -153,7 +153,7 @@ fun Editor(
     }
     var confirmDelete by remember { mutableStateOf(false) }
     val z = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault())
-    val valid = title.isNotBlank() && (repeat != "SCHEDULE" || sch.valid())
+    val valid = title.isNotBlank() && (alertMode == "NONE" || repeat != "SCHEDULE" || sch.valid())
 
     val soundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
@@ -177,13 +177,17 @@ fun Editor(
                     Icon(Icons.Default.Delete, "מחק", tint = MaterialTheme.colorScheme.error)
                 }
                 Button(enabled = valid, onClick = {
-                    val sched = repeat == "SCHEDULE"
+                    val noAlert = alertMode == "NONE"
+                    val sched = repeat == "SCHEDULE" && !noAlert
                     onSave(
                         initial.copy(
                             title = title.trim(), notes = notes.trim(), categoryId = categoryId,
-                            triggerAt = if (sched) 0L else if (repeat == "LIST") (dates.minOrNull() ?: at) else at, repeat = repeat,
+                            triggerAt = if (noAlert) (if (initial.alertMode == "NONE" && initial.triggerAt > 0) initial.triggerAt else System.currentTimeMillis())
+                                else if (sched) 0L else if (repeat == "LIST") (dates.minOrNull() ?: at) else at,
+                            repeat = if (noAlert) "NONE" else repeat,
                             days = if (sched) sch.days else 0, times = "",
                             slots = when {
+                                noAlert -> ""
                                 sched -> encodeSchedule(sch.build())
                                 repeat == "LIST" -> dates.sorted().joinToString(",")
                                 else -> ""
@@ -214,6 +218,12 @@ fun Editor(
                 )
             }
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("ONCE" to "עם התראה", "NONE" to "ללא התראה (רק ברשימה)").forEach { (k, l) ->
+                    FilterChip(alertMode == k, { alertMode = k }, label = { Text(l) })
+                }
+            }
+            if (alertMode != "NONE") {
             Section("מתי") {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(repeat == "NONE", { repeat = "NONE" }, label = { Text("חד-פעמי") })
@@ -236,6 +246,7 @@ fun Editor(
                     WhenPicker(at, quick = true) { at = it }
                 }
             }
+            }
 
             Section("קטגוריה") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -248,12 +259,7 @@ fun Editor(
                 }
             }
 
-            Section("התראה") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("ONCE" to "עם התראה", "NONE" to "ללא התראה (רק ברשימה)").forEach { (k, l) ->
-                        FilterChip(alertMode == k, { alertMode = k }, label = { Text(l) })
-                    }
-                }
+            if (alertMode != "NONE") Section("התראה") {
                 if (alertMode != "NONE") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
