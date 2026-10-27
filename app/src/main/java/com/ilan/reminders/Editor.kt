@@ -34,6 +34,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import android.widget.NumberPicker
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.viewinterop.AndroidView
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -187,8 +195,12 @@ fun Editor(
             }
         }
     ) { pad ->
+        val scrollSt = rememberScrollState()
+        val kbc = LocalSoftwareKeyboardController.current
+        val fm = LocalFocusManager.current
+        LaunchedEffect(scrollSt.isScrollInProgress) { if (scrollSt.isScrollInProgress) { kbc?.hide(); fm.clearFocus() } }
         Column(
-            Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState())
+            Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(scrollSt)
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -465,39 +477,86 @@ private fun parseHm(raw: String): Int? {
 }
 
 /** One place to set a moment: quick presets, today/tomorrow chips, date picker, and a time you can simply type. */
+private val MONTHS = arrayOf("ינו׳", "פבר׳", "מרץ", "אפר׳", "מאי", "יוני", "יולי", "אוג׳", "ספט׳", "אוק׳", "נוב׳", "דצמ׳")
+private val TWO = Array(60) { "%02d".format(it) }
+
+/** A scrolling wheel (like the system date/time spinner). */
+@Composable
+private fun Wheel(value: Int, min: Int, max: Int, labels: Array<String>?, color: Int, widthDp: Int, onChange: (Int) -> Unit) {
+    AndroidView(
+        modifier = Modifier.width(widthDp.dp).height(128.dp),
+        factory = { c ->
+            NumberPicker(c).apply {
+                descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                wrapSelectorWheel = true
+            }
+        },
+        update = { np ->
+            np.setOnValueChangedListener(null)
+            np.displayedValues = null
+            np.minValue = min; np.maxValue = max
+            if (labels != null) np.displayedValues = labels.copyOfRange(0, max - min + 1)
+            np.value = value
+            if (android.os.Build.VERSION.SDK_INT >= 29) np.textColor = color
+            np.setOnValueChangedListener { _, _, v -> onChange(v) }
+        }
+    )
+}
+
+/** Date wheels (day / month / year) over time wheels (hour : minute), like the system picker. */
+@Composable
+internal fun WheelDateTime(ms: Long, onChange: (Long) -> Unit) {
+    val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
+    val color = MaterialTheme.colorScheme.onSurface.toArgb()
+    val focus = LocalFocusManager.current
+    val kb = LocalSoftwareKeyboardController.current
+    fun set(y: Int = z.year, mo: Int = z.monthValue, d: Int = z.dayOfMonth, h: Int = z.hour, mi: Int = z.minute) {
+        focus.clearFocus(); kb?.hide()
+        val dd = minOf(d, java.time.YearMonth.of(y, mo).lengthOfMonth())
+        onChange(java.time.LocalDateTime.of(y, mo, dd, h, mi).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+    }
+    val dim = java.time.YearMonth.of(z.year, z.monthValue).lengthOfMonth()
+    val y0 = minOf(LocalDate.now().year, z.year)
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            Wheel(z.dayOfMonth, 1, dim, null, color, 84) { set(d = it) }
+            Wheel(z.monthValue, 1, 12, MONTHS, color, 96) { set(mo = it) }
+            Wheel(z.year, y0, y0 + 10, null, color, 96) { set(y = it) }
+        }
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Wheel(z.hour, 0, 23, TWO, color, 96) { set(h = it) }
+                Text(":", style = MaterialTheme.typography.headlineMedium)
+                Wheel(z.minute, 0, 59, TWO, color, 96) { set(mi = it) }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
-    val ctx = LocalContext.current
     val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
     val today = LocalDate.now()
     fun atTime(date: LocalDate, h: Int, m: Int) =
         date.atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val focus = LocalFocusManager.current
+    val kb = LocalSoftwareKeyboardController.current
+    fun pick(v: Long) { focus.clearFocus(); kb?.hide(); onChange(v) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (quick) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(whenText(ms), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(z.toLocalDate() == today, { pick(z.with(today).toInstant().toEpochMilli()) }, label = { Text("היום") })
+            FilterChip(z.toLocalDate() == today.plusDays(1), { pick(z.with(today.plusDays(1)).toInstant().toEpochMilli()) }, label = { Text("מחר") })
+        }
+        WheelDateTime(ms, onChange)
+        if (quick) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val nowMin = System.currentTimeMillis() / 60_000 * 60_000
             listOf("בעוד 5 דק׳" to 5, "בעוד 15 דק׳" to 15, "בעוד שעה" to 60).forEach { (l, m) ->
-                AssistChip(onClick = { onChange(nowMin + m * 60_000L) }, label = { Text(l) })
+                AssistChip(onClick = { pick(nowMin + m * 60_000L) }, label = { Text(l) })
             }
-            AssistChip(onClick = { onChange(atTime(today, 20, 0)) }, label = { Text("הערב 20:00") })
-            AssistChip(onClick = { onChange(atTime(today.plusDays(1), 8, 0)) }, label = { Text("מחר 08:00") })
+            AssistChip(onClick = { pick(atTime(today, 20, 0)) }, label = { Text("הערב 20:00") })
+            AssistChip(onClick = { pick(atTime(today.plusDays(1), 8, 0)) }, label = { Text("מחר 08:00") })
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(z.toLocalDate() == today, { onChange(z.with(today).toInstant().toEpochMilli()) }, label = { Text("היום") })
-            FilterChip(z.toLocalDate() == today.plusDays(1), { onChange(z.with(today.plusDays(1)).toInstant().toEpochMilli()) }, label = { Text("מחר") })
-            OutlinedButton(onClick = {
-                DatePickerDialog(ctx, { _, y, m, d ->
-                    onChange(z.withYear(y).withMonth(m + 1).withDayOfMonth(d).toInstant().toEpochMilli())
-                }, z.year, z.monthValue - 1, z.dayOfMonth).show()
-            }) { Text("${z.dayOfMonth}/${z.monthValue}/${z.year}") }
-        }
-        FilledTonalButton(
-            onClick = {
-                TimePickerDialog(ctx, { _, hh, mm ->
-                    onChange(z.withHour(hh).withMinute(mm).withSecond(0).withNano(0).toInstant().toEpochMilli())
-                }, z.hour, z.minute, true).show()
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp)
-        ) { Text("🕒  שעה: %02d:%02d  (לחץ לבחירה)".format(z.hour, z.minute), style = MaterialTheme.typography.titleMedium) }
     }
 }

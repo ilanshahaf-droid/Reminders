@@ -107,13 +107,24 @@ object Notifier {
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         try {
-            c.getSystemService(android.os.Vibrator::class.java)
-                ?.vibrate(android.os.VibrationEffect.createWaveform(p, -1), attrs)
+            vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(p, -1), attrs)
         } catch (_: Exception) {}
     }
 
+    /** One shared Vibrator: cancel() only works on the same instance that started the vibration. */
+    private var vib: android.os.Vibrator? = null
+    private fun vibrator(c: Context): android.os.Vibrator? =
+        vib ?: c.applicationContext.getSystemService(android.os.Vibrator::class.java).also { vib = it }
+
+    @Suppress("DEPRECATION")
     fun stopVibration(c: Context) {
-        try { c.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
+        try {
+            val v = vibrator(c) ?: return
+            v.cancel()
+            // belt and braces: a 1 ms buzz replaces whatever is still playing
+            val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
+            v.vibrate(android.os.VibrationEffect.createOneShot(1, 1), attrs)
+        } catch (_: Exception) {}
     }
 
     fun show(c: Context, t: Task) {
@@ -142,9 +153,15 @@ object Notifier {
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(open)
+            .setFullScreenIntent(PendingIntent.getActivity(
+                c, t.id.toInt() * 10 + 7,
+                Intent(c, AlertActivity::class.java).putExtra("id", t.id).putExtra("title", t.title)
+                    .putExtra("text", text).putExtra("minutes", minutes)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT), true)
             .setAutoCancel(false)
             .setOngoing(true)
             .setDeleteIntent(PendingIntent.getBroadcast(
@@ -158,6 +175,7 @@ object Notifier {
         NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
         vibrateNow(c, t)
+        AlertBanner.show(c, t.id, t.title, text, minutes)
     }
 
     /** Replaces the reminder notification with a short confirmation (snooze set / done). */
@@ -197,10 +215,10 @@ object Notifier {
     /** Separate id from the reminder itself, so the watch cancelling the reminder (same package+id) can't remove it. */
     private fun resultId(id: Long) = id.toInt() xor 0x20000000
 
-    fun dismissReminder(c: Context, id: Long) { stopVibration(c); NotificationManagerCompat.from(c).cancel(id.toInt()) }
+    fun dismissReminder(c: Context, id: Long) { stopVibration(c); AlertActivity.finishFor(id); AlertBanner.hide(c, id); NotificationManagerCompat.from(c).cancel(id.toInt()) }
 
     fun cancel(c: Context, id: Long) {
-        stopVibration(c)
+        stopVibration(c); AlertActivity.finishFor(id); AlertBanner.hide(c, id)
         NotificationManagerCompat.from(c).cancel(id.toInt())
         NotificationManagerCompat.from(c).cancel(resultId(id))
     }

@@ -93,13 +93,23 @@ class ReminderListenerService : WearableListenerService() {
             val attrs = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
             try {
-                c.getSystemService(android.os.Vibrator::class.java)
-                    ?.vibrate(android.os.VibrationEffect.createWaveform(list.toLongArray(), -1), attrs)
+                vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(list.toLongArray(), -1), attrs)
             } catch (_: Exception) {}
         }
 
+        /** One shared Vibrator: cancel() only works on the instance that started the vibration. */
+        private var vib: android.os.Vibrator? = null
+        private fun vibrator(c: android.content.Context): android.os.Vibrator? =
+            vib ?: c.applicationContext.getSystemService(android.os.Vibrator::class.java).also { vib = it }
+
+        @Suppress("DEPRECATION")
         fun stopVibration(c: android.content.Context) {
-            try { c.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
+            try {
+                val v = vibrator(c) ?: return
+                v.cancel()
+                val attrs = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM).build()
+                v.vibrate(android.os.VibrationEffect.createOneShot(1, 1), attrs)
+            } catch (_: Exception) {}
         }
 
         private const val CH = "watch_reminders2"

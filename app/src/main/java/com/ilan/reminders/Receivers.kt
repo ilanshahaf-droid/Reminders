@@ -52,8 +52,12 @@ class ActionReceiver : BroadcastReceiver() {
                 val z = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault())
                 return "%02d:%02d".format(z.hour, z.minute)
             }
+            fun toast(msg: String) = android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(c.applicationContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+            }
             when (act) {
                 "DONE" -> {
+                    toast("התזכורת הושלמה.")
                     Scheduler.cancel(c, id, true)
                     val finished = t.repeat == "NONE" ||
                         (t.repeat == "LIST" && Reminders.nextList(t, now) == null)
@@ -64,18 +68,21 @@ class ActionReceiver : BroadcastReceiver() {
                     Notifier.showResult(c, t, "הושלמה ✓", 8000)
                 }
                 "CANCEL_SNOOZE" -> {
+                    toast("הנודניק בוטל.")
                     Scheduler.cancel(c, id, true)
                     dao.upsert(t.copy(snoozeUntil = 0).touch())
                     Notifier.showResult(c, t, "הנודניק בוטל", 6000)
                 }
                 "SNOOZE_ADD" -> {
                     val at = maxOf(t.snoozeUntil, now) + minutes * 60_000L
+                    toast("הנודניק עודכן ל-${hm(at)}.")
                     dao.upsert(t.copy(snoozeUntil = at).touch())
                     Scheduler.set(c, id, at, true)
                     Notifier.showResult(c, t, "נדחה · נוספו $minutes דק׳ · יופיע שוב ב-${hm(at)}", snoozeActions = true)
                 }
                 else -> {
                     val at = now + minutes * 60_000L
+                    toast("הנודניק הופעל ל-${hm(at)}.")
                     dao.upsert(t.copy(snoozeUntil = at).touch())
                     Scheduler.set(c, id, at, true)
                     Notifier.showResult(c, t, "נדחה ל-$minutes דק׳ · יופיע שוב ב-${hm(at)}", snoozeActions = true)
