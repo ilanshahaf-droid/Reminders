@@ -521,7 +521,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v27") },
+        title = { Text("הגדרות · v28") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

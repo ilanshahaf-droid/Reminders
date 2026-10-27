@@ -93,7 +93,7 @@ internal fun previewVibration(c: Context, v: String) {
 @Composable
 private fun Section(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (title != null) Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             content()
         }
@@ -202,15 +202,15 @@ fun Editor(
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Section {
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
                 val clear = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent
                 )
                 TextField(
                     title, { title = it }, colors = clear, modifier = Modifier.fillMaxWidth(),
-                    textStyle = MaterialTheme.typography.headlineSmall,
-                    placeholder = { Text("מה להזכיר לך?") }
+                    textStyle = MaterialTheme.typography.titleLarge,
+                    placeholder = { Text("מה להזכיר לך?", style = MaterialTheme.typography.titleLarge) }
                 )
             }
 
@@ -475,7 +475,7 @@ private fun parseHm(raw: String): Int? {
 @Composable
 private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTouch: () -> Unit, onChange: (Int) -> Unit) {
     AndroidView(
-        modifier = Modifier.width(widthDp.dp).height(170.dp),
+        modifier = Modifier.width(widthDp.dp).height(128.dp),
         factory = { c ->
             NumberPicker(c).apply {
                 wrapSelectorWheel = true
@@ -490,7 +490,7 @@ private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTo
             np.value = value
             if (android.os.Build.VERSION.SDK_INT >= 29) {
                 np.textColor = color
-                np.textSize = 32f * np.resources.displayMetrics.scaledDensity
+                np.textSize = 28f * np.resources.displayMetrics.scaledDensity
             }
             np.setOnValueChangedListener { _, _, v -> onChange(v) }
             np.setOnTouchListener { _, e -> if (e.action == android.view.MotionEvent.ACTION_DOWN) onTouch(); false }
@@ -557,7 +557,7 @@ private fun dayLabel(ms: Long): String {
     return when (z.toLocalDate()) {
         today -> "היום"
         today.plusDays(1) -> "מחר"
-        else -> z.format(DateTimeFormatter.ofPattern("EEE d/M/yyyy", Locale("he")))
+        else -> "${DAY_LETTERS[z.dayOfWeek.value % 7]}׳ ${z.dayOfMonth}/${z.monthValue}/${z.year % 100}"
     }
 }
 
@@ -580,16 +580,27 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
     }
     fun atTime(date: LocalDate, h: Int, m: Int) =
         date.atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    fun pick(v: Long) { focus.clearFocus(); kb?.hide(); onChange(v) }
+    val view = androidx.compose.ui.platform.LocalView.current
+    fun hideKb() {
+        focus.clearFocus(); kb?.hide()
+        (view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
+            ?.hideSoftInputFromWindow(view.windowToken, 0)
+    }
+    LaunchedEffect(showCalendar) { if (showCalendar) hideKb() }
+    fun pick(v: Long) { hideKb(); onChange(v) }
     fun setHm(h: Int, m: Int) = pick(z.withHour(h).withMinute(m).withSecond(0).withNano(0).toInstant().toEpochMilli())
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            val dayModifier = Modifier.weight(1f).height(52.dp)
-            if (showCalendar) FilledTonalButton({ showCalendar = false }, dayModifier) { Text(dayLabel(ms), style = MaterialTheme.typography.titleMedium) }
-            else OutlinedButton({ showCalendar = true }, dayModifier) { Text(dayLabel(ms), style = MaterialTheme.typography.titleMedium) }
-            if (!showCalendar) FilledTonalButton({ }, dayModifier) { Text("%02d:%02d".format(z.hour, z.minute), style = MaterialTheme.typography.titleLarge) }
-            else OutlinedButton({ showCalendar = false }, dayModifier) { Text("%02d:%02d".format(z.hour, z.minute), style = MaterialTheme.typography.titleLarge) }
+            val dm = Modifier.weight(1.25f).height(46.dp)
+            val tm = Modifier.weight(0.75f).height(46.dp)
+            val pad = PaddingValues(horizontal = 8.dp)
+            val dayTxt: @Composable () -> Unit = { Text(dayLabel(ms), style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false) }
+            val timeTxt: @Composable () -> Unit = { Text("%02d:%02d".format(z.hour, z.minute), style = MaterialTheme.typography.titleMedium, maxLines = 1) }
+            if (showCalendar) FilledTonalButton({ hideKb() }, dm, contentPadding = pad) { dayTxt() }
+            else OutlinedButton({ hideKb(); showCalendar = true }, dm, contentPadding = pad) { dayTxt() }
+            if (!showCalendar) FilledTonalButton({ }, tm, contentPadding = pad) { timeTxt() }
+            else OutlinedButton({ showCalendar = false }, tm, contentPadding = pad) { timeTxt() }
         }
         if (showCalendar) {
             CalendarPick(ms) { pick(it); showCalendar = false }
@@ -604,7 +615,7 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
                     Wheel(z.minute, 0, 59, color, 120, { wheelTouched = true }) { setHm(z.hour, it) }
                 }
             }
-            Text("אפשר ללחוץ על המספר ולהקליד אותו", style = MaterialTheme.typography.bodySmall,
+            if (!imeUp) Text("אפשר ללחוץ על המספר ולהקליד אותו", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
