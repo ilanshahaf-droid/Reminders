@@ -521,7 +521,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v25") },
+        title = { Text("הגדרות · v27") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -588,12 +588,6 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
                     ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                         .setData(Uri.parse("package:${ctx.packageName}")))
                 }) { Text("אפשר ללא הגבלה") }
-
-                val overlayOk = Settings.canDrawOverlays(ctx)
-                Text((if (overlayOk) "✅" else "❌") + " באנר קבוע על המסך (נשאר עד לחיצה)")
-                if (!overlayOk) Button(onClick = {
-                    ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")))
-                }) { Text("אפשר הצגה מעל אפליקציות") }
 
                 Text("בסמסונג: הגדרות ← סוללה ← הגבלות שימוש ברקע, והוצא את האפליקציה מ-Sleeping apps ו-Deep sleeping apps.")
                 OutlinedButton(onClick = {

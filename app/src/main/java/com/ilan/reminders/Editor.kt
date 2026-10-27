@@ -35,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import android.widget.NumberPicker
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalFocusManager
@@ -196,9 +197,6 @@ fun Editor(
         }
     ) { pad ->
         val scrollSt = rememberScrollState()
-        val kbc = LocalSoftwareKeyboardController.current
-        val fm = LocalFocusManager.current
-        LaunchedEffect(scrollSt.isScrollInProgress) { if (scrollSt.isScrollInProgress) { kbc?.hide(); fm.clearFocus() } }
         Column(
             Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(scrollSt)
                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -214,14 +212,10 @@ fun Editor(
                     textStyle = MaterialTheme.typography.headlineSmall,
                     placeholder = { Text("מה להזכיר לך?") }
                 )
-                TextField(
-                    notes, { notes = it }, colors = clear, modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("הערות (לא חובה)") }
-                )
             }
 
             Section("מתי") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(repeat == "NONE", { repeat = "NONE" }, label = { Text("חד-פעמי") })
                     FilterChip(repeat == "SCHEDULE", { repeat = "SCHEDULE" }, label = { Text("ימים ושעות") })
                     FilterChip(repeat == "MONTHLY", { repeat = "MONTHLY" }, label = { Text("חודשי") })
@@ -479,7 +473,7 @@ private fun parseHm(raw: String): Int? {
 /** One place to set a moment: quick presets, today/tomorrow chips, date picker, and a time you can simply type. */
 /** A scrolling wheel; tap the centre number to type it with the keyboard. */
 @Composable
-private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onChange: (Int) -> Unit) {
+private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTouch: () -> Unit, onChange: (Int) -> Unit) {
     AndroidView(
         modifier = Modifier.width(widthDp.dp).height(170.dp),
         factory = { c ->
@@ -499,28 +493,61 @@ private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onCh
                 np.textSize = 32f * np.resources.displayMetrics.scaledDensity
             }
             np.setOnValueChangedListener { _, _, v -> onChange(v) }
+            np.setOnTouchListener { _, e -> if (e.action == android.view.MotionEvent.ACTION_DOWN) onTouch(); false }
         }
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Month grid that always fits the width (Sunday on the right). */
 @Composable
-private fun CalendarPick(ms: Long, onChange: (Long) -> Unit) {
+private fun CalendarPick(ms: Long, onPicked: (Long) -> Unit) {
     val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
-    val day = z.toLocalDate()
-    key(day) {
-        val st = rememberDatePickerState(
-            initialSelectedDateMillis = day.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
-        )
-        LaunchedEffect(st.selectedDateMillis) {
-            val sel = st.selectedDateMillis ?: return@LaunchedEffect
-            val d = Instant.ofEpochMilli(sel).atZone(java.time.ZoneOffset.UTC).toLocalDate()
-            if (d != day) onChange(z.with(d).toInstant().toEpochMilli())
+    val sel = z.toLocalDate()
+    val today = LocalDate.now()
+    var ym by remember { mutableStateOf(java.time.YearMonth.from(sel)) }
+    val cs = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TextButton({ ym = ym.minusMonths(1) }) { Text("▶", style = MaterialTheme.typography.titleMedium) }
+            Text(
+                ym.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale("he"))),
+                Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            TextButton({ ym = ym.plusMonths(1) }) { Text("◀", style = MaterialTheme.typography.titleMedium) }
         }
-        DatePicker(
-            st, showModeToggle = false, title = null, headline = null,
-            colors = DatePickerDefaults.colors(containerColor = Color.Transparent)
-        )
+        Row(Modifier.fillMaxWidth()) {
+            DAY_LETTERS.forEach { l ->
+                Text(l, Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = cs.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        val first = ym.atDay(1).dayOfWeek.value % 7
+        val rows = (first + ym.lengthOfMonth() + 6) / 7
+        for (r in 0 until rows) {
+            Row(Modifier.fillMaxWidth()) {
+                for (cIdx in 0 until 7) {
+                    val dayNum = r * 7 + cIdx - first + 1
+                    if (dayNum < 1 || dayNum > ym.lengthOfMonth()) {
+                        Spacer(Modifier.weight(1f).height(44.dp))
+                    } else {
+                        val d = ym.atDay(dayNum)
+                        val on = d == sel
+                        Box(
+                            Modifier.weight(1f).height(44.dp).padding(2.dp).clip(CircleShape)
+                                .background(if (on) cs.primary else Color.Transparent)
+                                .clickable { onPicked(z.with(d).toInstant().toEpochMilli()) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "$dayNum",
+                                color = if (on) cs.onPrimary else if (d == today) cs.primary else cs.onSurface,
+                                fontWeight = if (on || d == today) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -544,6 +571,13 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
     val focus = LocalFocusManager.current
     val kb = LocalSoftwareKeyboardController.current
     var showCalendar by remember { mutableStateOf(false) }
+    val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    var wheelTouched by remember { mutableStateOf(false) }
+    val imeUp = WindowInsets.isImeVisible
+    LaunchedEffect(imeUp, wheelTouched) {
+        if (imeUp && wheelTouched) { kotlinx.coroutines.delay(300); bring.bringIntoView() }
+        if (!imeUp) wheelTouched = false
+    }
     fun atTime(date: LocalDate, h: Int, m: Int) =
         date.atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     fun pick(v: Long) { focus.clearFocus(); kb?.hide(); onChange(v) }
@@ -558,13 +592,16 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
             else OutlinedButton({ showCalendar = false }, dayModifier) { Text("%02d:%02d".format(z.hour, z.minute), style = MaterialTheme.typography.titleLarge) }
         }
         if (showCalendar) {
-            CalendarPick(ms, onChange)
+            CalendarPick(ms) { pick(it); showCalendar = false }
         } else {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Wheel(z.hour, 0, 23, color, 120) { setHm(it, z.minute) }
+                Row(
+                    Modifier.fillMaxWidth().bringIntoViewRequester(bring),
+                    horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Wheel(z.hour, 0, 23, color, 120, { wheelTouched = true }) { setHm(it, z.minute) }
                     Text(":", style = MaterialTheme.typography.displaySmall)
-                    Wheel(z.minute, 0, 59, color, 120) { setHm(z.hour, it) }
+                    Wheel(z.minute, 0, 59, color, 120, { wheelTouched = true }) { setHm(z.hour, it) }
                 }
             }
             Text("אפשר ללחוץ על המספר ולהקליד אותו", style = MaterialTheme.typography.bodySmall,
