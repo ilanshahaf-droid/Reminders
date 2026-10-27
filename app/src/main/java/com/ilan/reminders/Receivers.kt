@@ -42,6 +42,7 @@ class ActionReceiver : BroadcastReceiver() {
         val id = i.getLongExtra("id", -1)
         val minutes = i.getIntExtra("minutes", 10)
         val act = i.action
+        if (act == "STOP") { Notifier.stopVibration(c); return }
         async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async

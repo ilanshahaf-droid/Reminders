@@ -95,13 +95,25 @@ object Notifier {
     /** Vibrates with ALARM usage, which Do Not Disturb lets through (notification vibration is muted there). */
     @Suppress("DEPRECATION")
     private fun vibrateNow(c: Context, t: Task) {
-        val p = patternOf(t.vibration) ?: return
+        val base = patternOf(t.vibration) ?: return
+        // repeat the pattern (with a pause) for up to 10 minutes, or until an action cancels it
+        val list = ArrayList<Long>()
+        var total = 0L
+        while (total < 600_000L) {
+            val chunk = base.toMutableList(); if (list.isNotEmpty()) chunk[0] = 1500L
+            list.addAll(chunk); total += chunk.sum()
+        }
+        val p = list.toLongArray()
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         try {
             c.getSystemService(android.os.Vibrator::class.java)
                 ?.vibrate(android.os.VibrationEffect.createWaveform(p, -1), attrs)
         } catch (_: Exception) {}
+    }
+
+    fun stopVibration(c: Context) {
+        try { c.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
     }
 
     fun show(c: Context, t: Task) {
@@ -133,11 +145,16 @@ object Notifier {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(open)
-            .setAutoCancel(true)
+            .setAutoCancel(false)
+            .setOngoing(true)
+            .setDeleteIntent(PendingIntent.getBroadcast(
+                c, t.id.toInt() * 10 + 6, Intent(c, ActionReceiver::class.java).setAction("STOP").putExtra("id", t.id),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .addAction(done)
             .addAction(snooze)
             .addAction(pick)
             .build()
+        n.flags = n.flags or Notification.FLAG_INSISTENT   // sound repeats until the notification is dismissed
         NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
         vibrateNow(c, t)
@@ -180,9 +197,10 @@ object Notifier {
     /** Separate id from the reminder itself, so the watch cancelling the reminder (same package+id) can't remove it. */
     private fun resultId(id: Long) = id.toInt() xor 0x20000000
 
-    fun dismissReminder(c: Context, id: Long) = NotificationManagerCompat.from(c).cancel(id.toInt())
+    fun dismissReminder(c: Context, id: Long) { stopVibration(c); NotificationManagerCompat.from(c).cancel(id.toInt()) }
 
     fun cancel(c: Context, id: Long) {
+        stopVibration(c)
         NotificationManagerCompat.from(c).cancel(id.toInt())
         NotificationManagerCompat.from(c).cancel(resultId(id))
     }

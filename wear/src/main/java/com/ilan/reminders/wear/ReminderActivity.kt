@@ -116,6 +116,7 @@ class ReminderActivity : ComponentActivity() {
     private fun act(f: Fire, action: String, leaving: Boolean = false, minutes: Int = f.snooze) {
         if (acted) return
         acted = true
+        ReminderListenerService.stopVibration(this)
         WatchBridge.send(this, "/reminder/action", JSONObject().put("id", f.id).put("action", action).put("minutes", minutes).toString())
         getSystemService(NotificationManager::class.java).cancel(f.id.toInt())
         val title: String

@@ -47,8 +47,7 @@ class ReminderListenerService : WearableListenerService() {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CH) == null) {
             val ch = NotificationChannel(CH, "תזכורות", NotificationManager.IMPORTANCE_HIGH)
-            ch.enableVibration(true)
-            ch.vibrationPattern = longArrayOf(0, 800, 200, 800, 200, 800)
+            ch.enableVibration(false)   // vibration is repeated manually until the user acts
             ch.setSound(null, null)
             ch.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             nm.createNotificationChannel(ch)
@@ -62,9 +61,11 @@ class ReminderListenerService : WearableListenerService() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setFullScreenIntent(pi, true)
             .setContentIntent(pi)
-            .setAutoCancel(true)
+            .setAutoCancel(false)
+            .setOngoing(true)
             .build()
         nm.notify(id.toInt(), n)
+        startVibration(this)
         // also try to open the screen directly (works when the overlay permission was granted over ADB)
         runCatching { startActivity(intent) }
     }
@@ -72,6 +73,7 @@ class ReminderListenerService : WearableListenerService() {
     private fun dismiss(id: Long, done: Boolean) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.cancel(id.toInt())
+        stopVibration(this)
         if (done) nm.cancel(snoozeNoteId(id))
         ReminderActivity.current?.get()?.let { a ->
             if (a.shows(id)) a.runOnUiThread { a.finish() }
@@ -79,7 +81,28 @@ class ReminderListenerService : WearableListenerService() {
     }
 
     companion object {
-        private const val CH = "watch_reminders"
+        /** Repeats the buzz (alarm usage, so it also works in Do Not Disturb) for up to 10 minutes or until stopped. */
+        @Suppress("DEPRECATION")
+        fun startVibration(c: android.content.Context) {
+            val base = longArrayOf(0, 800, 200, 800, 200, 800)
+            val list = ArrayList<Long>(); var total = 0L
+            while (total < 600_000L) {
+                val chunk = base.toMutableList(); if (list.isNotEmpty()) chunk[0] = 1500L
+                list.addAll(chunk); total += chunk.sum()
+            }
+            val attrs = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+            try {
+                c.getSystemService(android.os.Vibrator::class.java)
+                    ?.vibrate(android.os.VibrationEffect.createWaveform(list.toLongArray(), -1), attrs)
+            } catch (_: Exception) {}
+        }
+
+        fun stopVibration(c: android.content.Context) {
+            try { c.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
+        }
+
+        private const val CH = "watch_reminders2"
         fun snoozeNoteId(id: Long) = id.toInt() xor 0x40000000
     }
 }

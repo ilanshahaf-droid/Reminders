@@ -471,10 +471,6 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
     val ctx = LocalContext.current
     val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
     val today = LocalDate.now()
-    var text by remember { mutableStateOf("%02d:%02d".format(z.hour, z.minute)) }
-    LaunchedEffect(z.hour, z.minute) {
-        if (parseHm(text) != z.hour * 60 + z.minute) text = "%02d:%02d".format(z.hour, z.minute)
-    }
     fun atTime(date: LocalDate, h: Int, m: Int) =
         date.atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -495,24 +491,13 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
                 }, z.year, z.monthValue - 1, z.dayOfMonth).show()
             }) { Text("${z.dayOfMonth}/${z.monthValue}/${z.year}") }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                text, { v ->
-                    text = v
-                    parseHm(v)?.let { mins ->
-                        onChange(z.withHour(mins / 60).withMinute(mins % 60).withSecond(0).withNano(0).toInstant().toEpochMilli())
-                    }
-                },
-                label = { Text("שעה (למשל 0845)") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                isError = parseHm(text) == null,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = {
+        FilledTonalButton(
+            onClick = {
                 TimePickerDialog(ctx, { _, hh, mm ->
                     onChange(z.withHour(hh).withMinute(mm).withSecond(0).withNano(0).toInstant().toEpochMilli())
                 }, z.hour, z.minute, true).show()
-            }) { Text("שעון") }
-        }
+            },
+            modifier = Modifier.fillMaxWidth().height(56.dp)
+        ) { Text("🕒  שעה: %02d:%02d  (לחץ לבחירה)".format(z.hour, z.minute), style = MaterialTheme.typography.titleMedium) }
     }
 }
