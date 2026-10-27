@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.LocalDate
@@ -221,34 +223,11 @@ fun Editor(
                         (1..10).forEach { n -> FilterChip(dates.size == n, { setCount(n) }, label = { Text("$n") }) }
                     }
                     dates.forEachIndexed { i, ms ->
-                        val zi = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("התראה ${i + 1}", modifier = Modifier.width(78.dp))
-                            OutlinedButton(onClick = {
-                                DatePickerDialog(ctx, { _, y, m, d ->
-                                    dates[i] = zi.withYear(y).withMonth(m + 1).withDayOfMonth(d).toInstant().toEpochMilli()
-                                }, zi.year, zi.monthValue - 1, zi.dayOfMonth).show()
-                            }) { Text("${zi.dayOfMonth}/${zi.monthValue}/${zi.year}") }
-                            OutlinedButton(onClick = {
-                                pickTime(zi.hour, zi.minute) { h, m ->
-                                    dates[i] = zi.withHour(h).withMinute(m).withSecond(0).withNano(0).toInstant().toEpochMilli()
-                                }
-                            }) { Text("%02d:%02d".format(zi.hour, zi.minute)) }
-                        }
+                        Text("התראה ${i + 1}", style = MaterialTheme.typography.labelLarge)
+                        WhenPicker(ms, quick = false) { dates[i] = it }
                     }
                 } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = {
-                            DatePickerDialog(ctx, { _, y, m, d ->
-                                at = z.withYear(y).withMonth(m + 1).withDayOfMonth(d).toInstant().toEpochMilli()
-                            }, z.year, z.monthValue - 1, z.dayOfMonth).show()
-                        }) { Text("${z.dayOfMonth}/${z.monthValue}/${z.year}") }
-                        OutlinedButton(onClick = {
-                            pickTime(z.hour, z.minute) { h, m ->
-                                at = z.withHour(h).withMinute(m).withSecond(0).withNano(0).toInstant().toEpochMilli()
-                            }
-                        }) { Text("%02d:%02d".format(z.hour, z.minute)) }
-                    }
+                    WhenPicker(at, quick = true) { at = it }
                 }
             }
 
@@ -465,4 +444,75 @@ fun BulkScheduleDialog(count: Int, initial: Map<Int, List<String>>, onApply: (Ma
         confirmButton = { TextButton(enabled = sch.valid(), onClick = { onApply(sch.build()) }) { Text("החל") } },
         dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
     )
+}
+
+/** "08:45", "845", "0845" -> minutes since midnight, or null when it is not a valid time. */
+private fun parseHm(raw: String): Int? {
+    val s = raw.trim()
+    val (h, m) = if (s.contains(':')) {
+        val p = s.split(":")
+        if (p.size != 2) return null
+        (p[0].toIntOrNull() ?: return null) to (p[1].toIntOrNull() ?: return null)
+    } else {
+        val d = s.filter { it.isDigit() }
+        when (d.length) {
+            3 -> d.substring(0, 1).toInt() to d.substring(1).toInt()
+            4 -> d.substring(0, 2).toInt() to d.substring(2).toInt()
+            else -> return null
+        }
+    }
+    return if (h in 0..23 && m in 0..59) h * 60 + m else null
+}
+
+/** One place to set a moment: quick presets, today/tomorrow chips, date picker, and a time you can simply type. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
+    val ctx = LocalContext.current
+    val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
+    val today = LocalDate.now()
+    var text by remember { mutableStateOf("%02d:%02d".format(z.hour, z.minute)) }
+    LaunchedEffect(z.hour, z.minute) {
+        if (parseHm(text) != z.hour * 60 + z.minute) text = "%02d:%02d".format(z.hour, z.minute)
+    }
+    fun atTime(date: LocalDate, h: Int, m: Int) =
+        date.atTime(h, m).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (quick) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val nowMin = System.currentTimeMillis() / 60_000 * 60_000
+            listOf("בעוד 5 דק׳" to 5, "בעוד 15 דק׳" to 15, "בעוד שעה" to 60).forEach { (l, m) ->
+                AssistChip(onClick = { onChange(nowMin + m * 60_000L) }, label = { Text(l) })
+            }
+            AssistChip(onClick = { onChange(atTime(today, 20, 0)) }, label = { Text("הערב 20:00") })
+            AssistChip(onClick = { onChange(atTime(today.plusDays(1), 8, 0)) }, label = { Text("מחר 08:00") })
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(z.toLocalDate() == today, { onChange(z.with(today).toInstant().toEpochMilli()) }, label = { Text("היום") })
+            FilterChip(z.toLocalDate() == today.plusDays(1), { onChange(z.with(today.plusDays(1)).toInstant().toEpochMilli()) }, label = { Text("מחר") })
+            OutlinedButton(onClick = {
+                DatePickerDialog(ctx, { _, y, m, d ->
+                    onChange(z.withYear(y).withMonth(m + 1).withDayOfMonth(d).toInstant().toEpochMilli())
+                }, z.year, z.monthValue - 1, z.dayOfMonth).show()
+            }) { Text("${z.dayOfMonth}/${z.monthValue}/${z.year}") }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                text, { v ->
+                    text = v
+                    parseHm(v)?.let { mins ->
+                        onChange(z.withHour(mins / 60).withMinute(mins % 60).withSecond(0).withNano(0).toInstant().toEpochMilli())
+                    }
+                },
+                label = { Text("שעה (למשל 0845)") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = parseHm(text) == null,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = {
+                TimePickerDialog(ctx, { _, hh, mm ->
+                    onChange(z.withHour(hh).withMinute(mm).withSecond(0).withNano(0).toInstant().toEpochMilli())
+                }, z.hour, z.minute, true).show()
+            }) { Text("שעון") }
+        }
+    }
 }

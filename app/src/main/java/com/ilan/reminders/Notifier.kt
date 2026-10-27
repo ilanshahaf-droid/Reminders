@@ -46,13 +46,12 @@ object Notifier {
     /** Android fixes sound and vibration per channel, so each combination gets its own channel. */
     private fun channelFor(c: Context, t: Task): String {
         val snd = effectiveSound(c, t)
-        val id = "rem_${t.vibration}_${if (snd.isBlank()) "def" else abs(snd.hashCode()).toString()}"
+        val id = "rem2_${t.vibration}_${if (snd.isBlank()) "def" else abs(snd.hashCode()).toString()}"
         val nm = c.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(id) == null) {
             val ch = NotificationChannel(id, "תזכורות (${t.vibration})", NotificationManager.IMPORTANCE_HIGH)
-            val p = patternOf(t.vibration)
-            ch.enableVibration(p != null)
-            if (p != null) ch.vibrationPattern = p
+            // Vibration is done manually (alarm usage) so it also works in Do Not Disturb.
+            ch.enableVibration(false)
             val attrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
@@ -93,6 +92,18 @@ object Notifier {
         return bmp
     }
 
+    /** Vibrates with ALARM usage, which Do Not Disturb lets through (notification vibration is muted there). */
+    @Suppress("DEPRECATION")
+    private fun vibrateNow(c: Context, t: Task) {
+        val p = patternOf(t.vibration) ?: return
+        val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+        try {
+            c.getSystemService(android.os.Vibrator::class.java)
+                ?.vibrate(android.os.VibrationEffect.createWaveform(p, -1), attrs)
+        } catch (_: Exception) {}
+    }
+
     fun show(c: Context, t: Task) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -129,6 +140,7 @@ object Notifier {
             .build()
         NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
+        vibrateNow(c, t)
     }
 
     /** Replaces the reminder notification with a short confirmation (snooze set / done). */

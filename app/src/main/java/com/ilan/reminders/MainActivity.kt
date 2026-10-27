@@ -1,6 +1,13 @@
 package com.ilan.reminders
 
 import android.Manifest
+import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -62,6 +69,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { AppTheme { Root() } }
+        // while the app is on screen: pull web changes right away and then every 15 seconds
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    if (Sync.configured(this@MainActivity)) Sync.syncNow(this@MainActivity)
+                    delay(15_000)
+                }
+            }
+        }
     }
 }
 
@@ -116,6 +132,15 @@ fun Root() {
         mutableStateOf(ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getBoolean("showDone", false))
     }
     var showClearDone by remember { mutableStateOf(false) }
+    var syncStatus by remember { mutableStateOf(Sync.prefs(ctx).getString("status", "") ?: "") }
+    DisposableEffect(Unit) {
+        val p = Sync.prefs(ctx)
+        val l = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
+            if (k == "status") syncStatus = sp.getString("status", "") ?: ""
+        }
+        p.registerOnSharedPreferenceChangeListener(l)
+        onDispose { p.unregisterOnSharedPreferenceChangeListener(l) }
+    }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -194,6 +219,11 @@ fun Root() {
                                         if (n == 0) "אין תזכורות פעילות" else "$n תזכורות פעילות",
                                         style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant
                                     )
+                                    if (Sync.configured(ctx)) Text(
+                                        syncStatus, style = MaterialTheme.typography.bodySmall,
+                                        color = if (syncStatus.startsWith("❌")) cs.error else cs.onSurfaceVariant,
+                                        modifier = Modifier.clickable { showSync = true }
+                                    )
                                 }
                                 Surface(shape = RoundedCornerShape(28.dp), color = cs.surface, shadowElevation = 2.dp) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -209,7 +239,7 @@ fun Root() {
                                             }
                                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                                 DropdownMenuItem(
-                                                    text = { Text((if (healthy) "" else "⚠ ") + "הגדרות אמינות") },
+                                                    text = { Text((if (healthy) "" else "⚠ ") + "הגדרות") },
                                                     onClick = { menuOpen = false; showSettings = true }
                                                 )
                                                 val doneCount = tasks.count { it.done }
@@ -228,6 +258,13 @@ fun Root() {
                                                 DropdownMenuItem(
                                                     text = { Text("קטגוריות") },
                                                     onClick = { menuOpen = false; showCats = true }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("סנכרן עכשיו") },
+                                                    onClick = {
+                                                        menuOpen = false
+                                                        scope.launch { Toast.makeText(ctx, Sync.syncNow(ctx), Toast.LENGTH_LONG).show() }
+                                                    }
                                                 )
                                                 DropdownMenuItem(
                                                     text = { Text("סנכרון לענן") },
@@ -446,6 +483,11 @@ private fun TaskCard(
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (overdue) cs.error else cs.onSurfaceVariant
                 )
+                if (!t.done && t.snoozeUntil > System.currentTimeMillis()) {
+                    val z = java.time.Instant.ofEpochMilli(t.snoozeUntil).atZone(java.time.ZoneId.systemDefault())
+                    Text("(במצב נודניק · נדחה ל-%02d:%02d)".format(z.hour, z.minute),
+                        style = MaterialTheme.typography.bodyMedium, color = cs.tertiary, fontWeight = FontWeight.Bold)
+                }
                 if (t.repeat != "NONE") {
                     Text("↻ " + recurrenceText(t), style = MaterialTheme.typography.bodyMedium, color = cs.primary)
                 }
@@ -479,7 +521,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות") },
+        title = { Text("הגדרות · v21") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -547,7 +589,6 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
                         .setData(Uri.parse("package:${ctx.packageName}")))
                 }) { Text("אפשר ללא הגבלה") }
 
-                Text("גרסה: v19", style = MaterialTheme.typography.bodySmall)
                 Text("בסמסונג: הגדרות ← סוללה ← הגבלות שימוש ברקע, והוצא את האפליקציה מ-Sleeping apps ו-Deep sleeping apps.")
                 OutlinedButton(onClick = {
                     ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)

@@ -131,8 +131,13 @@ object Sync {
 
             fun upsert(table: String, arr: JSONArray) {
                 if (arr.length() == 0) return
-                val r = http("POST", "$base/rest/v1/$table?on_conflict=id",
-                    h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), arr.toString())
+                val hh = h + ("Prefer" to "resolution=merge-duplicates,return=minimal")
+                var r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
+                if (r.first == 400 && r.second.contains("alert_mode")) {
+                    // the SQL update that adds this column was not run yet: sync without it
+                    for (i in 0 until arr.length()) arr.getJSONObject(i).remove("alert_mode")
+                    r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
+                }
                 if (r.first !in 200..299) error("$table: ${r.first} ${r.second.take(160)}")
             }
 

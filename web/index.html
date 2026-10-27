@@ -398,7 +398,7 @@ async function saveEd(){
     alert_mode:ed.alert};
   const r = await api('/rest/v1/rem_tasks?on_conflict=id', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
   if(!r.ok) return err('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?');
-  closeEd(); await load(); toast('נשמר. יגיע לטלפון בפתיחת האפליקציה או עד 15 דקות');
+  closeEd(); await load(); toast('נשמר. בטלפון זה מתעדכן תוך כ-15 שניות כשהאפליקציה פתוחה, ובכל מקרה עד 15 דקות');
 }
 async function edToggleDone(){
   const id = ed.id, done = !ed.done; closeEd();
