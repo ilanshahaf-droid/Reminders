@@ -562,7 +562,7 @@ private fun dayLabel(ms: Long): String {
 }
 
 /** Day button + time button (like Samsung Reminder); the chosen one opens a calendar or hour:minute wheels. */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
     val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
