@@ -97,10 +97,12 @@ private fun bucket(t: Task, now: Long): Int {
     }
 }
 
-private fun newTask(c: Context): Task {
+private const val NO_ALERT = -1L
+
+private fun newTask(c: Context, noAlert: Boolean = false): Task {
     val z = ZonedDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0)
     val vib = c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defVibration", "STRONG") ?: "STRONG"
-    return Task(title = "", triggerAt = z.toInstant().toEpochMilli(), vibration = vib)
+    return Task(title = "", triggerAt = z.toInstant().toEpochMilli(), vibration = vib, alertMode = if (noAlert) "NONE" else "ONCE")
 }
 
 private fun batteryOk(c: Context) =
@@ -192,8 +194,12 @@ fun Root() {
         } else {
             val now = System.currentTimeMillis()
             val q = query.trim()
+            // "ללא התראה" (filter == -1) is a separate list; "הכל" and the categories hold only reminders with an alert
             val shown = tasks.filter {
-                (showDone || !it.done) && (filter == null || it.categoryId == filter) &&
+                val inList = if (q.isNotEmpty()) true
+                else if (filter == NO_ALERT) it.alertMode == "NONE"
+                else it.alertMode != "NONE" && (filter == null || it.categoryId == filter)
+                (showDone || !it.done) && inList &&
                     (q.isEmpty() || it.title.contains(q, true) || it.notes.contains(q, true))
             }
             val groups = shown.groupBy { bucket(it, now) }.toSortedMap()
@@ -214,9 +220,10 @@ fun Root() {
                             ) {
                                 Column(Modifier.weight(1f)) {
                                     Text("תזכורות", style = MaterialTheme.typography.headlineLarge)
-                                    val n = tasks.count { !it.done }
+                                    val n = tasks.count { !it.done && (it.alertMode == "NONE") == (filter == NO_ALERT) }
                                     Text(
-                                        if (n == 0) "אין תזכורות פעילות" else "$n תזכורות פעילות",
+                                        if (filter == NO_ALERT) (if (n == 0) "הרשימה ריקה" else "$n פריטים ברשימה ללא התראה")
+                                        else if (n == 0) "אין תזכורות פעילות" else "$n תזכורות פעילות",
                                         style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant
                                     )
                                     if (Sync.configured(ctx)) Text(
@@ -290,6 +297,7 @@ fun Root() {
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 item { FilterChip(filter == null, { filter = null }, label = { Text("הכל") }) }
+                                item { FilterChip(filter == NO_ALERT, { filter = NO_ALERT }, label = { Text("ללא התראה") }) }
                                 items(categories, key = { it.id }) { c ->
                                     FilterChip(filter == c.id, { filter = c.id }, label = { Text(c.name) }, leadingIcon = { Dot(c.color) })
                                 }
@@ -325,7 +333,7 @@ fun Root() {
                     }
 
                     Surface(
-                        onClick = { editor = newTask(ctx) },
+                        onClick = { editor = newTask(ctx, filter == NO_ALERT) },
                         shape = RoundedCornerShape(32.dp), color = cs.surface, shadowElevation = 10.dp,
                         modifier = Modifier.align(Alignment.BottomCenter)
                             .padding(horizontal = 28.dp, vertical = 16.dp).fillMaxWidth().height(64.dp)
@@ -521,7 +529,7 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v30") },
+        title = { Text("הגדרות · v31") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

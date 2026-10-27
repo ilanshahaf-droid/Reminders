@@ -173,7 +173,7 @@ private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit) {
     Screen {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("תזכורות v30", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("תזכורות v31", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
                     if (tasks.isEmpty()) "אין תזכורות פעילות" else "${tasks.size} תזכורות פעילות",
                     color = Color.Gray, fontSize = 13.sp

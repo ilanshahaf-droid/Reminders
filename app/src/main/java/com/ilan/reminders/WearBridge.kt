@@ -43,7 +43,7 @@ object WearBridge {
             runCatching {
                 val now = System.currentTimeMillis()
                 val arr = JSONArray()
-                AppDb.get(app).dao().active().sortedBy { it.triggerAt }.take(30).forEach { t ->
+                AppDb.get(app).dao().active().filter { it.alertMode != "NONE" }.sortedBy { it.triggerAt }.take(30).forEach { t ->
                     arr.put(
                         JSONObject().put("id", t.id).put("title", t.title).put("when", whenText(t.triggerAt))
                             .put("rec", recurrenceText(t).replace("\n", " | "))
