@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import org.json.JSONArray
 
-data class WatchTask(val id: Long, val title: String, val whenText: String, val rec: String, val overdue: Boolean)
+data class WatchTask(val id: Long, val title: String, val whenText: String, val rec: String, val overdue: Boolean, val snoozeUntil: Long = 0)
 
 /** Last task list received from the phone, kept in memory and in SharedPreferences. */
 object TaskStore {
@@ -24,7 +24,7 @@ object TaskStore {
         val a = JSONArray(json)
         (0 until a.length()).map {
             val o = a.getJSONObject(it)
-            WatchTask(o.getLong("id"), o.getString("title"), o.getString("when"), o.optString("rec"), o.optBoolean("overdue"))
+            WatchTask(o.getLong("id"), o.getString("title"), o.getString("when"), o.optString("rec"), o.optBoolean("overdue"), o.optLong("snoozeUntil"))
         }
     }.getOrDefault(emptyList())
 }

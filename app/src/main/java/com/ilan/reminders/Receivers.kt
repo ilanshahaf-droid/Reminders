@@ -28,6 +28,7 @@ class AlarmReceiver : BroadcastReceiver() {
             }
             if (snooze) {
                 dao.upsert(t.copy(snoozeUntil = 0))
+                WearBridge.pushList(c)
                 return@async
             }
             val n = if (t.repeat == "NONE") t.copy(fired = true) else Reminders.advance(t, System.currentTimeMillis())
@@ -89,6 +90,7 @@ class ActionReceiver : BroadcastReceiver() {
                 }
             }
             WearBridge.dismiss(c, id, act == "DONE" || act == "CANCEL_SNOOZE")
+            WearBridge.pushList(c)
         }
     }
 }

@@ -48,6 +48,7 @@ object WearBridge {
                         JSONObject().put("id", t.id).put("title", t.title).put("when", whenText(t.triggerAt))
                             .put("rec", recurrenceText(t).replace("\n", " | "))
                             .put("overdue", t.repeat == "NONE" && t.triggerAt < now)
+                            .put("snoozeUntil", t.snoozeUntil)
                     )
                 }
                 val req = PutDataMapRequest.create("/tasks").apply {

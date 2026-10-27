@@ -72,7 +72,7 @@ private fun TaskListScreen() {
         ) {
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("תזכורות v24", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("תזכורות v25", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text(
                         if (tasks.isEmpty()) "אין תזכורות פעילות" else "${tasks.size} תזכורות פעילות",
                         color = Color.Gray, fontSize = 13.sp
@@ -92,6 +92,13 @@ private fun TaskListScreen() {
                         t.whenText, fontSize = 14.sp,
                         color = if (t.overdue) Color(0xFFFF6B6B) else Color(0xFFB8BBC9)
                     )
+                    if (t.snoozeUntil > System.currentTimeMillis()) {
+                        val z = java.time.Instant.ofEpochMilli(t.snoozeUntil).atZone(java.time.ZoneId.systemDefault())
+                        Text(
+                            "(במצב נודניק · נדחה ל-%02d:%02d)".format(z.hour, z.minute),
+                            color = Color(0xFFFFC857), fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     if (t.rec.isNotBlank()) {
                         Text(
                             "↻ " + t.rec, color = Color(0xFFB3A6FF), fontSize = 12.sp,
