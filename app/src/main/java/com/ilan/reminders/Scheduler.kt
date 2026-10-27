@@ -28,6 +28,26 @@ object Scheduler {
     fun cancel(c: Context, id: Long, snooze: Boolean) {
         c.getSystemService(AlarmManager::class.java).cancel(pi(c, id, snooze))
     }
+
+    // "repeat alert until handled": a separate alarm that re-shows the alert every N minutes
+    private fun nagPi(c: Context, id: Long, count: Int): PendingIntent {
+        val i = Intent(c, AlarmReceiver::class.java).setAction("NAG").putExtra("id", id).putExtra("nag", count)
+        return PendingIntent.getBroadcast(c, (id xor 0x5A5A5A5AL).toInt(), i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    fun nagMinutes(c: Context) = c.getSharedPreferences("app", Context.MODE_PRIVATE).getInt("nagMin", 0)
+
+    fun setNag(c: Context, id: Long, count: Int) {
+        val m = nagMinutes(c)
+        if (m <= 0 || count > 12) { cancelNag(c, id); return }
+        val show = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        c.getSystemService(AlarmManager::class.java)
+            .setAlarmClock(AlarmManager.AlarmClockInfo(System.currentTimeMillis() + m * 60_000L, show), nagPi(c, id, count))
+    }
+
+    fun cancelNag(c: Context, id: Long) {
+        c.getSystemService(AlarmManager::class.java).cancel(nagPi(c, id, 0))
+    }
 }
 
 object Reminders {
@@ -111,10 +131,38 @@ object Reminders {
         ReminderWidget.refreshNow(c)
     }
 
-    /** User deletion: removes locally and tells the cloud copy (the web viewer) it was deleted. */
+    /** User deletion: moves to the recycle bin (kept 30 days) and tells the cloud copy it was deleted. */
     suspend fun delete(c: Context, t: Task) {
-        deleteLocal(c, t)
+        Scheduler.cancel(c, t.id, false)
+        Scheduler.cancel(c, t.id, true)
+        Notifier.cancel(c, t.id)
+        AppDb.get(c).dao().upsert(t.copy(deletedAt = System.currentTimeMillis()).touch())
         Sync.markDeleted(c, t.id)
+        ReminderWidget.refreshNow(c)
+        WearBridge.pushList(c)
+    }
+
+    suspend fun restore(c: Context, t: Task) {
+        val dao = AppDb.get(c).dao()
+        val now = System.currentTimeMillis()
+        Sync.unmarkDeleted(c, t.id)
+        var n = t.copy(deletedAt = 0, snoozeUntil = 0)
+        if (n.repeat == "NONE" && n.triggerAt <= now) n = n.copy(fired = true)   // don't ring for the past
+        else if (n.repeat != "NONE" && n.triggerAt <= now) n = advance(n, now)
+        n = n.touch()
+        dao.upsert(n)
+        if (needsAlarm(n)) scheduleMain(c, n)
+        ReminderWidget.refreshNow(c)
+        WearBridge.pushList(c)
+        Sync.schedulePush(c)
+    }
+
+    /** Permanently removes a task that is in the recycle bin. */
+    suspend fun purge(c: Context, t: Task) = deleteLocal(c, t)
+
+    suspend fun purgeExpired(c: Context) {
+        val dao = AppDb.get(c).dao()
+        for (t in dao.expired(System.currentTimeMillis() - 30L * 24 * 3600 * 1000)) deleteLocal(c, t)
     }
 
     suspend fun deleteLocal(c: Context, t: Task) {
@@ -149,6 +197,7 @@ object Reminders {
     suspend fun rescheduleAll(c: Context) {
         val dao = AppDb.get(c).dao()
         val now = System.currentTimeMillis()
+        purgeExpired(c)
         for (t0 in dao.active()) {
             var t = t0
             if (t.repeat != "NONE" && t.triggerAt <= now) {

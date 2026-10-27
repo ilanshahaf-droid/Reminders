@@ -99,11 +99,27 @@ private fun bucket(t: Task, now: Long): Int {
 }
 
 private const val NO_ALERT = -1L
+private const val TODAY = -2L
+private const val IMPORTANT = -3L
+
+/** Default time for new reminders: the "defTime" setting (HH:mm), today or tomorrow if already past; otherwise the next full hour. */
+fun defaultTriggerAt(c: Context): Long {
+    val p = c.getSharedPreferences("app", Context.MODE_PRIVATE)
+    val dt = p.getString("defTime", "") ?: ""
+    val parsed = runCatching { java.time.LocalTime.parse(dt) }.getOrNull()
+    val now = ZonedDateTime.now()
+    if (parsed == null) return now.plusHours(1).withMinute(0).withSecond(0).withNano(0).toInstant().toEpochMilli()
+    var z = now.with(parsed).withSecond(0).withNano(0)
+    if (!z.isAfter(now)) z = z.plusDays(1)
+    return z.toInstant().toEpochMilli()
+}
+
+fun defaultCategory(c: Context): Long = c.getSharedPreferences("app", Context.MODE_PRIVATE).getLong("defCat", 0L)
 
 private fun newTask(c: Context, noAlert: Boolean = false): Task {
-    val z = ZonedDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0)
     val vib = c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defVibration", "STRONG") ?: "STRONG"
-    return Task(title = "", triggerAt = z.toInstant().toEpochMilli(), vibration = vib, alertMode = if (noAlert) "NONE" else "ONCE")
+    return Task(title = "", triggerAt = defaultTriggerAt(c), vibration = vib, categoryId = defaultCategory(c),
+        alertMode = if (noAlert) "NONE" else "ONCE")
 }
 
 private fun batteryOk(c: Context) =
@@ -116,7 +132,10 @@ fun Root() {
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     val dao = remember { AppDb.get(ctx).dao() }
-    val tasks by dao.all().collectAsState(initial = emptyList())
+    val allTasks by dao.all().collectAsState(initial = emptyList())
+    val tasks = remember(allTasks) { allTasks.filter { it.deletedAt == 0L } }
+    val trash = remember(allTasks) { allTasks.filter { it.deletedAt > 0L } }
+    var showTrash by remember { mutableStateOf(false) }
     val categories by dao.categories().collectAsState(initial = emptyList())
     var editor by remember { mutableStateOf<Task?>(null) }
     var filter by remember { mutableStateOf<Long?>(null) }
@@ -162,6 +181,7 @@ fun Root() {
             SEED.forEach { (n, c) -> dao.addCategory(Category(name = n, color = c)) }
             p.edit().putBoolean("seeded", true).apply()
         }
+        Reminders.purgeExpired(ctx)
         Sync.schedulePush(ctx)
         WearBridge.pushList(ctx)
     }
@@ -199,6 +219,8 @@ fun Root() {
             val shown = tasks.filter {
                 val inList = if (q.isNotEmpty()) true
                 else if (filter == NO_ALERT) it.alertMode == "NONE"
+                else if (filter == IMPORTANT) it.important
+                else if (filter == TODAY) it.alertMode != "NONE" && bucket(it, now) <= 1
                 else it.alertMode != "NONE" && (filter == null || it.categoryId == filter)
                 (showDone || !it.done) && inList &&
                     (q.isEmpty() || it.title.contains(q, true) || it.notes.contains(q, true))
@@ -221,9 +243,11 @@ fun Root() {
                             ) {
                                 Column(Modifier.weight(1f)) {
                                     Text("תזכורות", style = MaterialTheme.typography.headlineLarge)
-                                    val n = tasks.count { !it.done && (it.alertMode == "NONE") == (filter == NO_ALERT) }
+                                    val n = shown.count { !it.done }
                                     Text(
                                         if (filter == NO_ALERT) (if (n == 0) "הרשימה ריקה" else "$n פריטים ברשימה ללא התראה")
+                                        else if (filter == IMPORTANT) (if (n == 0) "אין תזכורות חשובות" else "$n תזכורות חשובות")
+                                        else if (filter == TODAY) (if (n == 0) "אין תזכורות להיום" else "$n תזכורות להיום")
                                         else if (n == 0) "אין תזכורות פעילות" else "$n תזכורות פעילות",
                                         style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant
                                     )
@@ -264,6 +288,10 @@ fun Root() {
                                                     onClick = { menuOpen = false; showClearDone = true }
                                                 )
                                                 DropdownMenuItem(
+                                                    text = { Text("סל מיחזור (${trash.size})") },
+                                                    onClick = { menuOpen = false; showTrash = true }
+                                                )
+                                                DropdownMenuItem(
                                                     text = { Text("קטגוריות") },
                                                     onClick = { menuOpen = false; showCats = true }
                                                 )
@@ -292,13 +320,29 @@ fun Root() {
                             )
                         }
                         item {
+                            val live = tasks.filter { !it.done }
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                SummaryTile("היום", live.count { it.alertMode != "NONE" && bucket(it, now) <= 1 }, "📅", filter == TODAY, Modifier.weight(1f)) {
+                                    filter = if (filter == TODAY) null else TODAY
+                                }
+                                SummaryTile("חשוב", live.count { it.important }, "⭐", filter == IMPORTANT, Modifier.weight(1f)) {
+                                    filter = if (filter == IMPORTANT) null else IMPORTANT
+                                }
+                                SummaryTile("ללא התראה", live.count { it.alertMode == "NONE" }, "📝", filter == NO_ALERT, Modifier.weight(1f)) {
+                                    filter = if (filter == NO_ALERT) null else NO_ALERT
+                                }
+                            }
+                        }
+                        item {
                             LazyRow(
                                 Modifier.padding(vertical = 10.dp),
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 item { FilterChip(filter == null, { filter = null }, label = { Text("הכל") }) }
-                                item { FilterChip(filter == NO_ALERT, { filter = NO_ALERT }, label = { Text("ללא התראה") }) }
                                 items(categories, key = { it.id }) { c ->
                                     FilterChip(filter == c.id, { filter = c.id }, label = { Text(c.name) }, leadingIcon = { Dot(c.color) })
                                 }
@@ -319,7 +363,7 @@ fun Root() {
                                     color = if (k == 0) cs.error else cs.onSurface
                                 )
                             }
-                            items(list.sortedBy { it.triggerAt }, key = { it.id }) { t ->
+                            items(list.sortedWith(compareByDescending<Task> { it.important }.thenBy { it.triggerAt }), key = { it.id }) { t ->
                                 TaskCard(
                                     t, catById[t.categoryId], overdue = k == 0, selected = t.id in selected,
                                     onClick = {
@@ -334,7 +378,7 @@ fun Root() {
                     }
 
                     Surface(
-                        onClick = { editor = newTask(ctx, filter == NO_ALERT) },
+                        onClick = { editor = newTask(ctx, filter == NO_ALERT).copy(important = filter == IMPORTANT) },
                         shape = RoundedCornerShape(32.dp), color = cs.surface, shadowElevation = 10.dp,
                         modifier = Modifier.align(Alignment.BottomCenter)
                             .padding(horizontal = 28.dp, vertical = 16.dp).fillMaxWidth().height(64.dp)
@@ -361,7 +405,13 @@ fun Root() {
         }
     }
 
-    if (showSettings) SettingsDialog(tick) { showSettings = false }
+    if (showSettings) SettingsDialog(tick, categories) { showSettings = false }
+    if (showTrash) TrashDialog(
+        trash, onDismiss = { showTrash = false },
+        onRestore = { t -> scope.launch { Reminders.restore(ctx, t) } },
+        onPurge = { t -> scope.launch { Reminders.purge(ctx, t) } },
+        onEmpty = { scope.launch { trash.forEach { Reminders.purge(ctx, it) } }; showTrash = false }
+    )
     if (showSync) SyncDialog { showSync = false }
     if (showBulkSchedule) {
         val sel = tasks.filter { it.id in selected }
@@ -483,7 +533,7 @@ private fun TaskCard(
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    t.title, style = MaterialTheme.typography.titleLarge,
+                    (if (t.important) "⭐ " else "") + t.title, style = MaterialTheme.typography.titleLarge,
                     textDecoration = if (t.done) TextDecoration.LineThrough else null,
                     color = if (t.done) cs.onSurfaceVariant else cs.onSurface
                 )
@@ -524,13 +574,13 @@ private fun TaskCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
+fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val notifOk = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() }
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v32") },
+        title = { Text("הגדרות · v33") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -541,8 +591,36 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
                         FilterChip(snooze == m, { snooze = m; prefs.edit().putInt("snoozeMin", m).apply() }, label = { Text("$m") })
                     }
                 }
+                Text("התראה חוזרת עד לטיפול (דקות)")
+                var nag by remember { mutableIntStateOf(prefs.getInt("nagMin", 0)) }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0, 2, 5, 10, 15).forEach { m ->
+                        FilterChip(nag == m, { nag = m; prefs.edit().putInt("nagMin", m).apply() }, label = { Text(if (m == 0) "כבוי" else "$m") })
+                    }
+                }
+                Text("כשפעילה, ההתראה תופיע שוב כל כמה דקות עד שתלחץ על \"הושלמה\" או \"נודניק\" (עד 12 פעמים).", style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider()
                 Text("ברירת מחדל להתראות חדשות", fontWeight = FontWeight.Bold)
+                var defTime by remember { mutableStateOf(prefs.getString("defTime", "") ?: "") }
+                Text("שעה לתזכורת חדשה", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(defTime.isEmpty(), { defTime = ""; prefs.edit().putString("defTime", "").apply() }, label = { Text("השעה העגולה הבאה") })
+                    FilterChip(defTime.isNotEmpty(), {
+                        val cur = runCatching { java.time.LocalTime.parse(defTime) }.getOrNull() ?: java.time.LocalTime.of(9, 0)
+                        android.app.TimePickerDialog(ctx, { _, h, m ->
+                            defTime = "%02d:%02d".format(h, m); prefs.edit().putString("defTime", defTime).apply()
+                        }, cur.hour, cur.minute, true).show()
+                    }, label = { Text(if (defTime.isEmpty()) "שעה קבועה…" else defTime) })
+                }
+                var defCat by remember { mutableLongStateOf(prefs.getLong("defCat", 0L)) }
+                Text("קטגוריה לתזכורת חדשה", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(defCat == 0L, { defCat = 0L; prefs.edit().putLong("defCat", 0L).apply() }, label = { Text("ללא") })
+                    categories.forEach { c ->
+                        FilterChip(defCat == c.id, { defCat = c.id; prefs.edit().putLong("defCat", c.id).apply() },
+                            label = { Text(c.name) }, leadingIcon = { Dot(c.color) })
+                    }
+                }
                 var defSound by remember { mutableStateOf(prefs.getString("defSound", "") ?: "") }
                 var defVib by remember { mutableStateOf(prefs.getString("defVibration", "STRONG") ?: "STRONG") }
                 val soundPick = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -606,5 +684,56 @@ fun SettingsDialog(tick: Int, onDismiss: () -> Unit) {
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("סגור") } }
+    )
+}
+
+@Composable
+private fun SummaryTile(label: String, count: Int, icon: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick, modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) cs.primaryContainer else cs.surface,
+        shadowElevation = 1.dp
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(icon, fontSize = 18.sp)
+                Spacer(Modifier.weight(1f))
+                Text("$count", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun TrashDialog(
+    trash: List<Task>, onDismiss: () -> Unit, onRestore: (Task) -> Unit, onPurge: (Task) -> Unit, onEmpty: () -> Unit
+) {
+    val now = System.currentTimeMillis()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("סל מיחזור") },
+        text = {
+            if (trash.isEmpty()) Text("הסל ריק. תזכורות שנמחקו נשמרות כאן 30 יום.")
+            else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("נשמרות 30 יום ואז נמחקות סופית.", style = MaterialTheme.typography.bodySmall)
+                trash.sortedByDescending { it.deletedAt }.forEach { t ->
+                    val left = (30 - (now - t.deletedAt) / 86_400_000L).coerceAtLeast(0)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(t.title.ifBlank { "(ללא כותרת)" }, maxLines = 2)
+                            Text("יימחק בעוד $left ימים", style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton({ onRestore(t) }) { Text("שחזר") }
+                        TextButton({ onPurge(t) }) { Text("מחק", color = MaterialTheme.colorScheme.error) }
+                    }
+                    HorizontalDivider()
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("סגור") } },
+        dismissButton = if (trash.isNotEmpty()) ({ TextButton(onEmpty) { Text("רוקן סל", color = MaterialTheme.colorScheme.error) } }) else null
     )
 }

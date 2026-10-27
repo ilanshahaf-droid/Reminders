@@ -94,7 +94,7 @@ class WearActionService : WearableListenerService() {
                         val at = j.optLong("at")
                         if (title.isNotEmpty() && at > 0) {
                             val vib = app.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defVibration", "STRONG") ?: "STRONG"
-                            Reminders.save(app, Task(title = title, triggerAt = at, vibration = vib))
+                            Reminders.save(app, Task(title = title, triggerAt = at, vibration = vib, categoryId = defaultCategory(app)))
                         }
                     }
                     "/reminder/delete" -> dao.get(j.optLong("id"))?.let { Reminders.delete(app, it) }

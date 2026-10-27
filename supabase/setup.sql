@@ -25,13 +25,15 @@ create table if not exists public.rem_tasks (
   snooze_until bigint not null default 0,
   updated_at bigint not null default 0,
   deleted boolean not null default false,
-  alert_mode text not null default 'ONCE'
+  alert_mode text not null default 'ONCE',
+  important boolean not null default false
 );
 
 -- for tables created before two-way sync (safe to run more than once)
 alter table public.rem_tasks add column if not exists updated_at bigint not null default 0;
 alter table public.rem_tasks add column if not exists deleted boolean not null default false;
 alter table public.rem_tasks add column if not exists alert_mode text not null default 'ONCE';
+alter table public.rem_tasks add column if not exists important boolean not null default false;
 
 alter table public.rem_categories enable row level security;
 alter table public.rem_tasks enable row level security;

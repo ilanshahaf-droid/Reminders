@@ -18,14 +18,17 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val id = i.getLongExtra("id", -1)
         val snooze = i.getBooleanExtra("snooze", false)
+        val nag = if (i.action == "NAG") i.getIntExtra("nag", 1) else 0
         async(c) {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
-            if (t.done) return@async
+            if (t.done || t.deletedAt > 0) return@async
             if (t.alertMode != "NONE") {
                 Notifier.show(c, t)
                 WearBridge.fire(c, t)
+                Scheduler.setNag(c, id, nag + 1)
             }
+            if (nag > 0) return@async
             if (snooze) {
                 dao.upsert(t.copy(snoozeUntil = 0))
                 WearBridge.pushList(c)

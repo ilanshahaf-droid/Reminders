@@ -214,9 +214,10 @@ object Notifier {
     /** Separate id from the reminder itself, so the watch cancelling the reminder (same package+id) can't remove it. */
     private fun resultId(id: Long) = id.toInt() xor 0x20000000
 
-    fun dismissReminder(c: Context, id: Long) { stopVibration(c); AlertActivity.finishFor(id); NotificationManagerCompat.from(c).cancel(id.toInt()) }
+    fun dismissReminder(c: Context, id: Long) { Scheduler.cancelNag(c, id); stopVibration(c); AlertActivity.finishFor(id); NotificationManagerCompat.from(c).cancel(id.toInt()) }
 
     fun cancel(c: Context, id: Long) {
+        Scheduler.cancelNag(c, id)
         stopVibration(c); AlertActivity.finishFor(id)
         NotificationManagerCompat.from(c).cancel(id.toInt())
         NotificationManagerCompat.from(c).cancel(resultId(id))

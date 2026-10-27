@@ -54,6 +54,13 @@ object Sync {
         p.edit().putStringSet("pendingDel", set).apply()
         schedulePush(c)
     }
+    /** A task restored from the recycle bin must not be marked as deleted in the cloud any more. */
+    fun unmarkDeleted(c: Context, id: Long) {
+        val p = prefs(c)
+        val set = (p.getStringSet("pendingDel", emptySet()) ?: emptySet()).toMutableSet()
+        set.remove(id.toString())
+        p.edit().putStringSet("pendingDel", set).apply()
+    }
     private fun pendingDeleted(c: Context): Set<Long> =
         (prefs(c).getStringSet("pendingDel", emptySet()) ?: emptySet()).mapNotNull { it.toLongOrNull() }.toSet()
 
@@ -102,7 +109,7 @@ object Sync {
         sound = r.optString("sound"), vibration = r.optString("vibration", "STRONG"),
         done = r.optBoolean("done"), fired = r.optBoolean("fired"), snoozeUntil = r.optLong("snooze_until"),
         slots = r.optString("slots"), updatedAt = r.optLong("updated_at"),
-        alertMode = r.optString("alert_mode", "ONCE")
+        alertMode = r.optString("alert_mode", "ONCE"), important = r.optBoolean("important", false)
     )
 
     private fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
@@ -111,7 +118,7 @@ object Sync {
         .put("slots", it.slots).put("sound", it.sound).put("vibration", it.vibration)
         .put("done", it.done).put("fired", it.fired).put("snooze_until", it.snoozeUntil)
         .put("updated_at", it.updatedAt).put("deleted", false)
-        .put("alert_mode", it.alertMode)
+        .put("alert_mode", it.alertMode).put("important", it.important)
 
     suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) { mutex.withLock {
         val p = prefs(c)
@@ -133,10 +140,12 @@ object Sync {
                 if (arr.length() == 0) return
                 val hh = h + ("Prefer" to "resolution=merge-duplicates,return=minimal")
                 var r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
-                if (r.first == 400 && r.second.contains("alert_mode")) {
-                    // the SQL update that adds this column was not run yet: sync without it
-                    for (i in 0 until arr.length()) arr.getJSONObject(i).remove("alert_mode")
-                    r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
+                for (col in listOf("important", "alert_mode")) {
+                    if (r.first == 400 && r.second.contains(col)) {
+                        // the SQL update that adds this column was not run yet: sync without it
+                        for (i in 0 until arr.length()) arr.getJSONObject(i).remove(col)
+                        r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
+                    }
                 }
                 if (r.first !in 200..299) error("$table: ${r.first} ${r.second.take(160)}")
             }
@@ -160,14 +169,14 @@ object Sync {
                 if (deleted) remoteDeleted.add(id)
                 val l = local0[id]
                 if (deleted) {
-                    if (l != null && ru > l.updatedAt) { Reminders.deleteLocal(c, l); changed = true }
+                    if (l != null && l.deletedAt == 0L && ru > l.updatedAt) { Reminders.deleteLocal(c, l); changed = true }
                 } else if (l == null || ru > l.updatedAt) {
                     Reminders.applyRemote(c, fromJson(r)); changed = true
                 }
             }
 
             // 2) push: everything the phone has that is not older than the cloud copy
-            val tasks = dao.allNow()
+            val tasks = dao.allNow().filter { it.deletedAt == 0L }   // the recycle bin stays on the phone
             val cats = dao.categoriesNow()
             val taskArr = JSONArray()
             tasks.forEach { t ->

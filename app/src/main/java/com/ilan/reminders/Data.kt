@@ -33,7 +33,11 @@ data class Task(
     // last user/web edit time (ms), used to decide who wins when the phone and the web both changed a task
     @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
     // ONCE = normal alert, NONE = shown in the list only, no notification at all
-    @ColumnInfo(defaultValue = "'ONCE'") val alertMode: String = "ONCE"
+    @ColumnInfo(defaultValue = "'ONCE'") val alertMode: String = "ONCE",
+    // starred reminders are shown first and have their own filter
+    @ColumnInfo(defaultValue = "0") val important: Boolean = false,
+    // > 0 = in the recycle bin since this time (kept 30 days)
+    @ColumnInfo(defaultValue = "0") val deletedAt: Long = 0
 )
 
 fun Task.touch() = copy(updatedAt = System.currentTimeMillis())
@@ -43,7 +47,7 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY done, triggerAt")
     fun all(): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks WHERE done = 0")
+    @Query("SELECT * FROM tasks WHERE done = 0 AND deletedAt = 0")
     suspend fun active(): List<Task>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
@@ -61,6 +65,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks")
     suspend fun allNow(): List<Task>
 
+    @Query("SELECT * FROM tasks WHERE deletedAt > 0 AND deletedAt < :before")
+    suspend fun expired(before: Long): List<Task>
+
     @Query("SELECT * FROM categories")
     suspend fun categoriesNow(): List<Category>
 
@@ -74,7 +81,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 5, exportSchema = false)
+@Database(entities = [Task::class, Category::class], version = 6, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
 
@@ -82,7 +89,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -104,6 +111,13 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN important INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE tasks ADD COLUMN deletedAt INTEGER NOT NULL DEFAULT 0")
     }
 }
 

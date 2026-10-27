@@ -137,6 +137,7 @@ fun Editor(
     var sound by remember { mutableStateOf(initial.sound) }
     var vibration by remember { mutableStateOf(initial.vibration) }
     var alertMode by remember { mutableStateOf(initial.alertMode) }
+    var important by remember { mutableStateOf(initial.important) }
     val dates = remember {
         mutableStateListOf<Long>().apply {
             val saved = initial.dateList()
@@ -193,7 +194,7 @@ fun Editor(
                                 else -> ""
                             },
                             sound = sound, vibration = vibration,
-                            alertMode = alertMode
+                            alertMode = alertMode, important = important
                         )
                     )
                 }) { Text("שמור") }
@@ -218,10 +219,11 @@ fun Editor(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("ONCE" to "עם התראה", "NONE" to "ללא התראה (רק ברשימה)").forEach { (k, l) ->
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("ONCE" to "עם התראה", "NONE" to "ללא התראה").forEach { (k, l) ->
                     FilterChip(alertMode == k, { alertMode = k }, label = { Text(l) })
                 }
+                FilterChip(important, { important = !important }, label = { Text("⭐ חשוב") })
             }
             if (alertMode != "NONE") {
             Section("מתי") {
