@@ -23,20 +23,25 @@ class AlarmReceiver : BroadcastReceiver() {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
             if (t.done || t.deletedAt > 0) return@async
+            // a repeated alert is pointless (and a source of ghost alerts) if the user already pressed a button
+            if (nag > 0 && Notifier.handledSinceFire(c, id)) return@async
             if (t.alertMode != "NONE") {
                 Notifier.show(c, t)
                 WearBridge.fire(c, t)
                 Scheduler.setNag(c, id, nag + 1)
             }
             if (nag > 0) return@async
+            // re-read: the user may have tapped a button while the alert was being shown, and that must not be overwritten
+            val cur = dao.get(id) ?: return@async
+            if (cur.done || cur.deletedAt > 0) { Notifier.dismissReminder(c, id); return@async }
             if (snooze) {
-                dao.upsert(t.copy(snoozeUntil = 0))
+                dao.upsert(cur.copy(snoozeUntil = 0))
                 WearBridge.pushList(c)
                 return@async
             }
-            val n = if (t.repeat == "NONE") t.copy(fired = true) else Reminders.advance(t, System.currentTimeMillis())
+            val n = if (cur.repeat == "NONE") cur.copy(fired = true) else Reminders.advance(cur, System.currentTimeMillis())
             dao.upsert(n)
-            if (t.repeat != "NONE" && Reminders.needsAlarm(n)) Scheduler.set(c, id, n.triggerAt, false)
+            if (cur.repeat != "NONE" && Reminders.needsAlarm(n)) Scheduler.set(c, id, n.triggerAt, false)
         }
     }
 }
@@ -51,6 +56,7 @@ class ActionReceiver : BroadcastReceiver() {
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
             val now = System.currentTimeMillis()
+            Notifier.noteHandled(c, id)
             Notifier.dismissReminder(c, id)
             fun hm(at: Long): String {
                 val z = java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault())
@@ -94,6 +100,9 @@ class ActionReceiver : BroadcastReceiver() {
             }
             WearBridge.dismiss(c, id, act == "DONE" || act == "CANCEL_SNOOZE")
             WearBridge.pushList(c)
+            // belt and braces: stop any vibration that a racing alert may have started in the meantime
+            kotlinx.coroutines.delay(1500)
+            Notifier.dismissReminder(c, id)
         }
     }
 }

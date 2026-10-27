@@ -401,8 +401,10 @@ private fun TimeChips(times: List<String>, onRemove: (String) -> Unit, onAdd: ()
 fun ScheduleEditor(s: ScheduleState) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
-    fun pick(onPicked: (String) -> Unit) {
-        TimePickerDialog(ctx, { _, h, m -> onPicked("%02d:%02d".format(h, m)) }, 8, 0, true).show()
+    var pending by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    fun pick(onPicked: (String) -> Unit) { pending = onPicked }
+    pending?.let { cb ->
+        TimeWheelDialog("08:00", onDismiss = { pending = null }) { pending = null; cb(it) }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         for (i in 0..6) DayCircle(DAY_LETTERS[i], s.days and (1 shl i) != 0) { s.toggle(i) }
@@ -440,6 +442,30 @@ fun ScheduleEditor(s: ScheduleState) {
             color = cs.error, style = MaterialTheme.typography.bodySmall
         )
     }
+}
+
+/** The same hour:minute wheels used for one-off reminders, in a small dialog. */
+@Composable
+internal fun TimeWheelDialog(initial: String, onDismiss: () -> Unit, onPicked: (String) -> Unit) {
+    val parts = initial.split(":")
+    var h by remember { mutableIntStateOf(parts.getOrNull(0)?.toIntOrNull() ?: 8) }
+    var m by remember { mutableIntStateOf(parts.getOrNull(1)?.toIntOrNull() ?: 0) }
+    val color = MaterialTheme.colorScheme.onSurface.toArgb()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("בחר שעה") },
+        text = {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Wheel(h, 0, 23, color, 100, {}) { h = it }
+                    Text(":", style = MaterialTheme.typography.displaySmall)
+                    Wheel(m, 0, 59, color, 100, {}) { m = it }
+                }
+            }
+        },
+        confirmButton = { TextButton({ onPicked("%02d:%02d".format(h, m)) }) { Text("אישור") } },
+        dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
+    )
 }
 
 @Composable

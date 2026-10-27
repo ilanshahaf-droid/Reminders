@@ -127,7 +127,16 @@ object Notifier {
         } catch (_: Exception) {}
     }
 
+    private fun alertPrefs(c: Context) = c.getSharedPreferences("alerts", Context.MODE_PRIVATE)
+    /** The user pressed a button on this reminder's alert. */
+    fun noteHandled(c: Context, id: Long) { alertPrefs(c).edit().putLong("a$id", System.currentTimeMillis()).apply() }
+    /** True when a button was pressed after the alert was last shown (so a repeated alert must not come back). */
+    fun handledSinceFire(c: Context, id: Long): Boolean {
+        val p = alertPrefs(c); return p.getLong("a$id", 0) >= p.getLong("f$id", 0) && p.getLong("a$id", 0) > 0
+    }
+
     fun show(c: Context, t: Task) {
+        alertPrefs(c).edit().putLong("f${t.id}", System.currentTimeMillis()).apply()
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return

@@ -580,7 +580,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v33") },
+        title = { Text("הגדרות · v34") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -602,15 +602,14 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
                 HorizontalDivider()
                 Text("ברירת מחדל להתראות חדשות", fontWeight = FontWeight.Bold)
                 var defTime by remember { mutableStateOf(prefs.getString("defTime", "") ?: "") }
+                var pickDefTime by remember { mutableStateOf(false) }
+                if (pickDefTime) TimeWheelDialog(defTime.ifEmpty { "09:00" }, onDismiss = { pickDefTime = false }) {
+                    defTime = it; prefs.edit().putString("defTime", it).apply(); pickDefTime = false
+                }
                 Text("שעה לתזכורת חדשה", style = MaterialTheme.typography.bodySmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(defTime.isEmpty(), { defTime = ""; prefs.edit().putString("defTime", "").apply() }, label = { Text("השעה העגולה הבאה") })
-                    FilterChip(defTime.isNotEmpty(), {
-                        val cur = runCatching { java.time.LocalTime.parse(defTime) }.getOrNull() ?: java.time.LocalTime.of(9, 0)
-                        android.app.TimePickerDialog(ctx, { _, h, m ->
-                            defTime = "%02d:%02d".format(h, m); prefs.edit().putString("defTime", defTime).apply()
-                        }, cur.hour, cur.minute, true).show()
-                    }, label = { Text(if (defTime.isEmpty()) "שעה קבועה…" else defTime) })
+                    FilterChip(defTime.isNotEmpty(), { pickDefTime = true }, label = { Text(if (defTime.isEmpty()) "שעה קבועה…" else defTime) })
                 }
                 var defCat by remember { mutableLongStateOf(prefs.getLong("defCat", 0L)) }
                 Text("קטגוריה לתזכורת חדשה", style = MaterialTheme.typography.bodySmall)
