@@ -31,6 +31,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -592,13 +593,26 @@ fun Root() {
 
 @Composable
 private fun SelectionBar(count: Int, onClose: () -> Unit, onSchedule: () -> Unit, onCategory: () -> Unit, onDelete: () -> Unit, onMove: (() -> Unit)? = null) {
-    Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClose) { Icon(Icons.Default.Close, "בטל בחירה") }
-        Text("$count נבחרו", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        IconButton(onSchedule) { Icon(Icons.Default.Edit, "ימים ושעות") }
-        if (onMove != null) TextButton(onMove) { Text("העבר לרשימה") }
-        TextButton(onCategory) { Text("קטגוריה") }
-        IconButton(onDelete) { Icon(Icons.Default.Delete, "מחק", tint = MaterialTheme.colorScheme.error) }
+    val cs = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(24.dp), color = cs.primaryContainer,
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth()
+    ) {
+        Column(Modifier.padding(horizontal = 6.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClose) { Icon(Icons.Default.Close, "בטל בחירה") }
+                Text("$count נבחרו", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                IconButton(onDelete) { Icon(Icons.Default.Delete, "מחק", tint = cs.error) }
+            }
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (onMove != null) AssistChip(onMove, label = { Text("העבר לרשימה") })
+                AssistChip(onCategory, label = { Text("קטגוריה") })
+                AssistChip(onSchedule, label = { Text("ימים ושעות") })
+            }
+        }
     }
 }
 
@@ -687,7 +701,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v38") },
+        title = { Text("הגדרות · v39") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
