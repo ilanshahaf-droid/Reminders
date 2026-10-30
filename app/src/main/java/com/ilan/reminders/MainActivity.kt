@@ -136,6 +136,10 @@ fun Root() {
     val tasks = remember(allTasks) { allTasks.filter { it.deletedAt == 0L } }
     val trash = remember(allTasks) { allTasks.filter { it.deletedAt > 0L } }
     var showTrash by remember { mutableStateOf(false) }
+    var showNewList by remember { mutableStateOf(false) }
+    var renameList by remember { mutableStateOf<String?>(null) }
+    var deleteList by remember { mutableStateOf<String?>(null) }
+    val lists = remember(tasks) { tasks.filter { it.alertMode == "NONE" }.map { it.listName.trim() }.filter { it.isNotEmpty() }.distinct().sorted() }
     val categories by dao.categories().collectAsState(initial = emptyList())
     var editor by remember { mutableStateOf<Task?>(null) }
     var filter by remember { mutableStateOf<Long?>(null) }
@@ -206,7 +210,7 @@ fun Root() {
         val e = editor
         if (e != null) {
             Editor(
-                initial = e, categories = categories,
+                initial = e, categories = categories, lists = lists,
                 onManageCategories = { showCats = true },
                 onBack = { editor = null },
                 onSave = { t -> editor = null; scope.launch { Reminders.save(ctx, t) } },
@@ -348,6 +352,9 @@ fun Root() {
                                 }
                             }
                         }
+                        if (filter == NO_ALERT) item {
+                            TextButton({ showNewList = true }, Modifier.padding(horizontal = 12.dp)) { Text("＋ רשימה חדשה") }
+                        }
                         if (shown.isEmpty()) {
                             item {
                                 Box(Modifier.fillParentMaxWidth().padding(top = 80.dp), Alignment.Center) {
@@ -355,7 +362,31 @@ fun Root() {
                                 }
                             }
                         }
-                        for ((k, list) in groups) {
+                        if (filter == NO_ALERT) {
+                            val byList = shown.groupBy { it.listName.trim() }
+                            val names = byList.keys.filter { it.isNotEmpty() }.sorted() + (if (byList.containsKey("")) listOf("") else emptyList())
+                            for (name in names) {
+                                val rows = byList[name] ?: continue
+                                if (names.size > 1 || name.isNotEmpty()) item(key = "l$name") {
+                                    ListHeader(
+                                        if (name.isEmpty()) "כללי" else name, rows.count { !it.done }, editable = name.isNotEmpty(),
+                                        onAdd = { editor = newTask(ctx, true).copy(listName = name) },
+                                        onRename = { renameList = name }, onDelete = { deleteList = name }
+                                    )
+                                }
+                                items(rows.sortedWith(compareByDescending<Task> { it.important }.thenBy { it.triggerAt }), key = { it.id }) { t ->
+                                    TaskCard(
+                                        t, catById[t.categoryId], overdue = false, selected = t.id in selected,
+                                        onClick = {
+                                            if (selected.isNotEmpty()) selected = if (t.id in selected) selected - t.id else selected + t.id
+                                            else editor = t
+                                        },
+                                        onLongClick = { selected = selected + t.id },
+                                        onToggle = { scope.launch { Reminders.setDone(ctx, t, !t.done) } }
+                                    )
+                                }
+                            }
+                        } else for ((k, list) in groups) {
                             if (k != 6) item(key = "h$k") {
                                 Text(
                                     BUCKETS[k], Modifier.padding(horizontal = 28.dp).padding(top = 16.dp, bottom = 6.dp),
@@ -405,6 +436,55 @@ fun Root() {
         }
     }
 
+    if (showNewList) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNewList = false },
+            title = { Text("רשימה חדשה") },
+            text = { OutlinedTextField(name, { name = it }, singleLine = true, placeholder = { Text("למשל: קניות") }) },
+            confirmButton = {
+                TextButton(enabled = name.isNotBlank(), onClick = {
+                    showNewList = false
+                    editor = newTask(ctx, true).copy(listName = name.trim())
+                }) { Text("צור והוסף פריט") }
+            },
+            dismissButton = { TextButton({ showNewList = false }) { Text("ביטול") } }
+        )
+    }
+    renameList?.let { old ->
+        var name by remember { mutableStateOf(old) }
+        AlertDialog(
+            onDismissRequest = { renameList = null },
+            title = { Text("שינוי שם הרשימה") },
+            text = { OutlinedTextField(name, { name = it }, singleLine = true) },
+            confirmButton = {
+                TextButton(enabled = name.isNotBlank(), onClick = {
+                    renameList = null
+                    val n = name.trim()
+                    scope.launch {
+                        tasks.filter { it.alertMode == "NONE" && it.listName.trim() == old }.forEach { dao.upsert(it.copy(listName = n).touch()) }
+                        Sync.schedulePush(ctx)
+                    }
+                }) { Text("שמור") }
+            },
+            dismissButton = { TextButton({ renameList = null }) { Text("ביטול") } }
+        )
+    }
+    deleteList?.let { name ->
+        val n = tasks.count { it.alertMode == "NONE" && it.listName.trim() == name }
+        AlertDialog(
+            onDismissRequest = { deleteList = null },
+            title = { Text("למחוק את הרשימה \"$name\" ואת $n הפריטים שבה?") },
+            text = { Text("הפריטים יעברו לסל המיחזור למשך 30 יום.") },
+            confirmButton = {
+                TextButton({
+                    deleteList = null
+                    scope.launch { tasks.filter { it.alertMode == "NONE" && it.listName.trim() == name }.forEach { Reminders.delete(ctx, it) } }
+                }) { Text("מחק", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton({ deleteList = null }) { Text("ביטול") } }
+        )
+    }
     if (showSettings) SettingsDialog(tick, categories) { showSettings = false }
     if (showTrash) TrashDialog(
         trash, onDismiss = { showTrash = false },
@@ -548,7 +628,13 @@ private fun TaskCard(
                         style = MaterialTheme.typography.bodyMedium, color = cs.tertiary, fontWeight = FontWeight.Bold)
                 }
                 if (t.repeat != "NONE" && t.alertMode != "NONE") {
-                    Text("↻ " + recurrenceText(t), style = MaterialTheme.typography.bodyMedium, color = cs.primary)
+                    // just a marker; tap it to see every repeat
+                    var recOpen by remember { mutableStateOf(false) }
+                    Text(
+                        if (recOpen) "↻ חוזרת ▴\n" + recurrenceText(t) else "↻ חוזרת ▾",
+                        style = MaterialTheme.typography.bodyMedium, color = cs.primary,
+                        modifier = Modifier.clickable { recOpen = !recOpen }.padding(vertical = 2.dp)
+                    )
                 }
                 if (t.notes.isNotBlank()) {
                     Text(
@@ -580,7 +666,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v36") },
+        title = { Text("הגדרות · v37") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -735,4 +821,23 @@ private fun TrashDialog(
         confirmButton = { TextButton(onDismiss) { Text("סגור") } },
         dismissButton = if (trash.isNotEmpty()) ({ TextButton(onEmpty) { Text("רוקן סל", color = MaterialTheme.colorScheme.error) } }) else null
     )
+}
+
+@Composable
+private fun ListHeader(name: String, count: Int, editable: Boolean, onAdd: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    var menu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 28.dp).padding(top = 16.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = cs.onSurface)
+        Text("  $count", color = cs.onSurfaceVariant)
+        Spacer(Modifier.weight(1f))
+        TextButton(onAdd) { Text("＋ פריט") }
+        if (editable) Box {
+            IconButton({ menu = true }) { Icon(Icons.Default.MoreVert, "אפשרויות הרשימה") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menu = false; onRename() })
+                DropdownMenuItem(text = { Text("מחק רשימה", color = cs.error) }, onClick = { menu = false; onDelete() })
+            }
+        }
+    }
 }

@@ -41,7 +41,9 @@ data class Task(
     // repeat every N days / weeks / months (SCHEDULE = weeks, MONTHLY = months, DAILY = days)
     @ColumnInfo(defaultValue = "1") val every: Int = 1,
     // for "every N weeks": any moment inside the first week of the cycle
-    @ColumnInfo(defaultValue = "0") val anchor: Long = 0
+    @ColumnInfo(defaultValue = "0") val anchor: Long = 0,
+    // for list-only (no alert) reminders: the sub-list they belong to, e.g. "קניות"; blank = general
+    @ColumnInfo(defaultValue = "''") val listName: String = ""
 )
 
 fun Task.touch() = copy(updatedAt = System.currentTimeMillis())
@@ -85,7 +87,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 7, exportSchema = false)
+@Database(entities = [Task::class, Category::class], version = 8, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
 
@@ -93,7 +95,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -115,6 +117,12 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN listName TEXT NOT NULL DEFAULT ''")
     }
 }
 

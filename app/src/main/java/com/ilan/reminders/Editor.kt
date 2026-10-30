@@ -136,6 +136,7 @@ private fun DayCircle(letter: String, on: Boolean, onClick: () -> Unit) {
 fun Editor(
     initial: Task,
     categories: List<Category>,
+    lists: List<String> = emptyList(),
     onManageCategories: () -> Unit,
     onBack: () -> Unit,
     onSave: (Task) -> Unit,
@@ -154,6 +155,8 @@ fun Editor(
     var vibration by remember { mutableStateOf(initial.vibration) }
     var alertMode by remember { mutableStateOf(initial.alertMode) }
     var important by remember { mutableStateOf(initial.important) }
+    var listName by remember { mutableStateOf(initial.listName) }
+    var newListDlg by remember { mutableStateOf(false) }
     val dates = remember {
         mutableStateListOf<Long>().apply {
             val saved = initial.dateList()
@@ -212,7 +215,8 @@ fun Editor(
                                 else -> ""
                             },
                             sound = sound, vibration = vibration,
-                            alertMode = alertMode, important = important
+                            alertMode = alertMode, important = important,
+                            listName = if (noAlert) listName.trim() else ""
                         )
                     )
                 }) { Text("שמור") }
@@ -242,6 +246,15 @@ fun Editor(
                     FilterChip(alertMode == k, { alertMode = k }, label = { Text(l) })
                 }
                 FilterChip(important, { important = !important }, label = { Text("⭐ חשוב") })
+            }
+            if (alertMode == "NONE") Section("רשימה") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(listName.isBlank(), { listName = "" }, label = { Text("כללי") })
+                    (lists + listOf(listName.trim()).filter { it.isNotEmpty() && it !in lists }).forEach { n ->
+                        FilterChip(listName.trim() == n, { listName = n }, label = { Text(n) })
+                    }
+                    AssistChip(onClick = { newListDlg = true }, label = { Text("＋ רשימה חדשה") })
+                }
             }
             if (alertMode != "NONE") {
             Section("מתי") {
@@ -333,6 +346,16 @@ fun Editor(
         }
     }
 
+    if (newListDlg) {
+        var nm by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { newListDlg = false },
+            title = { Text("רשימה חדשה") },
+            text = { OutlinedTextField(nm, { nm = it }, singleLine = true, placeholder = { Text("למשל: קניות") }) },
+            confirmButton = { TextButton(enabled = nm.isNotBlank(), onClick = { listName = nm.trim(); newListDlg = false }) { Text("צור") } },
+            dismissButton = { TextButton({ newListDlg = false }) { Text("ביטול") } }
+        )
+    }
     if (confirmDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
