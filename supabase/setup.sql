@@ -26,7 +26,9 @@ create table if not exists public.rem_tasks (
   updated_at bigint not null default 0,
   deleted boolean not null default false,
   alert_mode text not null default 'ONCE',
-  important boolean not null default false
+  important boolean not null default false,
+  every_n integer not null default 1,
+  anchor bigint not null default 0
 );
 
 -- for tables created before two-way sync (safe to run more than once)
@@ -34,6 +36,8 @@ alter table public.rem_tasks add column if not exists updated_at bigint not null
 alter table public.rem_tasks add column if not exists deleted boolean not null default false;
 alter table public.rem_tasks add column if not exists alert_mode text not null default 'ONCE';
 alter table public.rem_tasks add column if not exists important boolean not null default false;
+alter table public.rem_tasks add column if not exists every_n integer not null default 1;
+alter table public.rem_tasks add column if not exists anchor bigint not null default 0;
 
 alter table public.rem_categories enable row level security;
 alter table public.rem_tasks enable row level security;

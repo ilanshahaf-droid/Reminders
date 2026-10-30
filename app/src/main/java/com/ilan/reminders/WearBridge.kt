@@ -99,7 +99,7 @@ class WearActionService : WearableListenerService() {
                     }
                     "/reminder/delete" -> dao.get(j.optLong("id"))?.let { Reminders.delete(app, it) }
                     "/reminder/settime" -> dao.get(j.optLong("id"))?.let { t ->
-                        if (t.repeat == "NONE" || t.repeat == "MONTHLY") Reminders.save(app, t.copy(triggerAt = j.optLong("at")))
+                        if (t.repeat == "NONE" || t.repeat == "MONTHLY" || t.repeat == "DAILY") Reminders.save(app, t.copy(triggerAt = j.optLong("at")))
                     }
                 }
                 ReminderWidget.refreshNow(app)

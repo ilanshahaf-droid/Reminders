@@ -54,12 +54,21 @@ object Reminders {
     private val zone get() = ZoneId.systemDefault()
 
     /** Next moment after [after] that matches one of the task's weekday/time slots. */
+    private fun weekStart(d: java.time.LocalDate): java.time.LocalDate = d.minusDays((d.dayOfWeek.value % 7).toLong())
+
     fun nextOccurrence(t: Task, after: Long): Long? {
         val sch = t.schedule()
         if (sch.isEmpty()) return null
         val start = Instant.ofEpochMilli(after).atZone(zone).toLocalDate()
-        for (d in 0..8) {
+        // "every N weeks": only weeks that are a multiple of N away from the anchor week count
+        val n = if (t.anchor > 0) t.every.coerceAtLeast(1) else 1
+        val anchorWeek = if (n > 1) weekStart(Instant.ofEpochMilli(t.anchor).atZone(zone).toLocalDate()) else null
+        for (d in 0..(7 * n + 8)) {
             val date = start.plusDays(d.toLong())
+            if (anchorWeek != null) {
+                val w = java.time.temporal.ChronoUnit.WEEKS.between(anchorWeek, weekStart(date))
+                if (Math.floorMod(w, n.toLong()) != 0L) continue
+            }
             val bit = date.dayOfWeek.value % 7 // Sunday(7) -> 0, Monday -> 1 ... Saturday -> 6
             val times = sch[bit] ?: continue
             for (tm in times.map { LocalTime.parse(it) }.sorted()) {
@@ -70,10 +79,17 @@ object Reminders {
         return null
     }
 
-    private fun monthlyAfter(base: Long, now: Long): Long {
+    private fun stepAfter(base: Long, now: Long, unit: java.time.temporal.ChronoUnit, n: Int): Long {
         var z = Instant.ofEpochMilli(base).atZone(zone)
-        do { z = z.plusMonths(1) } while (z.toInstant().toEpochMilli() <= now)
+        do { z = z.plus(n.coerceAtLeast(1).toLong(), unit) } while (z.toInstant().toEpochMilli() <= now)
         return z.toInstant().toEpochMilli()
+    }
+
+    /** First time a weekly "every N weeks" task is saved: the cycle starts in the week of its first occurrence. */
+    private fun withAnchor(t: Task, now: Long): Task {
+        if (t.repeat != "SCHEDULE" || t.every <= 1 || t.anchor > 0) return t
+        val first = nextOccurrence(t.copy(every = 1), now) ?: return t
+        return t.copy(anchor = first)
     }
 
     fun nextList(t: Task, after: Long): Long? = t.dateList().firstOrNull { it > after }
@@ -91,7 +107,8 @@ object Reminders {
     fun advance(t: Task, now: Long): Task = when (t.repeat) {
         "LIST" -> settleList(t, now)
         "SCHEDULE" -> nextOccurrence(t, maxOf(now, t.triggerAt))?.let { t.copy(triggerAt = it) } ?: t
-        "MONTHLY" -> t.copy(triggerAt = monthlyAfter(t.triggerAt, now))
+        "MONTHLY" -> t.copy(triggerAt = stepAfter(t.triggerAt, now, java.time.temporal.ChronoUnit.MONTHS, t.every))
+        "DAILY" -> t.copy(triggerAt = stepAfter(t.triggerAt, now, java.time.temporal.ChronoUnit.DAYS, t.every))
         else -> t
     }
 
@@ -103,9 +120,9 @@ object Reminders {
     suspend fun save(c: Context, task: Task) {
         val dao = AppDb.get(c).dao()
         val now = System.currentTimeMillis()
-        var t = task.copy(done = false, fired = false, snoozeUntil = 0)
+        var t = withAnchor(task.copy(done = false, fired = false, snoozeUntil = 0), now)
         if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
-        if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
+        if ((t.repeat == "MONTHLY" || t.repeat == "DAILY") && t.triggerAt <= now) t = advance(t, now)
         if (t.repeat == "LIST") t = settleList(t, now)
         val id = dao.upsert(t.touch())
         val saved = t.copy(id = id)
@@ -177,7 +194,7 @@ object Reminders {
     suspend fun applyRemote(c: Context, remote: Task) {
         val dao = AppDb.get(c).dao()
         val now = System.currentTimeMillis()
-        var t = remote
+        var t = withAnchor(remote, now)
         Scheduler.cancel(c, t.id, false)
         Scheduler.cancel(c, t.id, true)
         if (t.done) {
@@ -186,7 +203,7 @@ object Reminders {
             return
         }
         if (t.repeat == "SCHEDULE") t = t.copy(triggerAt = nextOccurrence(t, now) ?: (now + 60_000))
-        else if (t.repeat == "MONTHLY" && t.triggerAt <= now) t = advance(t, now)
+        else if ((t.repeat == "MONTHLY" || t.repeat == "DAILY") && t.triggerAt <= now) t = advance(t, now)
         else if (t.repeat == "LIST") t = settleList(t, now)
         dao.upsert(t)
         if (needsAlarm(t)) scheduleMain(c, t) else Scheduler.cancel(c, t.id, false)

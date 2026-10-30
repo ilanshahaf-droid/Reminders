@@ -65,12 +65,20 @@ fun whenText(ms: Long): String {
     }
 }
 
+/** "כל יום" / "כל יומיים" / "כל 3 ימים", and the same for weeks (w) and months (m). */
+fun everyText(n: Int, unit: String): String = when (unit) {
+    "d" -> when (n) { 1 -> "כל יום"; 2 -> "כל יומיים"; else -> "כל $n ימים" }
+    "w" -> when (n) { 1 -> "כל שבוע"; 2 -> "כל שבועיים"; else -> "כל $n שבועות" }
+    else -> when (n) { 1 -> "כל חודש"; 2 -> "כל חודשיים"; else -> "כל $n חודשים" }
+}
+
 fun recurrenceText(t: Task): String = when (t.repeat) {
-    "SCHEDULE" -> t.schedule().entries.groupBy({ it.value }, { it.key }).entries.joinToString("\n") { (ts, ds) ->
+    "SCHEDULE" -> (if (t.every > 1) everyText(t.every, "w") + "\n" else "") + t.schedule().entries.groupBy({ it.value }, { it.key }).entries.joinToString("\n") { (ts, ds) ->
         val dt = if (ds.size == 7) "כל יום" else ds.sorted().joinToString(" ") { DAY_LETTERS[it] + "׳" }
         dt + " · " + ts.joinToString("  ")
     }
-    "MONTHLY" -> "כל חודש"
+    "MONTHLY" -> everyText(t.every, "m")
+    "DAILY" -> everyText(t.every, "d")
     "LIST" -> t.dateList().let { l ->
         "${l.size} התראות: " + l.joinToString("  ·  ") {
             Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d/M HH:mm"))
@@ -133,6 +141,8 @@ fun Editor(
     var repeat by remember { mutableStateOf(initial.repeat) }
     var at by remember { mutableLongStateOf(initial.triggerAt.takeIf { it > 0 } ?: System.currentTimeMillis() + 3_600_000) }
     val sch = remember { ScheduleState(initial.schedule()) }
+    var every by remember { mutableIntStateOf(initial.every.coerceIn(1, 99)) }
+    var lastRecurring by remember { mutableStateOf(if (initial.repeat in listOf("DAILY", "SCHEDULE", "MONTHLY")) initial.repeat else "SCHEDULE") }
     var categoryId by remember { mutableLongStateOf(initial.categoryId) }
     var sound by remember { mutableStateOf(initial.sound) }
     var vibration by remember { mutableStateOf(initial.vibration) }
@@ -186,6 +196,8 @@ fun Editor(
                             triggerAt = if (noAlert) (if (initial.alertMode == "NONE" && initial.triggerAt > 0) initial.triggerAt else System.currentTimeMillis())
                                 else if (sched) 0L else if (repeat == "LIST") (dates.minOrNull() ?: at) else at,
                             repeat = if (noAlert) "NONE" else repeat,
+                            every = if (!noAlert && repeat in listOf("DAILY", "SCHEDULE", "MONTHLY")) every else 1,
+                            anchor = if (sched && every > 1 && initial.repeat == "SCHEDULE" && initial.every == every) initial.anchor else 0L,
                             days = if (sched) sch.days else 0, times = "",
                             slots = when {
                                 noAlert -> ""
@@ -229,9 +241,26 @@ fun Editor(
             Section("מתי") {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(repeat == "NONE", { repeat = "NONE" }, label = { Text("חד-פעמי") })
-                    FilterChip(repeat == "SCHEDULE", { repeat = "SCHEDULE" }, label = { Text("ימים ושעות") })
-                    FilterChip(repeat == "MONTHLY", { repeat = "MONTHLY" }, label = { Text("חודשי") })
+                    val recurring = repeat in listOf("DAILY", "SCHEDULE", "MONTHLY")
+                    FilterChip(recurring, { repeat = lastRecurring }, label = { Text("חוזרת") })
                     FilterChip(repeat == "LIST", { repeat = "LIST" }, label = { Text("מספר חזרות מוגדר") })
+                }
+                if (repeat in listOf("DAILY", "SCHEDULE", "MONTHLY")) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("DAILY" to "יום", "SCHEDULE" to "שבוע", "MONTHLY" to "חודש").forEach { (k, l) ->
+                            FilterChip(repeat == k, { repeat = k; lastRecurring = k }, label = { Text(l) })
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("כל", style = MaterialTheme.typography.titleMedium)
+                        OutlinedButton({ if (every > 1) every-- }, Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) { Text("−", style = MaterialTheme.typography.titleLarge) }
+                        Text("$every", style = MaterialTheme.typography.titleLarge, modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        OutlinedButton({ if (every < 99) every++ }, Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) { Text("+", style = MaterialTheme.typography.titleLarge) }
+                        Text(
+                            when (repeat) { "DAILY" -> if (every == 1) "יום" else "ימים"; "SCHEDULE" -> if (every == 1) "שבוע" else "שבועות"; else -> if (every == 1) "חודש" else "חודשים" },
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                 }
                 if (repeat == "SCHEDULE") {
                     ScheduleEditor(sch)

@@ -104,6 +104,7 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
     <div class="lbl">מצב התראה</div><div class="chips" id="edAlert"></div>
     <div id="edWhen">
     <div class="lbl">חזרה</div><div class="chips" id="edRep"></div>
+    <div id="edRec"><div class="chips" id="edUnit"></div><div class="lbl">כל כמה?</div><div style="display:flex;gap:8px;align-items:center"><input id="edEveryN" type="number" min="1" max="99" style="width:80px" oninput="syncEdInputs();renderEdLabel()"> <span id="edEveryLbl"></span></div></div>
     <div id="edOnce"><div class="lbl">תאריך ושעה</div><input id="edDt" type="datetime-local"></div>
     <div id="edList"><div class="lbl">כמה התראות?</div><div class="chips" id="edCnt"></div><div id="edDates"></div></div>
     <div id="edSch"><div class="lbl">ימים ושעות</div><div class="days" id="edDays"></div><div id="edTimes"></div></div>
@@ -186,13 +187,20 @@ function schedule(t){
 }
 function dateList(t){ return (t.slots || '').split(',').map(x => +x.trim()).filter(Boolean).sort((a, b) => a - b); }
 function fmtShort(ms){ const d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function everyText(n, u){
+  if(u === 'd') return n === 1 ? 'כל יום' : n === 2 ? 'כל יומיים' : 'כל ' + n + ' ימים';
+  if(u === 'w') return n === 1 ? 'כל שבוע' : n === 2 ? 'כל שבועיים' : 'כל ' + n + ' שבועות';
+  return n === 1 ? 'כל חודש' : n === 2 ? 'כל חודשיים' : 'כל ' + n + ' חודשים';
+}
 function recText(t){
-  if(t.repeat_mode === 'MONTHLY') return 'כל חודש';
+  const n = t.every_n || 1;
+  if(t.repeat_mode === 'MONTHLY') return everyText(n, 'm');
+  if(t.repeat_mode === 'DAILY') return everyText(n, 'd');
   if(t.repeat_mode === 'LIST'){ const l = dateList(t); return l.length + ' התראות: ' + l.map(fmtShort).join('  ·  '); }
   if(t.repeat_mode !== 'SCHEDULE') return '';
   const groups = {};
   Object.entries(schedule(t)).forEach(([d, ts]) => { const k = ts.join('  '); (groups[k] = groups[k] || []).push(+d); });
-  return Object.entries(groups).map(([k, ds]) => (ds.length === 7 ? 'כל יום' : ds.sort().map(d => DAY_L[d] + '׳').join(' ')) + ' · ' + k).join('\n');
+  return (n > 1 ? everyText(n, 'w') + '\n' : '') + Object.entries(groups).map(([k, ds]) => (ds.length === 7 ? 'כל יום' : ds.sort().map(d => DAY_L[d] + '׳').join(' ')) + ' · ' + k).join('\n');
 }
 const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 function whenText(ms){
@@ -262,7 +270,9 @@ function render(){
   });
 }
 const VIBS = [['STRONG','חזק'],['SHORT','קצר'],['PULSE','פולסים'],['NONE','ללא']];
-const REPS = [['NONE','ללא חזרה'],['SCHEDULE','בימים ושעות'],['MONTHLY','חודשי'],['LIST','מספר חזרות מוגדר']];
+const REPS = [['NONE','חד-פעמי'],['REC','חוזרת'],['LIST','מספר חזרות מוגדר']];
+const UNITS = [['DAILY','יום'],['SCHEDULE','שבוע'],['MONTHLY','חודש']];
+const isRec = r => r === 'DAILY' || r === 'SCHEDULE' || r === 'MONTHLY';
 const DAY_N = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const rid = () => Math.floor(1e9 + Math.random() * 1.0e9);
 
@@ -302,10 +312,13 @@ async function clearDone(){
 }
 
 // ---------- editor
-function nextOcc(m, after){
+function weekIdx(d){ const x = new Date(d); x.setHours(12,0,0,0); x.setDate(x.getDate() - x.getDay()); return Math.floor(x.getTime() / (7 * 864e5)); }
+function nextOcc(m, after, every, anchor){
   const base = new Date(after); base.setHours(0,0,0,0);
-  for(let d = 0; d <= 8; d++){
+  const n = anchor > 0 && every > 1 ? every : 1;
+  for(let d = 0; d <= 7 * n + 8; d++){
     const day = new Date(base); day.setDate(base.getDate() + d);
+    if(n > 1 && (((weekIdx(day) - weekIdx(anchor)) % n) + n) % n !== 0) continue;
     const ts = m[day.getDay()]; if(!ts) continue;
     for(const t of [...ts].sort()){
       const [h, mi] = t.split(':'); const x = new Date(day); x.setHours(+h, +mi, 0, 0);
@@ -323,8 +336,8 @@ function openEd(t){
   const isNew = !t;
   const now = new Date(); now.setHours(now.getHours() + 1, 0, 0, 0);
   ed = isNew
-    ? {id:rid(), alert:(filter === -1 ? 'NONE' : 'ONCE'), imp:(filter === -3), dates:[0,1,2].map(i => toLocalInput(now.getTime() + i * 864e5)), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
-    : {id:t.id, alert:t.alert_mode || 'ONCE', imp:!!t.important, dates:(t.repeat_mode === 'LIST' && dateList(t).length ? dateList(t) : [0,1,2].map(i => t.trigger_at + i * 864e5)).map(toLocalInput), title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false, origNone:t.alert_mode === 'NONE', origTrig:t.trigger_at};
+    ? {id:rid(), alert:(filter === -1 ? 'NONE' : 'ONCE'), imp:(filter === -3), every:1, anchor:0, origRep:'NONE', origEvery:1, dates:[0,1,2].map(i => toLocalInput(now.getTime() + i * 864e5)), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
+    : {id:t.id, alert:t.alert_mode || 'ONCE', imp:!!t.important, every:t.every_n || 1, anchor:t.anchor || 0, origRep:t.repeat_mode, origEvery:t.every_n || 1, lastRec:isRec(t.repeat_mode) ? t.repeat_mode : 'SCHEDULE', dates:(t.repeat_mode === 'LIST' && dateList(t).length ? dateList(t) : [0,1,2].map(i => t.trigger_at + i * 864e5)).map(toLocalInput), title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false, origNone:t.alert_mode === 'NONE', origTrig:t.trigger_at};
   $('edTitleH').textContent = isNew ? 'תזכורת חדשה' : 'עריכת תזכורת';
   $('edTitle').value = ed.title; $('edNotes').value = ed.notes; $('edDt').value = ed.dt; $('edErr').textContent = '';
   $('edDel').classList.toggle('hide', isNew); $('edDone').classList.toggle('hide', isNew);
@@ -342,7 +355,11 @@ function renderEd(){
   cc.appendChild(chip('ללא', !ed.cat, () => { ed.cat = 0; renderEd(); }));
   cats.forEach(c => cc.appendChild(chip(c.name, ed.cat === c.id, () => { ed.cat = c.id; renderEd(); }, colorOf(c.color))));
   const rr = $('edRep'); rr.innerHTML = '';
-  REPS.forEach(([k, l]) => rr.appendChild(chip(l, ed.rep === k, () => { syncEdInputs(); ed.rep = k; renderEd(); })));
+  REPS.forEach(([k, l]) => rr.appendChild(chip(l, k === 'REC' ? isRec(ed.rep) : ed.rep === k, () => { syncEdInputs(); ed.rep = k === 'REC' ? (ed.lastRec || 'SCHEDULE') : k; renderEd(); })));
+  $('edRec').classList.toggle('hide', !isRec(ed.rep));
+  const uu = $('edUnit'); uu.innerHTML = '';
+  UNITS.forEach(([k, l]) => uu.appendChild(chip(l, ed.rep === k, () => { syncEdInputs(); ed.rep = k; ed.lastRec = k; renderEd(); })));
+  $('edEveryN').value = ed.every || 1; renderEdLabel();
   const al = $('edAlert'); al.innerHTML = '';
   [['ONCE','עם התראה'],['NONE','ללא התראה']].forEach(([k, l]) => al.appendChild(chip(l, ed.alert === k, () => { syncEdInputs(); ed.alert = k; renderEd(); })));
   al.appendChild(chip('⭐ חשוב', ed.imp, () => { syncEdInputs(); ed.imp = !ed.imp; renderEd(); }));
@@ -385,13 +402,14 @@ function renderEd(){
     row.appendChild(add); tt.appendChild(row);
   });
 }
-function syncEdInputs(){ ed.title = $('edTitle').value; ed.notes = $('edNotes').value; ed.dt = $('edDt').value; }
+function renderEdLabel(){ const n = Math.max(1, Math.min(99, +$('edEveryN').value || 1)); $('edEveryLbl').textContent = ed.rep === 'DAILY' ? (n === 1 ? 'יום' : 'ימים') : ed.rep === 'SCHEDULE' ? (n === 1 ? 'שבוע' : 'שבועות') : (n === 1 ? 'חודש' : 'חודשים'); }
+function syncEdInputs(){ ed.title = $('edTitle').value; ed.notes = $('edNotes').value; ed.dt = $('edDt').value; ed.every = Math.max(1, Math.min(99, +$('edEveryN').value || 1)); }
 async function saveEd(){
   syncEdInputs();
   const err = m => { $('edErr').textContent = m; };
   if(!ed.title.trim()) return err('חסרה כותרת');
   const sch = {}; if(ed.alert !== 'NONE') Object.keys(ed.sch).forEach(d => { const ts = ed.sch[d].filter(Boolean); if(ts.length) sch[d] = ts; });
-  let trig, slotsOut = '', fired = false;
+  let trig, slotsOut = '', fired = false, anchorOut = 0;
   if(ed.alert === 'NONE'){
     trig = ed.origNone && ed.origTrig ? ed.origTrig : Date.now(); ed.rep = 'NONE';
   } else if(ed.rep === 'LIST'){
@@ -401,7 +419,9 @@ async function saveEd(){
     const nx = ms.find(x => x > Date.now()); trig = nx || ms[ms.length - 1]; fired = !nx;
   } else if(ed.rep === 'SCHEDULE'){
     if(!Object.keys(sch).length) return err('בחר לפחות יום אחד עם שעה');
-    trig = nextOcc(sch, Date.now()) || Date.now() + 60000;
+    const ev = ed.every || 1;
+    if(ev > 1){ anchorOut = (ed.origRep === 'SCHEDULE' && ed.origEvery === ev && ed.anchor > 0) ? ed.anchor : (nextOcc(sch, Date.now(), 1, 0) || Date.now()); }
+    trig = nextOcc(sch, Date.now(), ev, anchorOut) || Date.now() + 60000;
   } else {
     if(!ed.dt) return err('חסר תאריך ושעה');
     trig = new Date(ed.dt).getTime();
@@ -409,7 +429,8 @@ async function saveEd(){
   const row = {id:ed.id, title:ed.title.trim(), notes:ed.notes.trim(), category_id:ed.cat, trigger_at:trig,
     repeat_mode:ed.rep, days:0, times:'', slots:ed.rep === 'SCHEDULE' ? encodeSlots(sch) : slotsOut, sound:ed.sound, vibration:ed.vib,
     done:false, fired:fired, snooze_until:0, updated_at:Date.now(), deleted:false,
-    alert_mode:ed.alert, important:!!ed.imp};
+    alert_mode:ed.alert, important:!!ed.imp,
+    every_n:(ed.alert !== 'NONE' && isRec(ed.rep)) ? (ed.every || 1) : 1, anchor:(ed.alert !== 'NONE' && ed.rep === 'SCHEDULE') ? anchorOut : 0};
   const r = await api('/rest/v1/rem_tasks?on_conflict=id', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
   if(!r.ok) return err('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?');
   closeEd(); await load(); toast('נשמר. בטלפון זה מתעדכן תוך כ-15 שניות כשהאפליקציה פתוחה, ובכל מקרה עד 15 דקות');

@@ -109,7 +109,8 @@ object Sync {
         sound = r.optString("sound"), vibration = r.optString("vibration", "STRONG"),
         done = r.optBoolean("done"), fired = r.optBoolean("fired"), snoozeUntil = r.optLong("snooze_until"),
         slots = r.optString("slots"), updatedAt = r.optLong("updated_at"),
-        alertMode = r.optString("alert_mode", "ONCE"), important = r.optBoolean("important", false)
+        alertMode = r.optString("alert_mode", "ONCE"), important = r.optBoolean("important", false),
+        every = r.optInt("every_n", 1).coerceAtLeast(1), anchor = r.optLong("anchor", 0)
     )
 
     private fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
@@ -119,6 +120,7 @@ object Sync {
         .put("done", it.done).put("fired", it.fired).put("snooze_until", it.snoozeUntil)
         .put("updated_at", it.updatedAt).put("deleted", false)
         .put("alert_mode", it.alertMode).put("important", it.important)
+        .put("every_n", it.every).put("anchor", it.anchor)
 
     suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) { mutex.withLock {
         val p = prefs(c)
@@ -140,7 +142,7 @@ object Sync {
                 if (arr.length() == 0) return
                 val hh = h + ("Prefer" to "resolution=merge-duplicates,return=minimal")
                 var r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
-                for (col in listOf("important", "alert_mode")) {
+                for (col in listOf("every_n", "anchor", "important", "alert_mode")) {
                     if (r.first == 400 && r.second.contains(col)) {
                         // the SQL update that adds this column was not run yet: sync without it
                         for (i in 0 until arr.length()) arr.getJSONObject(i).remove(col)

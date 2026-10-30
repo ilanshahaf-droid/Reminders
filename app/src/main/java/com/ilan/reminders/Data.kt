@@ -20,7 +20,7 @@ data class Task(
     val notes: String = "",
     val categoryId: Long = 0,
     val triggerAt: Long = 0,
-    val repeat: String = "NONE",     // NONE, SCHEDULE (days + times), MONTHLY
+    val repeat: String = "NONE",     // NONE, SCHEDULE (weekly: days + times), DAILY, MONTHLY, LIST
     val days: Int = 0,               // bitmask, Sunday = bit 0 ... Saturday = bit 6
     val times: String = "",          // "08:00,20:00"
     val sound: String = "",          // "" = default, "silent", or a uri
@@ -37,7 +37,11 @@ data class Task(
     // starred reminders are shown first and have their own filter
     @ColumnInfo(defaultValue = "0") val important: Boolean = false,
     // > 0 = in the recycle bin since this time (kept 30 days)
-    @ColumnInfo(defaultValue = "0") val deletedAt: Long = 0
+    @ColumnInfo(defaultValue = "0") val deletedAt: Long = 0,
+    // repeat every N days / weeks / months (SCHEDULE = weeks, MONTHLY = months, DAILY = days)
+    @ColumnInfo(defaultValue = "1") val every: Int = 1,
+    // for "every N weeks": any moment inside the first week of the cycle
+    @ColumnInfo(defaultValue = "0") val anchor: Long = 0
 )
 
 fun Task.touch() = copy(updatedAt = System.currentTimeMillis())
@@ -81,7 +85,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 6, exportSchema = false)
+@Database(entities = [Task::class, Category::class], version = 7, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
 
@@ -89,7 +93,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -111,6 +115,13 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN every INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE tasks ADD COLUMN anchor INTEGER NOT NULL DEFAULT 0")
     }
 }
 
