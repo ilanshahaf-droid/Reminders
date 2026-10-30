@@ -125,6 +125,7 @@ const LS = localStorage;
 let cfg = JSON.parse(LS.getItem('cfg') || '{}');
 let sess = JSON.parse(LS.getItem('sess') || 'null');
 const expRec = new Set();
+let listFilter = null;
 let tasks = [], cats = [], filter = null, timer = null, sel = new Set(), showDone = LS.getItem('showDone') === '1', ed = null;
 const $ = id => document.getElementById(id);
 const DAY_L = ['א','ב','ג','ד','ה','ו','ש'];
@@ -293,12 +294,16 @@ function render(){
     // list-only reminders, grouped into their sub-lists
     const byList = {};
     shown.forEach(t => { const n = (t.list_name || '').trim(); (byList[n] = byList[n] || []).push(t); });
-    const names = Object.keys(byList).filter(n => n).sort().concat(byList[''] ? [''] : []);
-    const nb = el('div'); nb.style.margin = '8px 0';
-    const nbtn = el('button', 'sec', '＋ רשימה חדשה'); nbtn.onclick = () => { const n = (prompt('שם הרשימה החדשה (למשל: קניות)') || '').trim(); if(n) openEd(null, {alert:'NONE', list:n}); };
-    nb.appendChild(nbtn); list.appendChild(nb);
+    const allNames = Object.keys(byList).filter(n => n).sort().concat(byList[''] && Object.keys(byList).some(n => n) ? [''] : []);
+    if(listFilter !== null && !(listFilter in byList)) listFilter = null;
+    const names = allNames.filter(n => listFilter === null || n === listFilter);
+    const nb = el('div', 'chips');
+    nb.appendChild(chip('כל הרשימות', listFilter === null, () => { listFilter = null; render(); }));
+    allNames.forEach(n => nb.appendChild(chip(n || 'כללי', listFilter === n, () => { listFilter = n; render(); })));
+    nb.appendChild(chip('＋ רשימה חדשה', false, () => { const n = (prompt('שם הרשימה החדשה (למשל: קניות)') || '').trim(); if(n) openEd(null, {alert:'NONE', list:n}); }));
+    list.appendChild(nb);
     names.forEach(n => {
-      if(names.length > 1 || n){
+      if(names.length > 1 || n || listFilter !== null){
         const h = el('h2', '', (n || 'כללי') + '  ' + byList[n].filter(t => !t.done).length);
         const bar = el('span'); bar.style.cssText = 'font-size:14px;font-weight:400;margin-inline-start:12px';
         const add = el('button', 'ghost', '＋ פריט'); add.onclick = () => openEd(null, {alert:'NONE', list:n});
@@ -359,6 +364,11 @@ function renderSelBar(){
   cats.forEach(c => s.appendChild(new Option(c.name, String(c.id))));
   s.onchange = () => { if(s.value !== '') bulk({category_id:+s.value}); };
   b.appendChild(s);
+  if(tasks.some(t => sel.has(t.id) && t.alert_mode === 'NONE')) add('העבר לרשימה', () => {
+    const names = [...new Set(tasks.filter(t => t.alert_mode === 'NONE').map(t => (t.list_name || '').trim()).filter(Boolean))].sort();
+    const n = prompt('העבר לרשימה (השאר ריק = כללי).\nרשימות קיימות: ' + (names.join(', ') || '—'));
+    if(n !== null) bulk({list_name:n.trim()}, 'הועבר');
+  });
   add('מחק', () => { if(confirm('למחוק ' + sel.size + ' תזכורות?')) bulk({deleted:true}); }, 'danger');
   add('ביטול', () => { sel = new Set(); render(); });
 }
@@ -394,7 +404,7 @@ function openEd(t, preset){
   const isNew = !t;
   const now = new Date(); now.setHours(now.getHours() + 1, 0, 0, 0);
   ed = isNew
-    ? {id:rid(), alert:(preset && preset.alert) || (filter === -1 ? 'NONE' : 'ONCE'), list:(preset && preset.list) || '', imp:(filter === -3), every:1, anchor:0, origRep:'NONE', origEvery:1, dates:[0,1,2].map(i => toLocalInput(now.getTime() + i * 864e5)), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
+    ? {id:rid(), alert:(preset && preset.alert) || (filter === -1 ? 'NONE' : 'ONCE'), list:(preset && preset.list) || (filter === -1 && listFilter ? listFilter : ''), imp:(filter === -3), every:1, anchor:0, origRep:'NONE', origEvery:1, dates:[0,1,2].map(i => toLocalInput(now.getTime() + i * 864e5)), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
     : {id:t.id, alert:t.alert_mode || 'ONCE', list:(t.list_name || ''), imp:!!t.important, every:t.every_n || 1, anchor:t.anchor || 0, origRep:t.repeat_mode, origEvery:t.every_n || 1, lastRec:isRec(t.repeat_mode) ? t.repeat_mode : 'SCHEDULE', dates:(t.repeat_mode === 'LIST' && dateList(t).length ? dateList(t) : [0,1,2].map(i => t.trigger_at + i * 864e5)).map(toLocalInput), title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false, origNone:t.alert_mode === 'NONE', origTrig:t.trigger_at};
   $('edTitleH').textContent = isNew ? 'תזכורת חדשה' : 'עריכת תזכורת';
   $('edTitle').value = ed.title; $('edNotes').value = ed.notes; $('edDt').value = ed.dt; $('edErr').textContent = '';

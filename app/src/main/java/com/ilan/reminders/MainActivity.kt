@@ -139,6 +139,8 @@ fun Root() {
     var showNewList by remember { mutableStateOf(false) }
     var renameList by remember { mutableStateOf<String?>(null) }
     var deleteList by remember { mutableStateOf<String?>(null) }
+    var showMove by remember { mutableStateOf(false) }
+    var listFilter by remember { mutableStateOf<String?>(null) }
     val lists = remember(tasks) { tasks.filter { it.alertMode == "NONE" }.map { it.listName.trim() }.filter { it.isNotEmpty() }.distinct().sorted() }
     val categories by dao.categories().collectAsState(initial = emptyList())
     var editor by remember { mutableStateOf<Task?>(null) }
@@ -230,6 +232,8 @@ fun Root() {
                     (q.isEmpty() || it.title.contains(q, true) || it.notes.contains(q, true))
             }
             val groups = shown.groupBy { bucket(it, now) }.toSortedMap()
+            val hasGeneral = tasks.any { it.alertMode == "NONE" && it.listName.isBlank() }
+            val lf = listFilter?.takeIf { if (it.isEmpty()) hasGeneral else it in lists }   // selected sub-list (null = all)
             val catById = categories.associateBy { it.id }
             Scaffold(containerColor = Color.Transparent) { pad ->
                 Box(Modifier.padding(pad).fillMaxSize()) {
@@ -238,7 +242,8 @@ fun Root() {
                             SelectionBar(
                                 selected.size, onClose = { selected = emptySet() },
                                 onSchedule = { showBulkSchedule = true }, onCategory = { showBulkCat = true },
-                                onDelete = { showBulkDelete = true }
+                                onDelete = { showBulkDelete = true },
+                                onMove = if (tasks.any { it.id in selected && it.alertMode == "NONE" }) ({ showMove = true }) else null
                             )
                         } else item {
                             Row(
@@ -353,7 +358,15 @@ fun Root() {
                             }
                         }
                         if (filter == NO_ALERT) item {
-                            TextButton({ showNewList = true }, Modifier.padding(horizontal = 12.dp)) { Text("＋ רשימה חדשה") }
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                item { FilterChip(lf == null, { listFilter = null }, label = { Text("כל הרשימות") }) }
+                                if (hasGeneral && lists.isNotEmpty()) item { FilterChip(lf == "", { listFilter = "" }, label = { Text("כללי") }) }
+                                items(lists, key = { "ln$it" }) { n -> FilterChip(lf == n, { listFilter = n }, label = { Text(n) }) }
+                                item { AssistChip({ showNewList = true }, label = { Text("＋ רשימה חדשה") }) }
+                            }
                         }
                         if (shown.isEmpty()) {
                             item {
@@ -363,11 +376,11 @@ fun Root() {
                             }
                         }
                         if (filter == NO_ALERT) {
-                            val byList = shown.groupBy { it.listName.trim() }
+                            val byList = shown.groupBy { it.listName.trim() }.filterKeys { lf == null || it == lf }
                             val names = byList.keys.filter { it.isNotEmpty() }.sorted() + (if (byList.containsKey("")) listOf("") else emptyList())
                             for (name in names) {
                                 val rows = byList[name] ?: continue
-                                if (names.size > 1 || name.isNotEmpty()) item(key = "l$name") {
+                                if (names.size > 1 || name.isNotEmpty() || lf != null) item(key = "l$name") {
                                     ListHeader(
                                         if (name.isEmpty()) "כללי" else name, rows.count { !it.done }, editable = name.isNotEmpty(),
                                         onAdd = { editor = newTask(ctx, true).copy(listName = name) },
@@ -409,7 +422,7 @@ fun Root() {
                     }
 
                     Surface(
-                        onClick = { editor = newTask(ctx, filter == NO_ALERT).copy(important = filter == IMPORTANT) },
+                        onClick = { editor = newTask(ctx, filter == NO_ALERT).copy(important = filter == IMPORTANT, listName = if (filter == NO_ALERT) (lf ?: "") else "") },
                         shape = RoundedCornerShape(32.dp), color = cs.surface, shadowElevation = 10.dp,
                         modifier = Modifier.align(Alignment.BottomCenter)
                             .padding(horizontal = 28.dp, vertical = 16.dp).fillMaxWidth().height(64.dp)
@@ -436,6 +449,13 @@ fun Root() {
         }
     }
 
+    if (showMove) {
+        val sel = tasks.filter { it.id in selected && it.alertMode == "NONE" }
+        MoveToListDialog(lists, sel.size, onDismiss = { showMove = false }) { target ->
+            showMove = false; selected = emptySet()
+            scope.launch { sel.forEach { dao.upsert(it.copy(listName = target).touch()) }; Sync.schedulePush(ctx) }
+        }
+    }
     if (showNewList) {
         var name by remember { mutableStateOf("") }
         AlertDialog(
@@ -571,11 +591,12 @@ fun Root() {
 }
 
 @Composable
-private fun SelectionBar(count: Int, onClose: () -> Unit, onSchedule: () -> Unit, onCategory: () -> Unit, onDelete: () -> Unit) {
+private fun SelectionBar(count: Int, onClose: () -> Unit, onSchedule: () -> Unit, onCategory: () -> Unit, onDelete: () -> Unit, onMove: (() -> Unit)? = null) {
     Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClose) { Icon(Icons.Default.Close, "בטל בחירה") }
         Text("$count נבחרו", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         IconButton(onSchedule) { Icon(Icons.Default.Edit, "ימים ושעות") }
+        if (onMove != null) TextButton(onMove) { Text("העבר לרשימה") }
         TextButton(onCategory) { Text("קטגוריה") }
         IconButton(onDelete) { Icon(Icons.Default.Delete, "מחק", tint = MaterialTheme.colorScheme.error) }
     }
@@ -666,7 +687,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v37") },
+        title = { Text("הגדרות · v38") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -840,4 +861,25 @@ private fun ListHeader(name: String, count: Int, editable: Boolean, onAdd: () ->
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MoveToListDialog(lists: List<String>, count: Int, onDismiss: () -> Unit, onMove: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("העבר $count פריטים לרשימה") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistChip({ onMove("") }, label = { Text("כללי") })
+                    lists.forEach { n -> AssistChip({ onMove(n) }, label = { Text(n) }) }
+                }
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("או רשימה חדשה") })
+            }
+        },
+        confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { onMove(name.trim()) }) { Text("העבר לרשימה חדשה") } },
+        dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
+    )
 }

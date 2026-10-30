@@ -157,6 +157,7 @@ fun Editor(
     var important by remember { mutableStateOf(initial.important) }
     var listName by remember { mutableStateOf(initial.listName) }
     var newListDlg by remember { mutableStateOf(false) }
+    val extraLists = remember { mutableStateListOf<String>() }   // lists created while editing: keep their chips when another list is picked
     val dates = remember {
         mutableStateListOf<Long>().apply {
             val saved = initial.dateList()
@@ -250,7 +251,7 @@ fun Editor(
             if (alertMode == "NONE") Section("רשימה") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(listName.isBlank(), { listName = "" }, label = { Text("כללי") })
-                    (lists + listOf(listName.trim()).filter { it.isNotEmpty() && it !in lists }).forEach { n ->
+                    (lists + extraLists + listOf(listName.trim()).filter { it.isNotEmpty() }).distinct().forEach { n ->
                         FilterChip(listName.trim() == n, { listName = n }, label = { Text(n) })
                     }
                     AssistChip(onClick = { newListDlg = true }, label = { Text("＋ רשימה חדשה") })
@@ -352,7 +353,7 @@ fun Editor(
             onDismissRequest = { newListDlg = false },
             title = { Text("רשימה חדשה") },
             text = { OutlinedTextField(nm, { nm = it }, singleLine = true, placeholder = { Text("למשל: קניות") }) },
-            confirmButton = { TextButton(enabled = nm.isNotBlank(), onClick = { listName = nm.trim(); newListDlg = false }) { Text("צור") } },
+            confirmButton = { TextButton(enabled = nm.isNotBlank(), onClick = { listName = nm.trim(); extraLists.add(nm.trim()); newListDlg = false }) { Text("צור") } },
             dismissButton = { TextButton({ newListDlg = false }) { Text("ביטול") } }
         )
     }
