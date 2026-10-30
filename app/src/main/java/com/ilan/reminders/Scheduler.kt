@@ -54,23 +54,25 @@ object Reminders {
     private val zone get() = ZoneId.systemDefault()
 
     /** Next moment after [after] that matches one of the task's weekday/time slots. */
-    private fun weekStart(d: java.time.LocalDate): java.time.LocalDate = d.minusDays((d.dayOfWeek.value % 7).toLong())
+    /** A weekly time that repeats every N weeks counts only on/after its start date and in every N-th week from it. */
+    private fun slotActive(sl: Slot, epochDay: Long): Boolean {
+        if (sl.every <= 1 || sl.anchorDay <= 0) return true
+        if (epochDay < sl.anchorDay) return false
+        val w = Math.floorDiv(epochDay + 4, 7L) - Math.floorDiv(sl.anchorDay + 4, 7L)   // epoch day 3 was a Sunday
+        return Math.floorMod(w, sl.every.toLong()) == 0L
+    }
 
     fun nextOccurrence(t: Task, after: Long): Long? {
         val sch = t.schedule()
         if (sch.isEmpty()) return null
         val start = Instant.ofEpochMilli(after).atZone(zone).toLocalDate()
-        // "every N weeks": only weeks that are a multiple of N away from the anchor week count
-        val n = if (t.anchor > 0) t.every.coerceAtLeast(1) else 1
-        val anchorWeek = if (n > 1) weekStart(Instant.ofEpochMilli(t.anchor).atZone(zone).toLocalDate()) else null
-        for (d in 0..(7 * n + 8)) {
+        val maxN = sch.values.flatten().maxOf { parseSlot(it).every }
+        for (d in 0..(7 * maxN + 8)) {
             val date = start.plusDays(d.toLong())
-            if (anchorWeek != null) {
-                val w = java.time.temporal.ChronoUnit.WEEKS.between(anchorWeek, weekStart(date))
-                if (Math.floorMod(w, n.toLong()) != 0L) continue
-            }
             val bit = date.dayOfWeek.value % 7 // Sunday(7) -> 0, Monday -> 1 ... Saturday -> 6
-            val times = sch[bit] ?: continue
+            val toks = sch[bit] ?: continue
+            val epoch = date.toEpochDay()
+            val times = toks.map { parseSlot(it) }.filter { slotActive(it, epoch) }.map { it.time }
             for (tm in times.map { LocalTime.parse(it) }.sorted()) {
                 val ms = date.atTime(tm).atZone(zone).toInstant().toEpochMilli()
                 if (ms > after) return ms

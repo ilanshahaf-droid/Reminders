@@ -65,6 +65,12 @@ fun whenText(ms: Long): String {
     }
 }
 
+/** "06:45" or "06:45 (כל שבועיים)". */
+fun slotLabel(tok: String): String {
+    val s = parseSlot(tok)
+    return if (s.every > 1) s.time + " (" + everyText(s.every, "w") + ")" else s.time
+}
+
 /** "כל יום" / "כל יומיים" / "כל 3 ימים", and the same for weeks (w) and months (m). */
 fun everyText(n: Int, unit: String): String = when (unit) {
     "d" -> when (n) { 1 -> "כל יום"; 2 -> "כל יומיים"; else -> "כל $n ימים" }
@@ -73,9 +79,9 @@ fun everyText(n: Int, unit: String): String = when (unit) {
 }
 
 fun recurrenceText(t: Task): String = when (t.repeat) {
-    "SCHEDULE" -> (if (t.every > 1) everyText(t.every, "w") + "\n" else "") + t.schedule().entries.groupBy({ it.value }, { it.key }).entries.joinToString("\n") { (ts, ds) ->
+    "SCHEDULE" -> t.schedule().entries.groupBy({ it.value }, { it.key }).entries.joinToString("\n") { (ts, ds) ->
         val dt = if (ds.size == 7) "כל יום" else ds.sorted().joinToString(" ") { DAY_LETTERS[it] + "׳" }
-        dt + " · " + ts.joinToString("  ")
+        dt + " · " + ts.joinToString("  ") { slotLabel(it) }
     }
     "MONTHLY" -> everyText(t.every, "m")
     "DAILY" -> everyText(t.every, "d")
@@ -196,8 +202,8 @@ fun Editor(
                             triggerAt = if (noAlert) (if (initial.alertMode == "NONE" && initial.triggerAt > 0) initial.triggerAt else System.currentTimeMillis())
                                 else if (sched) 0L else if (repeat == "LIST") (dates.minOrNull() ?: at) else at,
                             repeat = if (noAlert) "NONE" else repeat,
-                            every = if (!noAlert && repeat in listOf("DAILY", "SCHEDULE", "MONTHLY")) every else 1,
-                            anchor = if (sched && every > 1 && initial.repeat == "SCHEDULE" && initial.every == every) initial.anchor else 0L,
+                            every = if (!noAlert && repeat in listOf("DAILY", "MONTHLY")) every else 1,
+                            anchor = 0L,
                             days = if (sched) sch.days else 0, times = "",
                             slots = when {
                                 noAlert -> ""
@@ -251,7 +257,7 @@ fun Editor(
                             FilterChip(repeat == k, { repeat = k; lastRecurring = k }, label = { Text(l) })
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (repeat != "SCHEDULE") Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("כל", style = MaterialTheme.typography.titleMedium)
                         OutlinedButton({ if (every > 1) every-- }, Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) { Text("−", style = MaterialTheme.typography.titleLarge) }
                         Text("$every", style = MaterialTheme.typography.titleLarge, modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -416,11 +422,12 @@ class ScheduleState(initial: Map<Int, List<String>>) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TimeChips(times: List<String>, onRemove: (String) -> Unit, onAdd: () -> Unit, modifier: Modifier = Modifier) {
+private fun TimeChips(times: List<String>, onEdit: (String) -> Unit, onRemove: (String) -> Unit, onAdd: () -> Unit, modifier: Modifier = Modifier) {
     FlowRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         times.forEach { s ->
-            InputChip(false, { onRemove(s) }, label = { Text(s) },
-                trailingIcon = { Icon(Icons.Default.Close, "הסר", Modifier.size(16.dp)) })
+            // tap the time to edit it; tap the X to remove it
+            InputChip(false, { onEdit(s) }, label = { Text(slotLabel(s)) },
+                trailingIcon = { Icon(Icons.Default.Close, "הסר", Modifier.size(20.dp).clip(CircleShape).clickable { onRemove(s) }.padding(2.dp)) })
         }
         AssistChip(onClick = onAdd, label = { Text("＋ שעה") })
     }
@@ -430,10 +437,9 @@ private fun TimeChips(times: List<String>, onRemove: (String) -> Unit, onAdd: ()
 fun ScheduleEditor(s: ScheduleState) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
-    var pending by remember { mutableStateOf<((String) -> Unit)?>(null) }
-    fun pick(onPicked: (String) -> Unit) { pending = onPicked }
-    pending?.let { cb ->
-        TimeWheelDialog("08:00", onDismiss = { pending = null }) { pending = null; cb(it) }
+    var pending by remember { mutableStateOf<SlotEdit?>(null) }
+    pending?.let { e ->
+        SlotDialog(e.initial, e.daysMask, onDismiss = { pending = null }) { tok -> pending = null; e.apply(tok) }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         for (i in 0..6) DayCircle(DAY_LETTERS[i], s.days and (1 shl i) != 0) { s.toggle(i) }
@@ -454,14 +460,26 @@ fun ScheduleEditor(s: ScheduleState) {
     }
     if (!s.diff) {
         TimeChips(s.shared.sorted(), onRemove = { s.shared.remove(it) },
-            onAdd = { pick { t -> if (t !in s.shared) s.shared.add(t) } })
+            onEdit = { old ->
+                pending = SlotEdit(old, s.days) { n ->
+                    val l = s.shared.toMutableList(); val i = l.indexOf(old); if (i >= 0) l[i] = n else l.add(n)
+                    s.shared.clear(); s.shared.addAll(l.distinct())
+                }
+            },
+            onAdd = { pending = SlotEdit("08:00", s.days) { t -> if (t !in s.shared) s.shared.add(t) } })
     } else {
         for (i in 0..6) if (s.days and (1 shl i) != 0) {
             val list = s.perDay[i] ?: emptyList()
             Row(verticalAlignment = Alignment.Top) {
                 Text("יום ${DAY_NAMES[i]}", Modifier.width(76.dp).padding(top = 8.dp), fontWeight = FontWeight.SemiBold)
                 TimeChips(list, onRemove = { r -> s.perDay[i] = list - r },
-                    onAdd = { pick { t -> if (t !in list) s.perDay[i] = (list + t).sorted() } }, modifier = Modifier.weight(1f))
+                    onEdit = { old ->
+                        pending = SlotEdit(old, 1 shl i) { n ->
+                            s.perDay[i] = (list.map { if (it == old) n else it }).distinct().sorted()
+                        }
+                    },
+                    onAdd = { pending = SlotEdit("08:00", 1 shl i) { t -> if (t !in list) s.perDay[i] = (list + t).sorted() } },
+                    modifier = Modifier.weight(1f))
             }
         }
     }
@@ -473,26 +491,91 @@ fun ScheduleEditor(s: ScheduleState) {
     }
 }
 
+/** What the user typed into a wheel's number box, even if the wheel has not committed it yet (no need to tap elsewhere first). */
+private fun typedValue(np: NumberPicker?, cur: Int, lo: Int, hi: Int): Int {
+    val v = (np?.getChildAt(0) as? android.widget.EditText)?.text?.toString()?.trim()?.toIntOrNull()
+    return v?.coerceIn(lo, hi) ?: cur
+}
+
+@Composable
+private fun HmWheels(h: Int, m: Int, views: Array<NumberPicker?>, onH: (Int) -> Unit, onM: (Int) -> Unit) {
+    val color = MaterialTheme.colorScheme.onSurface.toArgb()
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Wheel(h, 0, 23, color, 100, {}, { views[0] = it }) { onH(it) }
+            Text(":", style = MaterialTheme.typography.displaySmall)
+            Wheel(m, 0, 59, color, 100, {}, { views[1] = it }) { onM(it) }
+        }
+    }
+}
+
 /** The same hour:minute wheels used for one-off reminders, in a small dialog. */
 @Composable
 internal fun TimeWheelDialog(initial: String, onDismiss: () -> Unit, onPicked: (String) -> Unit) {
     val parts = initial.split(":")
     var h by remember { mutableIntStateOf(parts.getOrNull(0)?.toIntOrNull() ?: 8) }
     var m by remember { mutableIntStateOf(parts.getOrNull(1)?.toIntOrNull() ?: 0) }
-    val color = MaterialTheme.colorScheme.onSurface.toArgb()
+    val views = remember { arrayOfNulls<NumberPicker>(2) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("בחר שעה") },
+        text = { HmWheels(h, m, views, { h = it }, { m = it }) },
+        confirmButton = {
+            TextButton({ onPicked("%02d:%02d".format(typedValue(views[0], h, 0, 23), typedValue(views[1], m, 0, 59))) }) { Text("אישור") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
+    )
+}
+
+private class SlotEdit(val initial: String, val daysMask: Int, val apply: (String) -> Unit)
+
+/** One weekly time: hour:minute, and how often it repeats (every N weeks, counted from a start date). */
+@Composable
+private fun SlotDialog(initial: String, daysMask: Int, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    val sl0 = parseSlot(initial)
+    var h by remember { mutableIntStateOf(sl0.time.substringBefore(":").toIntOrNull() ?: 8) }
+    var m by remember { mutableIntStateOf(sl0.time.substringAfter(":", "0").toIntOrNull() ?: 0) }
+    var every by remember { mutableIntStateOf(sl0.every.coerceIn(1, 52)) }
+    var anchorDay by remember { mutableLongStateOf(if (sl0.anchorDay > 0) sl0.anchorDay else LocalDate.now().toEpochDay()) }
+    var pickDate by remember { mutableStateOf(false) }
+    val views = remember { arrayOfNulls<NumberPicker>(2) }
+    val zone = ZoneId.systemDefault()
+    fun token(): Slot = Slot("%02d:%02d".format(h, m), every, if (every > 1) anchorDay else 0L)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("שעה ותדירות") },
         text = {
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Wheel(h, 0, 23, color, 100, {}) { h = it }
-                    Text(":", style = MaterialTheme.typography.displaySmall)
-                    Wheel(m, 0, 59, color, 100, {}) { m = it }
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                HmWheels(h, m, views, { h = it }, { m = it })
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("כל", style = MaterialTheme.typography.titleMedium)
+                    OutlinedButton({ if (every > 1) every-- }, Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) { Text("−", style = MaterialTheme.typography.titleLarge) }
+                    Text("$every", style = MaterialTheme.typography.titleLarge, modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    OutlinedButton({ if (every < 52) every++ }, Modifier.size(44.dp), contentPadding = PaddingValues(0.dp)) { Text("+", style = MaterialTheme.typography.titleLarge) }
+                    Text(if (every == 1) "שבוע" else "שבועות", style = MaterialTheme.typography.titleMedium)
+                }
+                if (every > 1) {
+                    val d = LocalDate.ofEpochDay(anchorDay)
+                    OutlinedButton({ pickDate = !pickDate }) { Text("החל מתאריך: ${d.dayOfMonth}/${d.monthValue}/${d.year}") }
+                    if (pickDate) CalendarPick(d.atStartOfDay(zone).toInstant().toEpochMilli()) {
+                        anchorDay = Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toEpochDay(); pickDate = false
+                    }
+                    val first = Reminders.nextOccurrence(
+                        Task(title = "", triggerAt = 0,
+                            slots = encodeSchedule((0..6).filter { daysMask and (1 shl it) != 0 }.associateWith { listOf(token().token()) })),
+                        System.currentTimeMillis()
+                    )
+                    if (first != null) Text("הפעם הראשונה: " + whenText(first), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
-        confirmButton = { TextButton({ onPicked("%02d:%02d".format(h, m)) }) { Text("אישור") } },
+        confirmButton = {
+            TextButton({
+                h = typedValue(views[0], h, 0, 23); m = typedValue(views[1], m, 0, 59)
+                onSave(token().token())
+            }) { Text("אישור") }
+        },
         dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
     )
 }
@@ -536,7 +619,7 @@ private fun parseHm(raw: String): Int? {
 /** One place to set a moment: quick presets, today/tomorrow chips, date picker, and a time you can simply type. */
 /** A scrolling wheel; tap the centre number to type it with the keyboard. */
 @Composable
-private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTouch: () -> Unit, onChange: (Int) -> Unit) {
+private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTouch: () -> Unit, onView: (NumberPicker) -> Unit = {}, onChange: (Int) -> Unit) {
     AndroidView(
         modifier = Modifier.width(widthDp.dp).height(128.dp),
         factory = { c ->
@@ -545,6 +628,7 @@ private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTo
                 setFormatter { "%02d".format(it) }
                 // the system filter would reject the zero-padded text ("08") on first draw
                 (getChildAt(0) as? android.widget.EditText)?.filters = arrayOf<android.text.InputFilter>()
+                onView(this)
             }
         },
         update = { np ->

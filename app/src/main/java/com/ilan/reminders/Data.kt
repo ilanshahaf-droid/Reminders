@@ -132,12 +132,26 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/** One alert time of a weekly schedule. Stored as "HH:mm" or, for "every N weeks", "HH:mm/N/anchorEpochDay". */
+data class Slot(val time: String, val every: Int = 1, val anchorDay: Long = 0) {
+    fun token() = if (every <= 1) time else "$time/$every/$anchorDay"
+}
+
+fun parseSlot(tok: String): Slot {
+    val p = tok.split("/")
+    return Slot(p[0], p.getOrNull(1)?.toIntOrNull()?.coerceAtLeast(1) ?: 1, p.getOrNull(2)?.toLongOrNull() ?: 0L)
+}
+
 /** weekday (0 = Sunday) -> times. Falls back to the older days + times fields. */
 fun Task.schedule(): Map<Int, List<String>> {
     if (slots.isNotBlank()) {
+        // v35 stored one "every N weeks" for the whole task: fold it into the times
+        val legacy = if (repeat == "SCHEDULE" && every > 1 && anchor > 0)
+            java.time.Instant.ofEpochMilli(anchor).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toEpochDay() else 0L
         return slots.split(";").filter { it.contains("=") }.associate {
             val p = it.split("=", limit = 2)
-            p[0].toInt() to p[1].split(",").filter { x -> x.isNotBlank() }.sorted()
+            p[0].toInt() to p[1].split(",").filter { x -> x.isNotBlank() }
+                .map { x -> if (legacy > 0 && '/' !in x) "$x/$every/$legacy" else x }.sorted()
         }
     }
     val ts = times.split(",").filter { it.isNotBlank() }.sorted()

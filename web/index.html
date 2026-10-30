@@ -104,7 +104,7 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
     <div class="lbl">מצב התראה</div><div class="chips" id="edAlert"></div>
     <div id="edWhen">
     <div class="lbl">חזרה</div><div class="chips" id="edRep"></div>
-    <div id="edRec"><div class="chips" id="edUnit"></div><div class="lbl">כל כמה?</div><div style="display:flex;gap:8px;align-items:center"><input id="edEveryN" type="number" min="1" max="99" style="width:80px" oninput="syncEdInputs();renderEdLabel()"> <span id="edEveryLbl"></span></div></div>
+    <div id="edRec"><div class="chips" id="edUnit"></div><div id="edEveryBox"><div class="lbl">כל כמה?</div><div style="display:flex;gap:8px;align-items:center"><input id="edEveryN" type="number" min="1" max="99" style="width:80px" oninput="syncEdInputs();renderEdLabel()"> <span id="edEveryLbl"></span></div></div></div>
     <div id="edOnce"><div class="lbl">תאריך ושעה</div><input id="edDt" type="datetime-local"></div>
     <div id="edList"><div class="lbl">כמה התראות?</div><div class="chips" id="edCnt"></div><div id="edDates"></div></div>
     <div id="edSch"><div class="lbl">ימים ושעות</div><div class="days" id="edDays"></div><div id="edTimes"></div></div>
@@ -175,10 +175,25 @@ function start(){
   view('app'); load(); timer = setInterval(load, 30000);
 }
 
+function epochDayOf(ms){ const d = new Date(ms); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }
+function fromEpochDay(n){ return new Date(n * 864e5).toISOString().slice(0, 10); }
+function toEpochDay(str){ const [y, m, d] = str.split('-').map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 864e5); }
+// a weekly time is "HH:mm" or, for "every N weeks", "HH:mm/N/startEpochDay"
+function parseTok(k){ const p = String(k).split('/'); return {t:p[0], n:Math.max(1, +p[1] || 1), a:+p[2] || 0}; }
+function mkTok(o){ return o.n > 1 ? o.t + '/' + o.n + '/' + o.a : o.t; }
+function slotLabel(k){ const o = parseTok(k); return o.n > 1 ? o.t + ' (' + everyText(o.n, 'w') + ')' : o.t; }
+function slotActive(o, ep){
+  if(o.n <= 1 || o.a <= 0) return true;
+  if(ep < o.a) return false;
+  const w = Math.floor((ep + 4) / 7) - Math.floor((o.a + 4) / 7);
+  return ((w % o.n) + o.n) % o.n === 0;
+}
 function schedule(t){
   if(t.slots){
     const m = {};
     t.slots.split(';').forEach(p => { const [d, ts] = p.split('='); if(ts) m[+d] = ts.split(',').filter(Boolean); });
+    const lg = (t.repeat_mode === 'SCHEDULE' && (t.every_n || 1) > 1 && t.anchor > 0) ? epochDayOf(t.anchor) : 0;   // older single "every N weeks"
+    if(lg) Object.keys(m).forEach(d => { m[d] = m[d].map(x => x.includes('/') ? x : x + '/' + t.every_n + '/' + lg); });
     return m;
   }
   const ts = (t.times || '').split(',').filter(Boolean), m = {};
@@ -199,8 +214,8 @@ function recText(t){
   if(t.repeat_mode === 'LIST'){ const l = dateList(t); return l.length + ' התראות: ' + l.map(fmtShort).join('  ·  '); }
   if(t.repeat_mode !== 'SCHEDULE') return '';
   const groups = {};
-  Object.entries(schedule(t)).forEach(([d, ts]) => { const k = ts.join('  '); (groups[k] = groups[k] || []).push(+d); });
-  return (n > 1 ? everyText(n, 'w') + '\n' : '') + Object.entries(groups).map(([k, ds]) => (ds.length === 7 ? 'כל יום' : ds.sort().map(d => DAY_L[d] + '׳').join(' ')) + ' · ' + k).join('\n');
+  Object.entries(schedule(t)).forEach(([d, ts]) => { const k = ts.map(slotLabel).join('  '); (groups[k] = groups[k] || []).push(+d); });
+  return Object.entries(groups).map(([k, ds]) => (ds.length === 7 ? 'כל יום' : ds.sort().map(d => DAY_L[d] + '׳').join(' ')) + ' · ' + k).join('\n');
 }
 const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 function whenText(ms){
@@ -312,15 +327,15 @@ async function clearDone(){
 }
 
 // ---------- editor
-function weekIdx(d){ const x = new Date(d); x.setHours(12,0,0,0); x.setDate(x.getDate() - x.getDay()); return Math.floor(x.getTime() / (7 * 864e5)); }
-function nextOcc(m, after, every, anchor){
+function nextOcc(m, after){
   const base = new Date(after); base.setHours(0,0,0,0);
-  const n = anchor > 0 && every > 1 ? every : 1;
-  for(let d = 0; d <= 7 * n + 8; d++){
+  let maxN = 1; Object.values(m).forEach(ts => ts.forEach(k => { maxN = Math.max(maxN, parseTok(k).n); }));
+  for(let d = 0; d <= 7 * maxN + 8; d++){
     const day = new Date(base); day.setDate(base.getDate() + d);
-    if(n > 1 && (((weekIdx(day) - weekIdx(anchor)) % n) + n) % n !== 0) continue;
-    const ts = m[day.getDay()]; if(!ts) continue;
-    for(const t of [...ts].sort()){
+    const toks = m[day.getDay()]; if(!toks) continue;
+    const ep = epochDayOf(day.getTime());
+    const times = toks.map(parseTok).filter(o => slotActive(o, ep)).map(o => o.t).sort();
+    for(const t of times){
       const [h, mi] = t.split(':'); const x = new Date(day); x.setHours(+h, +mi, 0, 0);
       if(x.getTime() > after) return x.getTime();
     }
@@ -357,6 +372,7 @@ function renderEd(){
   const rr = $('edRep'); rr.innerHTML = '';
   REPS.forEach(([k, l]) => rr.appendChild(chip(l, k === 'REC' ? isRec(ed.rep) : ed.rep === k, () => { syncEdInputs(); ed.rep = k === 'REC' ? (ed.lastRec || 'SCHEDULE') : k; renderEd(); })));
   $('edRec').classList.toggle('hide', !isRec(ed.rep));
+  $('edEveryBox').classList.toggle('hide', ed.rep === 'SCHEDULE');
   const uu = $('edUnit'); uu.innerHTML = '';
   UNITS.forEach(([k, l]) => uu.appendChild(chip(l, ed.rep === k, () => { syncEdInputs(); ed.rep = k; ed.lastRec = k; renderEd(); })));
   $('edEveryN').value = ed.every || 1; renderEdLabel();
@@ -392,11 +408,27 @@ function renderEd(){
   const tt = $('edTimes'); tt.innerHTML = '';
   Object.keys(ed.sch).map(Number).sort().forEach(d => {
     const row = el('div', 'dayrow'); row.appendChild(el('b', '', 'יום ' + DAY_N[d]));
-    ed.sch[d].forEach((tm, i) => {
-      const inp = el('input'); inp.type = 'time'; inp.value = tm; inp.dir = 'ltr';
-      inp.onchange = () => { ed.sch[d][i] = inp.value; };
+    row.style.flexWrap = 'wrap';
+    ed.sch[d].forEach((tok, i) => {
+      const o = parseTok(tok);
+      const grp = el('div'); grp.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0';
+      const inp = el('input'); inp.type = 'time'; inp.value = o.t; inp.dir = 'ltr';
+      inp.onchange = () => { const x = parseTok(ed.sch[d][i]); x.t = inp.value; ed.sch[d][i] = mkTok(x); };
+      const ev = el('input'); ev.type = 'number'; ev.min = 1; ev.max = 52; ev.value = o.n; ev.style.width = '64px'; ev.title = 'כל כמה שבועות';
+      ev.onchange = () => {
+        syncEdInputs();
+        const x = parseTok(ed.sch[d][i]); x.n = Math.max(1, Math.min(52, +ev.value || 1));
+        if(x.n > 1 && !x.a) x.a = epochDayOf(Date.now());
+        ed.sch[d][i] = mkTok(x); renderEd();
+      };
+      grp.appendChild(inp); grp.appendChild(el('span', '', 'כל')); grp.appendChild(ev); grp.appendChild(el('span', '', o.n === 1 ? 'שבוע' : 'שבועות'));
+      if(o.n > 1){
+        const dt = el('input'); dt.type = 'date'; dt.value = fromEpochDay(o.a);
+        dt.onchange = () => { const x = parseTok(ed.sch[d][i]); if(dt.value) x.a = toEpochDay(dt.value); ed.sch[d][i] = mkTok(x); };
+        grp.appendChild(el('span', '', 'מתאריך')); grp.appendChild(dt);
+      }
       const rm = el('button', 'ghost', '✕'); rm.onclick = () => { syncEdInputs(); ed.sch[d].splice(i, 1); if(!ed.sch[d].length) delete ed.sch[d]; renderEd(); };
-      row.appendChild(inp); row.appendChild(rm);
+      grp.appendChild(rm); row.appendChild(grp);
     });
     const add = el('button', 'sec', '+ שעה'); add.onclick = () => { syncEdInputs(); ed.sch[d].push('12:00'); renderEd(); };
     row.appendChild(add); tt.appendChild(row);
@@ -409,7 +441,7 @@ async function saveEd(){
   const err = m => { $('edErr').textContent = m; };
   if(!ed.title.trim()) return err('חסרה כותרת');
   const sch = {}; if(ed.alert !== 'NONE') Object.keys(ed.sch).forEach(d => { const ts = ed.sch[d].filter(Boolean); if(ts.length) sch[d] = ts; });
-  let trig, slotsOut = '', fired = false, anchorOut = 0;
+  let trig, slotsOut = '', fired = false;
   if(ed.alert === 'NONE'){
     trig = ed.origNone && ed.origTrig ? ed.origTrig : Date.now(); ed.rep = 'NONE';
   } else if(ed.rep === 'LIST'){
@@ -419,9 +451,7 @@ async function saveEd(){
     const nx = ms.find(x => x > Date.now()); trig = nx || ms[ms.length - 1]; fired = !nx;
   } else if(ed.rep === 'SCHEDULE'){
     if(!Object.keys(sch).length) return err('בחר לפחות יום אחד עם שעה');
-    const ev = ed.every || 1;
-    if(ev > 1){ anchorOut = (ed.origRep === 'SCHEDULE' && ed.origEvery === ev && ed.anchor > 0) ? ed.anchor : (nextOcc(sch, Date.now(), 1, 0) || Date.now()); }
-    trig = nextOcc(sch, Date.now(), ev, anchorOut) || Date.now() + 60000;
+    trig = nextOcc(sch, Date.now()) || Date.now() + 60000;
   } else {
     if(!ed.dt) return err('חסר תאריך ושעה');
     trig = new Date(ed.dt).getTime();
@@ -430,7 +460,7 @@ async function saveEd(){
     repeat_mode:ed.rep, days:0, times:'', slots:ed.rep === 'SCHEDULE' ? encodeSlots(sch) : slotsOut, sound:ed.sound, vibration:ed.vib,
     done:false, fired:fired, snooze_until:0, updated_at:Date.now(), deleted:false,
     alert_mode:ed.alert, important:!!ed.imp,
-    every_n:(ed.alert !== 'NONE' && isRec(ed.rep)) ? (ed.every || 1) : 1, anchor:(ed.alert !== 'NONE' && ed.rep === 'SCHEDULE') ? anchorOut : 0};
+    every_n:(ed.alert !== 'NONE' && (ed.rep === 'DAILY' || ed.rep === 'MONTHLY')) ? (ed.every || 1) : 1, anchor:0};
   const r = await api('/rest/v1/rem_tasks?on_conflict=id', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
   if(!r.ok) return err('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?');
   closeEd(); await load(); toast('נשמר. בטלפון זה מתעדכן תוך כ-15 שניות כשהאפליקציה פתוחה, ובכל מקרה עד 15 דקות');
