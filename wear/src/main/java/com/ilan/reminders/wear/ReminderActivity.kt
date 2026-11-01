@@ -171,6 +171,10 @@ class ReminderActivity : ComponentActivity() {
             .setContentText(noteText)
             .setSilent(true)
             .setAutoCancel(true)
+            .addAction(R.drawable.ic_stat, "בטל נודניק", android.app.PendingIntent.getBroadcast(
+                this, f.id.toInt() xor 0x2F2F2F2F,
+                Intent(this, SnoozeActionReceiver::class.java).putExtra("id", f.id),
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT))
             .build()
         nm.notify(ReminderListenerService.snoozeNoteId(f.id), n)
     }

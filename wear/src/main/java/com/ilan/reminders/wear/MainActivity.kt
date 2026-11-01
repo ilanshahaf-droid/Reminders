@@ -173,7 +173,7 @@ private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit) {
     Screen {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("תזכורות v32", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("תזכורות v40", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
                     if (tasks.isEmpty()) "אין תזכורות פעילות" else "${tasks.size} תזכורות פעילות",
                     color = Color.Gray, fontSize = 13.sp
@@ -226,16 +226,22 @@ private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit) {
 private fun MenuScreen(t: WatchTask, onSnooze: () -> Unit, onSetTime: () -> Unit, onDone: () -> Unit) {
     val ctx = LocalContext.current
     var confirm by remember { mutableStateOf(false) }
+    val snoozed = t.snoozeUntil > System.currentTimeMillis()
     Screen {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(t.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                 Text(t.whenText, color = Color(0xFFB8BBC9), fontSize = 13.sp)
+                if (snoozed) {
+                    val z = Instant.ofEpochMilli(t.snoozeUntil).atZone(ZoneId.systemDefault())
+                    Text("(במצב נודניק עד %02d:%02d)".format(z.hour, z.minute), color = Color(0xFFB8A6FF), fontSize = 13.sp)
+                }
             }
         }
         item { Pill("✓ הושלמה", Color(0xFF6D4AFF)) { sendAction(ctx, t.id, "DONE"); toast(ctx, "התזכורת הושלמה"); onDone() } }
-        item { Pill("⏱ נודניק") { onSnooze() } }
+        if (snoozed) item { Pill("✖ בטל נודניק", Color(0xFF3A3358)) { sendAction(ctx, t.id, "CANCEL_SNOOZE"); toast(ctx, "הנודניק בוטל"); onDone() } }
+        item { Pill(if (snoozed) "⏱ נודניק מחדש" else "⏱ נודניק") { onSnooze() } }
         if (t.rec.isBlank()) item { Pill("🕒 שנה שעה") { onSetTime() } }
         item {
             Pill(if (confirm) "לחץ שוב למחיקה" else "🗑 מחק", Color(0xFF5A2A2A), Color(0xFFFF9B9B)) {
