@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -225,6 +227,13 @@ fun Editor(
         }
     ) { pad ->
         val scrollSt = rememberScrollState()
+        val titleFocus = remember { FocusRequester() }
+        val keyboard = LocalSoftwareKeyboardController.current
+        if (initial.id == 0L) LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(150)
+            runCatching { titleFocus.requestFocus() }
+            keyboard?.show()
+        }
         Column(
             Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(scrollSt)
                 .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -236,7 +245,7 @@ fun Editor(
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent
                 )
                 TextField(
-                    title, { title = it }, colors = clear, modifier = Modifier.fillMaxWidth(),
+                    title, { title = it }, colors = clear, modifier = Modifier.fillMaxWidth().focusRequester(titleFocus),
                     textStyle = MaterialTheme.typography.titleLarge,
                     placeholder = { Text("מה להזכיר לך?", style = MaterialTheme.typography.titleLarge) }
                 )

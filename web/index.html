@@ -411,6 +411,7 @@ function openEd(t, preset){
   $('edDel').classList.toggle('hide', isNew); $('edDone').classList.toggle('hide', isNew);
   $('edDone').textContent = ed.done ? 'בטל השלמה' : 'סמן כהושלמה';
   renderEd(); $('modal').classList.remove('hide');
+  if(isNew) setTimeout(() => { try{ $('edTitle').focus(); }catch(e){} }, 50);
 }
 function closeEd(){ $('modal').classList.add('hide'); ed = null; }
 function chip(label, on, fn, color){
