@@ -73,10 +73,14 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 
 <div id="login" class="panel hide">
   <h1 style="font-size:30px">התחברות</h1>
+  <button onclick="googleLogin()">התחבר עם Google</button>
+  <div class="err" id="loginErr"></div>
+  <button class="ghost" onclick="$('pwBox').classList.toggle('hide')">כניסה עם אימייל וסיסמה</button>
+  <div id="pwBox" class="hide">
   <input id="em" type="email" placeholder="אימייל" dir="ltr" autocomplete="username">
   <input id="pw" type="password" placeholder="סיסמה" dir="ltr" autocomplete="current-password">
-  <div class="err" id="loginErr"></div>
   <button onclick="doLogin()">התחבר</button>
+  </div>
   <button class="ghost" onclick="resetCfg()">שינוי פרטי חיבור</button>
 </div>
 
@@ -146,6 +150,19 @@ async function tokenCall(grant, body){
   if(!r.ok) return null;
   sess = await r.json(); LS.setItem('sess', JSON.stringify(sess)); return sess;
 }
+function googleLogin(){
+  location.href = cfg.url + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(location.origin + location.pathname);
+}
+// back from Google: the tokens arrive in the URL hash
+(function(){
+  if(!location.hash.includes('access_token=')) return;
+  const q = new URLSearchParams(location.hash.slice(1));
+  if(q.get('access_token')){
+    sess = {access_token:q.get('access_token'), refresh_token:q.get('refresh_token')};
+    LS.setItem('sess', JSON.stringify(sess));
+  }
+  history.replaceState(null, '', location.pathname + location.search);
+})();
 async function doLogin(){
   $('loginErr').textContent = '';
   const ok = await tokenCall('password', {email:$('em').value.trim(), password:$('pw').value});

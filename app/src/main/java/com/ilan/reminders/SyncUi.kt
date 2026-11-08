@@ -10,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -27,6 +29,8 @@ fun SyncDialog(onDismiss: () -> Unit) {
     var pass by remember { mutableStateOf(p.getString("pass", "") ?: "") }
     var status by remember { mutableStateOf(p.getString("status", "") ?: "") }
     var busy by remember { mutableStateOf(false) }
+    var showPw by remember { mutableStateOf(false) }
+    var google by remember { mutableStateOf(Sync.signedInWithGoogle(ctx)) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("סנכרון לענן (Supabase)") },
@@ -34,11 +38,24 @@ fun SyncDialog(onDismiss: () -> Unit) {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(url, { url = it }, label = { Text("Project URL") }, singleLine = true)
                 OutlinedTextField(key, { key = it }, label = { Text("anon / publishable key") }, singleLine = true)
-                OutlinedTextField(email, { email = it }, label = { Text("אימייל") }, singleLine = true)
-                OutlinedTextField(
-                    pass, { pass = it }, label = { Text("סיסמה") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
-                )
+                if (google) {
+                    Text("מחובר עם Google" + (p.getString("account", "")?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""), style = MaterialTheme.typography.bodyMedium)
+                    TextButton({ Sync.signOut(ctx); google = false; status = "" }) { Text("התנתק מ-Google") }
+                } else {
+                    Button(
+                        enabled = url.isNotBlank() && key.isNotBlank(),
+                        onClick = { Sync.startGoogle(ctx, url, key); onDismiss() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("התחבר עם Google") }
+                    TextButton({ showPw = !showPw }) { Text(if (showPw) "הסתר כניסה עם סיסמה" else "כניסה עם אימייל וסיסמה") }
+                    if (showPw) {
+                        OutlinedTextField(email, { email = it }, label = { Text("אימייל") }, singleLine = true)
+                        OutlinedTextField(
+                            pass, { pass = it }, label = { Text("סיסמה") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                    }
+                }
                 if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodyMedium)
             }
         },

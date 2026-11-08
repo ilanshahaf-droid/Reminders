@@ -66,7 +66,49 @@ object Sync {
 
     private val mutex = Mutex()
 
-    fun configured(c: Context) = listOf("url", "key", "email", "pass").all { !prefs(c).getString(it, "").isNullOrBlank() }
+    fun configured(c: Context): Boolean {
+        val p = prefs(c)
+        fun has(k: String) = !p.getString(k, "").isNullOrBlank()
+        return has("url") && has("key") && (has("refresh") || (has("email") && has("pass")))
+    }
+
+    fun signedInWithGoogle(c: Context) = !prefs(c).getString("refresh", "").isNullOrBlank()
+    fun signOut(c: Context) { prefs(c).edit().remove("refresh").remove("account").apply() }
+
+    private fun b64url(b: ByteArray) = android.util.Base64.encodeToString(b, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP)
+
+    /** Opens Google sign-in through Supabase (PKCE). The browser returns to com.ilan.reminders://auth?code=... */
+    fun startGoogle(c: Context, url: String, key: String) {
+        save(c, url, key, prefs(c).getString("email", "") ?: "", prefs(c).getString("pass", "") ?: "")
+        val verifier = b64url(java.security.SecureRandom().let { r -> ByteArray(48).also { r.nextBytes(it) } })
+        val challenge = b64url(java.security.MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
+        prefs(c).edit().putString("verifier", verifier).apply()
+        val base = prefs(c).getString("url", "")!!
+        val u = "$base/auth/v1/authorize?provider=google&redirect_to=" + java.net.URLEncoder.encode("com.ilan.reminders://auth", "UTF-8") +
+            "&code_challenge=$challenge&code_challenge_method=s256"
+        val i = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        c.startActivity(i)
+    }
+
+    /** Called when the browser comes back with the one-time code. */
+    suspend fun finishGoogle(c: Context, code: String): String = withContext(Dispatchers.IO) { mutex.withLock {
+        val p = prefs(c)
+        try {
+            val verifier = p.getString("verifier", "") ?: ""
+            if (verifier.isBlank()) error("בקשת ההתחברות לא נמצאה, נסה שוב")
+            val r = http(
+                "POST", p.getString("url", "") + "/auth/v1/token?grant_type=pkce",
+                mapOf("apikey" to (p.getString("key", "") ?: ""), "Content-Type" to "application/json"),
+                JSONObject().put("auth_code", code).put("code_verifier", verifier).toString()
+            )
+            if (r.first !in 200..299) error("התחברות עם Google נכשלה (${r.first}) ${r.second.take(120)}")
+            val j = JSONObject(r.second)
+            p.edit().putString("refresh", j.getString("refresh_token")).remove("verifier")
+                .putString("account", j.optJSONObject("user")?.optString("email") ?: "").apply()
+            ensurePeriodic(c)
+            "ok"
+        } catch (e: Exception) { "❌ " + (e.message ?: e.javaClass.simpleName) }
+    } }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -128,13 +170,26 @@ object Sync {
             if (!configured(c)) return@withLock "חסרים פרטי חיבור"
             val base = p.getString("url", "")!!
             val key = p.getString("key", "")!!
-            val login = http(
+            val refresh = p.getString("refresh", "") ?: ""
+            val login = if (refresh.isNotBlank()) http(
+                "POST", "$base/auth/v1/token?grant_type=refresh_token",
+                mapOf("apikey" to key, "Content-Type" to "application/json"),
+                JSONObject().put("refresh_token", refresh).toString()
+            ) else http(
                 "POST", "$base/auth/v1/token?grant_type=password",
                 mapOf("apikey" to key, "Content-Type" to "application/json"),
                 JSONObject().put("email", p.getString("email", "")).put("password", p.getString("pass", "")).toString()
             )
-            if (login.first !in 200..299) error("התחברות נכשלה (${login.first}). בדוק אימייל וסיסמה")
-            val token = JSONObject(login.second).getString("access_token")
+            if (login.first !in 200..299) {
+                if (refresh.isNotBlank()) {
+                    if (login.first in 400..401) p.edit().remove("refresh").apply()
+                    error("ההתחברות פגה. התחבר שוב עם Google")
+                }
+                error("התחברות נכשלה (${login.first}). בדוק אימייל וסיסמה")
+            }
+            val lj = JSONObject(login.second)
+            if (refresh.isNotBlank()) lj.optString("refresh_token").takeIf { it.isNotBlank() }?.let { p.edit().putString("refresh", it).apply() }
+            val token = lj.getString("access_token")
             val h = mapOf("apikey" to key, "Authorization" to "Bearer $token", "Content-Type" to "application/json")
             val dao = AppDb.get(c).dao()
 

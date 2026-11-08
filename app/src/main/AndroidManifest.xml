@@ -22,6 +22,16 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".AuthCallbackActivity" android:exported="true" android:launchMode="singleTask"
+            android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.ilan.reminders" android:host="auth" />
+            </intent-filter>
+        </activity>
+
         <service android:name=".WearActionService" android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
