@@ -258,16 +258,17 @@ function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.cl
 function render(){
   const now = Date.now(), q = $('q').value.trim().toLowerCase();
   const noAl = t => t.alert_mode === 'NONE';
-  const inFilter = t => filter === -1 ? noAl(t) : filter === -3 ? !!t.important : filter === -2 ? (!noAl(t) && bucket(t, now) <= 1) : (!noAl(t) && (filter === null || t.category_id === filter));
+  const isRecT = t => !noAl(t) && t.repeat_mode !== 'NONE';
+  const inFilter = t => filter === -4 ? isRecT(t) : filter === -1 ? noAl(t) : filter === -3 ? !!t.important : filter === -2 ? (!noAl(t) && bucket(t, now) <= 1) : (!noAl(t) && !isRecT(t) && (filter === null || t.category_id === filter));
   { const n = tasks.filter(t => !t.done && inFilter(t)).length;
-    $('count').textContent = filter === -1 ? (n ? n + ' פריטים ברשימה ללא התראה' : 'הרשימה ריקה') : filter === -3 ? n + ' תזכורות חשובות' : filter === -2 ? n + ' תזכורות להיום' : n + ' תזכורות פעילות'; }
+    $('count').textContent = filter === -1 ? (n ? n + ' פריטים ברשימה ללא התראה' : 'הרשימה ריקה') : filter === -3 ? n + ' תזכורות חשובות' : filter === -2 ? n + ' תזכורות להיום' : filter === -4 ? n + ' תזכורות חוזרות' : n + ' תזכורות פעילות'; }
   const chips = $('chips'); chips.innerHTML = '';
   const mk = (label, id, color) => {
     const c = el('div', 'chip' + (filter === id ? ' on' : ''));
     if(color){ const d = el('span', 'dot'); d.style.background = color; c.appendChild(d); }
     c.appendChild(document.createTextNode(label)); c.onclick = () => { filter = id; render(); }; chips.appendChild(c);
   };
-  mk('הכל', null); mk('📅 היום', -2); mk('⭐ חשוב', -3); mk('ללא התראה', -1); cats.forEach(c => mk(c.name, c.id, colorOf(c.color)));
+  mk('הכל', null); mk('📅 היום', -2); mk('🔁 חוזרות', -4); mk('⭐ חשוב', -3); mk('ללא התראה', -1); cats.forEach(c => mk(c.name, c.id, colorOf(c.color)));
   const byCat = Object.fromEntries(cats.map(c => [c.id, c]));
   $('doneToggle').textContent = (showDone ? 'הסתר' : 'הצג') + ' משימות שהושלמו (' + tasks.filter(t => t.done).length + ')';
   renderSelBar();

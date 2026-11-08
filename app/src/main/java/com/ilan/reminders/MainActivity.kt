@@ -102,6 +102,8 @@ private fun bucket(t: Task, now: Long): Int {
 private const val NO_ALERT = -1L
 private const val TODAY = -2L
 private const val IMPORTANT = -3L
+private const val RECURRING = -4L
+private val Task.isRecurring get() = alertMode != "NONE" && repeat != "NONE"
 
 /** Default time for new reminders: the "defTime" setting (HH:mm), today or tomorrow if already past; otherwise the next full hour. */
 fun defaultTriggerAt(c: Context): Long {
@@ -228,7 +230,8 @@ fun Root() {
                 else if (filter == NO_ALERT) it.alertMode == "NONE"
                 else if (filter == IMPORTANT) it.important
                 else if (filter == TODAY) it.alertMode != "NONE" && bucket(it, now) <= 1
-                else it.alertMode != "NONE" && (filter == null || it.categoryId == filter)
+                else if (filter == RECURRING) it.isRecurring
+                else it.alertMode != "NONE" && !it.isRecurring && (filter == null || it.categoryId == filter)
                 (showDone || !it.done) && inList &&
                     (q.isEmpty() || it.title.contains(q, true) || it.notes.contains(q, true))
             }
@@ -258,6 +261,7 @@ fun Root() {
                                         if (filter == NO_ALERT) (if (n == 0) "הרשימה ריקה" else "$n פריטים ברשימה ללא התראה")
                                         else if (filter == IMPORTANT) (if (n == 0) "אין תזכורות חשובות" else "$n תזכורות חשובות")
                                         else if (filter == TODAY) (if (n == 0) "אין תזכורות להיום" else "$n תזכורות להיום")
+                                        else if (filter == RECURRING) (if (n == 0) "אין תזכורות חוזרות" else "$n תזכורות חוזרות")
                                         else if (n == 0) "אין תזכורות פעילות" else "$n תזכורות פעילות",
                                         style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant
                                     )
@@ -337,6 +341,9 @@ fun Root() {
                             ) {
                                 SummaryTile("היום", live.count { it.alertMode != "NONE" && bucket(it, now) <= 1 }, "📅", filter == TODAY, Modifier.weight(1f)) {
                                     filter = if (filter == TODAY) null else TODAY
+                                }
+                                SummaryTile("חוזרות", live.count { it.isRecurring }, "🔁", filter == RECURRING, Modifier.weight(1f)) {
+                                    filter = if (filter == RECURRING) null else RECURRING
                                 }
                                 SummaryTile("חשוב", live.count { it.important }, "⭐", filter == IMPORTANT, Modifier.weight(1f)) {
                                     filter = if (filter == IMPORTANT) null else IMPORTANT
@@ -701,7 +708,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val battOk = remember(tick) { batteryOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v42") },
+        title = { Text("הגדרות · v43") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
