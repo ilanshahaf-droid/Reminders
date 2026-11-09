@@ -125,6 +125,9 @@ private fun newTask(c: Context, noAlert: Boolean = false): Task {
         alertMode = if (noAlert) "NONE" else "ONCE")
 }
 
+private fun fullScreenOk(c: Context) =
+    android.os.Build.VERSION.SDK_INT < 34 || c.getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
+
 private fun batteryOk(c: Context) =
     c.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(c.packageName)
 
@@ -209,7 +212,7 @@ fun Root() {
             else -> { searching = false; query = "" }
         }
     }
-    val healthy = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() && batteryOk(ctx) }
+    val healthy = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() && batteryOk(ctx) && fullScreenOk(ctx) }
 
     Box(Modifier.fillMaxSize().background(appBackground())) {
         val e = editor
@@ -706,9 +709,10 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val ctx = LocalContext.current
     val notifOk = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() }
     val battOk = remember(tick) { batteryOk(ctx) }
+    val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v43") },
+        title = { Text("הגדרות · v44") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -796,6 +800,12 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
                     ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                         .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName))
                 }) { Text("פתח הגדרות התראות") }
+
+                Text((if (fsOk) "✅" else "❌") + " התראה במסך מלא (מעל מסך הנעילה)")
+                if (!fsOk) Button(onClick = {
+                    ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                        .setData(Uri.parse("package:${ctx.packageName}")))
+                }) { Text("אפשר התראה במסך מלא") }
 
                 Text((if (battOk) "✅" else "❌") + " סוללה: ללא הגבלה")
                 if (!battOk) Button(onClick = {
