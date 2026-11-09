@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>תזכורות</title>
+<style>
+:root{--bg1:#f8f8fd;--bg2:#ebe9fa;--card:#fdfdff;--text:#14161f;--sub:#626880;--accent:#4f46e5;--err:#dc2626;--line:#d9dbe6}
+@media (prefers-color-scheme:dark){:root{--bg1:#0e1015;--bg2:#15142a;--card:#1a1d26;--text:#e8eaf2;--sub:#9aa0b8;--accent:#9ea0ff;--err:#ff6b6b;--line:#2f3345}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:var(--text);background:linear-gradient(var(--bg1),var(--bg2)) fixed}
+.wrap{max-width:760px;margin:0 auto;padding:20px 14px 60px}
+h1{font-size:40px;margin:8px 0 2px}
+.sub{color:var(--sub);font-size:18px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:12px}
+input,button{font:inherit}
+input{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);margin:6px 0}
+button{border:0;border-radius:14px;padding:10px 16px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600}
+button.ghost{background:transparent;color:var(--accent)}
+.panel{background:var(--card);border-radius:24px;padding:20px;box-shadow:0 1px 3px #0002}
+.err{color:var(--err);min-height:1.2em}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chip{padding:8px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);cursor:pointer;display:flex;gap:6px;align-items:center}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+h2{font-size:21px;margin:22px 8px 6px}
+h2.late{color:var(--err)}
+.card{background:var(--card);border-radius:26px;padding:18px 20px;margin:8px 0;display:flex;gap:16px;align-items:flex-start;box-shadow:0 1px 3px #0001}
+.ck{flex:none;width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700}
+.ck.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.main{flex:1;min-width:0}
+.title{font-size:23px}
+.done .title{text-decoration:line-through;color:var(--sub)}
+.when{font-size:18px;color:var(--sub)}
+.when.late{color:var(--err)}
+.rec{font-size:16px;color:var(--accent);white-space:pre-line}
+.notes{font-size:16px;color:var(--sub)}
+.snz{font-size:15px;color:#d97706;font-weight:600}
+.tag{flex:none;font-size:14px;padding:5px 12px;border-radius:999px;display:flex;gap:6px;align-items:center}
+.empty{text-align:center;color:var(--sub);padding:50px 0;font-size:18px}
+.hide,#modal.hide{display:none}
+.ck{cursor:pointer}.ck.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+.card{cursor:pointer}.card.sel{outline:2px solid var(--accent)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.selbar{position:sticky;top:0;z-index:5;background:var(--card);border-radius:18px;padding:10px 14px;box-shadow:0 2px 8px #0003;margin:8px 0}
+.selbar b{margin-inline-end:auto}
+button.sec{background:var(--card);color:var(--accent);border:1px solid var(--line)}
+button.danger{background:var(--err)}
+select{font:inherit;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+#modal{position:fixed;inset:0;background:#0007;z-index:10;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 10px}
+#modal .panel{width:100%;max-width:560px}
+.lbl{color:var(--sub);font-size:14px;margin:14px 0 4px}
+textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;min-height:64px;margin:6px 0}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--card)}
+.day.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dayrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;padding:8px 10px;border:1px solid var(--line);border-radius:14px}
+.dayrow input{width:auto;margin:0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:14px;z-index:20}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="setup" class="panel hide">
+  <h1 style="font-size:30px">הגדרה ראשונית</h1>
+  <p class="sub">הדבק את הפרטים מ-Supabase (Project Settings ← API). הם נשמרים בדפדפן הזה בלבד.</p>
+  <input id="cfgUrl" placeholder="Project URL (https://xxxx.supabase.co)" dir="ltr">
+  <input id="cfgKey" placeholder="anon / publishable key" dir="ltr">
+  <button onclick="saveCfg()">המשך</button>
+</div>
+
+<div id="login" class="panel hide">
+  <h1 style="font-size:30px">התחברות</h1>
+  <button onclick="googleLogin()">התחבר עם Google</button>
+  <div class="err" id="loginErr"></div>
+  <button class="ghost" onclick="$('pwBox').classList.toggle('hide')">כניסה עם אימייל וסיסמה</button>
+  <div id="pwBox" class="hide">
+  <input id="em" type="email" placeholder="אימייל" dir="ltr" autocomplete="username">
+  <input id="pw" type="password" placeholder="סיסמה" dir="ltr" autocomplete="current-password">
+  <button onclick="doLogin()">התחבר</button>
+  </div>
+  <button class="ghost" onclick="resetCfg()">שינוי פרטי חיבור</button>
+</div>
+
+<div id="app" class="hide">
+  <div class="top">
+    <div><h1>תזכורות</h1><div class="sub" id="count"></div></div>
+    <div class="bar" style="margin:0"><button onclick="openEd()">+ תזכורת</button><button class="ghost" onclick="logout()">התנתק</button></div>
+  </div>
+  <div id="selbar" class="selbar bar hide"></div>
+  <input id="q" placeholder="חיפוש" oninput="render()">
+  <div class="chips" id="chips"></div>
+  <div class="bar"><button class="sec" id="doneToggle" onclick="toggleDone()"></button><button class="sec" onclick="clearDone()">נקה משימות שהושלמו</button></div>
+  <div id="list"></div>
+  <div class="sub" id="upd" style="text-align:center;margin-top:20px;font-size:14px"></div>
+</div>
+
+</div>
+
+<div id="modal" class="hide" onclick="if(event.target===this)closeEd()">
+  <div class="panel">
+    <h1 style="font-size:28px" id="edTitleH">תזכורת</h1>
+    <input id="edTitle" placeholder="כותרת">
+    <textarea id="edNotes" placeholder="הערות"></textarea>
+    <div class="lbl">קטגוריה</div><div class="chips" id="edCats"></div>
+    <div class="lbl">מצב התראה</div><div class="chips" id="edAlert"></div>
+    <div id="edListBox"><div class="lbl">רשימה</div><div class="chips" id="edListChips"></div><input id="edListNew" placeholder="או שם רשימה חדשה" oninput="ed.list = this.value"></div>
+    <div id="edWhen">
+    <div class="lbl">חזרה</div><div class="chips" id="edRep"></div>
+    <div id="edRec"><div class="chips" id="edUnit"></div><div id="edEveryBox"><div class="lbl">כל כמה?</div><div style="display:flex;gap:8px;align-items:center"><input id="edEveryN" type="number" min="1" max="99" style="width:80px" oninput="syncEdInputs();renderEdLabel()"> <span id="edEveryLbl"></span></div></div></div>
+    <div id="edOnce"><div class="lbl">תאריך ושעה</div><input id="edDt" type="datetime-local"></div>
+    <div id="edList"><div class="lbl">כמה התראות?</div><div class="chips" id="edCnt"></div><div id="edDates"></div></div>
+    <div id="edSch"><div class="lbl">ימים ושעות</div><div class="days" id="edDays"></div><div id="edTimes"></div></div>
+    </div>
+    <div id="edVibBox"><div class="lbl">רטט</div><div class="chips" id="edVib"></div></div>
+    <div class="err" id="edErr"></div>
+    <div class="actions">
+      <button onclick="saveEd()">שמור</button>
+      <button class="sec" onclick="closeEd()">ביטול</button>
+      <button class="sec" id="edDone" onclick="edToggleDone()"></button>
+      <button class="danger" id="edDel" onclick="edDelete()">מחק</button>
+    </div>
+  </div>
+</div>
+<script>
+const LS = localStorage;
+let cfg = JSON.parse(LS.getItem('cfg') || '{}');
+let sess = JSON.parse(LS.getItem('sess') || 'null');
+const expRec = new Set();
+let listFilter = null;
+let tasks = [], cats = [], filter = null, timer = null, sel = new Set(), showDone = LS.getItem('showDone') === '1', ed = null;
+const $ = id => document.getElementById(id);
+const DAY_L = ['א','ב','ג','ד','ה','ו','ש'];
+const BUCKETS = ['באיחור','היום','מחר','השבוע','בהמשך','הושלמו'];
+
+function view(name){ for (const v of ['setup','login','app']) $(v).classList.toggle('hide', v !== name); }
+function saveCfg(){
+  const u = $('cfgUrl').value.trim().replace(/\/+$/,''), k = $('cfgKey').value.trim();
+  if(!u || !k) return;
+  cfg = {url:u, key:k}; LS.setItem('cfg', JSON.stringify(cfg)); start();
+}
+function resetCfg(){ LS.removeItem('cfg'); LS.removeItem('sess'); cfg = {}; sess = null; start(); }
+function logout(){ LS.removeItem('sess'); sess = null; clearInterval(timer); start(); }
+
+async function tokenCall(grant, body){
+  const r = await fetch(cfg.url + '/auth/v1/token?grant_type=' + grant, {
+    method:'POST', headers:{apikey:cfg.key,'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(!r.ok) return null;
+  sess = await r.json(); LS.setItem('sess', JSON.stringify(sess)); return sess;
+}
+function googleLogin(){
+  location.href = cfg.url + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(location.origin + location.pathname);
+}
+// back from Google: the tokens arrive in the URL hash
+(function(){
+  if(!location.hash.includes('access_token=')) return;
+  const q = new URLSearchParams(location.hash.slice(1));
+  if(q.get('access_token')){
+    sess = {access_token:q.get('access_token'), refresh_token:q.get('refresh_token')};
+    LS.setItem('sess', JSON.stringify(sess));
+  }
+  history.replaceState(null, '', location.pathname + location.search);
+})();
+async function doLogin(){
+  $('loginErr').textContent = '';
+  const ok = await tokenCall('password', {email:$('em').value.trim(), password:$('pw').value});
+  if(!ok){ $('loginErr').textContent = 'התחברות נכשלה'; return; }
+  start();
+}
+async function api(path, opt = {}, retry = true){
+  const headers = Object.assign({apikey:cfg.key, Authorization:'Bearer ' + (sess ? sess.access_token : ''), 'Content-Type':'application/json'}, opt.headers || {});
+  const r = await fetch(cfg.url + path, {method:opt.method || 'GET', headers, body:opt.body});
+  if(r.status === 401 && retry && sess && sess.refresh_token){
+    if(await tokenCall('refresh_token', {refresh_token:sess.refresh_token})) return api(path, opt, false);
+    sess = null; LS.removeItem('sess');
+  }
+  return r;
+}
+function toast(msg){ const t = el('div', 'toast', msg); document.body.appendChild(t); setTimeout(() => t.remove(), 3500); }
+async function load(){
+  try{
+    const [t, c] = await Promise.all([api('/rest/v1/rem_tasks?select=*&order=trigger_at'), api('/rest/v1/rem_categories?select=*&order=id')]);
+    if(!t.ok || !c.ok){ view('login'); return; }
+    tasks = (await t.json()).filter(x => !x.deleted); cats = await c.json(); sel = new Set([...sel].filter(id => tasks.some(x => x.id === id)));
+    $('upd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+    render();
+  }catch(e){ $('upd').textContent = 'שגיאת רשת'; }
+}
+function start(){
+  clearInterval(timer);
+  if(!cfg.url){ view('setup'); return; }
+  if(!sess){ view('login'); return; }
+  view('app'); load(); timer = setInterval(load, 30000);
+}
+
+function epochDayOf(ms){ const d = new Date(ms); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }
+function fromEpochDay(n){ return new Date(n * 864e5).toISOString().slice(0, 10); }
+function toEpochDay(str){ const [y, m, d] = str.split('-').map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 864e5); }
+// a weekly time is "HH:mm" or, for "every N weeks", "HH:mm/N/startEpochDay"
+function parseTok(k){ const p = String(k).split('/'); return {t:p[0], n:Math.max(1, +p[1] || 1), a:+p[2] || 0}; }
+function mkTok(o){ return o.n > 1 ? o.t + '/' + o.n + '/' + o.a : o.t; }
+function slotLabel(k){ const o = parseTok(k); return o.n > 1 ? o.t + ' (' + everyText(o.n, 'w') + ')' : o.t; }
+function slotActive(o, ep){
+  if(o.n <= 1 || o.a <= 0) return true;
+  if(ep < o.a) return false;
+  const w = Math.floor((ep + 4) / 7) - Math.floor((o.a + 4) / 7);
+  return ((w % o.n) + o.n) % o.n === 0;
+}
+function schedule(t){
+  if(t.slots){
+    const m = {};
+    t.slots.split(';').forEach(p => { const [d, ts] = p.split('='); if(ts) m[+d] = ts.split(',').filter(Boolean); });
+    const lg = (t.repeat_mode === 'SCHEDULE' && (t.every_n || 1) > 1 && t.anchor > 0) ? epochDayOf(t.anchor) : 0;   // older single "every N weeks"
+    if(lg) Object.keys(m).forEach(d => { m[d] = m[d].map(x => x.includes('/') ? x : x + '/' + t.every_n + '/' + lg); });
+    return m;
+  }
+  const ts = (t.times || '').split(',').filter(Boolean), m = {};
+  for(let i = 0; i < 7; i++) if(t.days & (1 << i)) m[i] = ts;
+  return m;
+}
+function dateList(t){ return (t.slots || '').split(',').map(x => +x.trim()).filter(Boolean).sort((a, b) => a - b); }
+function fmtShort(ms){ const d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function everyText(n, u){
+  if(u === 'd') return n === 1 ? 'כל יום' : n === 2 ? 'כל יומיים' : 'כל ' + n + ' ימים';
+  if(u === 'w') return n === 1 ? 'כל שבוע' : n === 2 ? 'כל שבועיים' : 'כל ' + n + ' שבועות';
+  return n === 1 ? 'כל חודש' : n === 2 ? 'כל חודשיים' : 'כל ' + n + ' חודשים';
+}
+function recText(t){
+  const n = t.every_n || 1;
+  if(t.repeat_mode === 'MONTHLY') return everyText(n, 'm');
+  if(t.repeat_mode === 'DAILY') return everyText(n, 'd');
+  if(t.repeat_mode === 'LIST'){ const l = dateList(t); return l.length + ' התראות: ' + l.map(fmtShort).join('  ·  '); }
+  if(t.repeat_mode !== 'SCHEDULE') return '';
+  const groups = {};
+  Object.entries(schedule(t)).forEach(([d, ts]) => { const k = ts.map(slotLabel).join('  '); (groups[k] = groups[k] || []).push(+d); });
+  return Object.entries(groups).map(([k, ds]) => (ds.length === 7 ? 'כל יום' : ds.sort().map(d => DAY_L[d] + '׳').join(' ')) + ' · ' + k).join('\n');
+}
+const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+function whenText(ms){
+  const d = new Date(ms), diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 864e5);
+  const time = d.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', hour12:false});
+  if(diff === 0) return 'היום ' + time;
+  if(diff === 1) return 'מחר ' + time;
+  return d.toLocaleDateString('he-IL', {weekday:'short', day:'numeric', month:'numeric'}) + ' ' + time;
+}
+function bucket(t, now){
+  if(t.done) return 5;
+  if(t.alert_mode === 'NONE') return 6;
+  if((t.repeat_mode === 'NONE' || (t.repeat_mode === 'LIST' && t.fired)) && t.trigger_at < now) return 0;
+  const diff = Math.round((startOfDay(new Date(t.trigger_at)) - startOfDay(new Date())) / 864e5);
+  return diff <= 0 ? 1 : diff === 1 ? 2 : diff < 7 ? 3 : 4;
+}
+function colorOf(n){ return '#' + (Number(BigInt.asUintN(32, BigInt(n)) & 0xFFFFFFn)).toString(16).padStart(6, '0'); }
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+
+function render(){
+  const now = Date.now(), q = $('q').value.trim().toLowerCase();
+  const noAl = t => t.alert_mode === 'NONE';
+  const isRecT = t => !noAl(t) && t.repeat_mode !== 'NONE';
+  const inFilter = t => filter === -4 ? isRecT(t) : filter === -1 ? noAl(t) : filter === -3 ? !!t.important : filter === -2 ? (!noAl(t) && bucket(t, now) <= 1) : (!noAl(t) && !isRecT(t) && (filter === null || t.category_id === filter));
+  { const n = tasks.filter(t => !t.done && inFilter(t)).length;
+    $('count').textContent = filter === -1 ? (n ? n + ' פריטים ברשימה ללא התראה' : 'הרשימה ריקה') : filter === -3 ? n + ' תזכורות חשובות' : filter === -2 ? n + ' תזכורות להיום' : filter === -4 ? n + ' תזכורות חוזרות' : n + ' תזכורות פעילות'; }
+  const chips = $('chips'); chips.innerHTML = '';
+  const mk = (label, id, color) => {
+    const c = el('div', 'chip' + (filter === id ? ' on' : ''));
+    if(color){ const d = el('span', 'dot'); d.style.background = color; c.appendChild(d); }
+    c.appendChild(document.createTextNode(label)); c.onclick = () => { filter = id; render(); }; chips.appendChild(c);
+  };
+  mk('הכל', null); mk('📅 היום', -2); mk('🔁 חוזרות', -4); mk('⭐ חשוב', -3); mk('ללא התראה', -1); cats.forEach(c => mk(c.name, c.id, colorOf(c.color)));
+  const byCat = Object.fromEntries(cats.map(c => [c.id, c]));
+  $('doneToggle').textContent = (showDone ? 'הסתר' : 'הצג') + ' משימות שהושלמו (' + tasks.filter(t => t.done).length + ')';
+  renderSelBar();
+  const shown = tasks.filter(t => (showDone || !t.done) &&
+    (q ? true : inFilter(t)) &&
+    (!q || (t.title + ' ' + t.notes).toLowerCase().includes(q)));
+  const list = $('list'); list.innerHTML = '';
+  if(!shown.length){ list.appendChild(el('div', 'empty', 'אין תזכורות')); return; }
+  const groups = {};
+  shown.forEach(t => (groups[bucket(t, now)] = groups[bucket(t, now)] || []).push(t));
+  const byImp = (a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || a.trigger_at - b.trigger_at;
+  const addCard = (t, k) => {
+      const card = el('div', 'card' + (t.done ? ' done' : '') + (sel.has(t.id) ? ' sel' : ''));
+      card.onclick = () => { if(sel.size) toggleSel(t.id); else openEd(t); };
+      const ck = el('div', 'ck' + (t.done ? ' done' : '') + (sel.has(t.id) ? ' sel' : ''), sel.has(t.id) ? '✓' : (t.done ? '✓' : (t.repeat_mode !== 'NONE' ? '↻' : '')));
+      ck.onclick = ev => { ev.stopPropagation(); toggleSel(t.id); };
+      card.appendChild(ck);
+      const main = el('div', 'main');
+      main.appendChild(el('div', 'title', (t.important ? '⭐ ' : '') + t.title));
+      if(!noAl(t)) main.appendChild(el('div', 'when' + (k == 0 ? ' late' : ''), (t.repeat_mode !== 'NONE' && !(t.repeat_mode === 'LIST' && t.fired) ? 'הבא: ' : '') + whenText(t.trigger_at)));
+      if(!t.done && t.snooze_until > Date.now()){ const d = new Date(t.snooze_until); main.appendChild(el('div', 'snz', '(במצב נודניק · נדחה ל-' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ')')); }
+      const rec = noAl(t) ? '' : recText(t);
+      if(rec){
+        const open = expRec.has(t.id);
+        const rd = el('div', 'rec', open ? '↻ חוזרת ▴\n' + rec : '↻ חוזרת ▾'); rd.style.cursor = 'pointer';
+        rd.onclick = ev => { ev.stopPropagation(); if(open) expRec.delete(t.id); else expRec.add(t.id); render(); };
+        main.appendChild(rd);
+      }
+      if(t.notes) main.appendChild(el('div', 'notes', t.notes));
+      card.appendChild(main);
+      const cat = byCat[t.category_id];
+      if(cat){
+        const tag = el('div', 'tag'); const col = colorOf(cat.color);
+        tag.style.background = col + '29';
+        const d = el('span', 'dot'); d.style.background = col; tag.appendChild(d); tag.appendChild(document.createTextNode(cat.name));
+        card.appendChild(tag);
+      }
+      list.appendChild(card);
+  };
+  if(filter === -1){
+    // list-only reminders, grouped into their sub-lists
+    const byList = {};
+    shown.forEach(t => { const n = (t.list_name || '').trim(); (byList[n] = byList[n] || []).push(t); });
+    const allNames = Object.keys(byList).filter(n => n).sort().concat(byList[''] && Object.keys(byList).some(n => n) ? [''] : []);
+    if(listFilter !== null && !(listFilter in byList)) listFilter = null;
+    const names = allNames.filter(n => listFilter === null || n === listFilter);
+    const nb = el('div', 'chips');
+    nb.appendChild(chip('כל הרשימות', listFilter === null, () => { listFilter = null; render(); }));
+    allNames.forEach(n => nb.appendChild(chip(n || 'כללי', listFilter === n, () => { listFilter = n; render(); })));
+    nb.appendChild(chip('＋ רשימה חדשה', false, () => { const n = (prompt('שם הרשימה החדשה (למשל: קניות)') || '').trim(); if(n) openEd(null, {alert:'NONE', list:n}); }));
+    list.appendChild(nb);
+    names.forEach(n => {
+      if(names.length > 1 || n || listFilter !== null){
+        const h = el('h2', '', (n || 'כללי') + '  ' + byList[n].filter(t => !t.done).length);
+        const bar = el('span'); bar.style.cssText = 'font-size:14px;font-weight:400;margin-inline-start:12px';
+        const add = el('button', 'ghost', '＋ פריט'); add.onclick = () => openEd(null, {alert:'NONE', list:n});
+        bar.appendChild(add);
+        if(n){
+          const rn = el('button', 'ghost', '✎ שם'); rn.onclick = () => renameList(n);
+          const dl = el('button', 'ghost', '🗑 מחק'); dl.onclick = () => deleteList(n);
+          bar.appendChild(rn); bar.appendChild(dl);
+        }
+        h.appendChild(bar); list.appendChild(h);
+      }
+      byList[n].sort(byImp).forEach(t => addCard(t, 6));
+    });
+  } else Object.keys(groups).sort().forEach(k => {
+    if(k != 6) list.appendChild(el('h2', k == 0 ? 'late' : '', BUCKETS[k]));
+    groups[k].sort(byImp).forEach(t => addCard(t, k));
+  });
+}
+async function renameList(old){
+  const n = (prompt('שם חדש לרשימה', old) || '').trim(); if(!n || n === old) return;
+  const ids = tasks.filter(t => t.alert_mode === 'NONE' && (t.list_name || '').trim() === old).map(t => t.id);
+  if(await patch(ids, {list_name:n})) await load();
+}
+async function deleteList(name){
+  const ids = tasks.filter(t => t.alert_mode === 'NONE' && (t.list_name || '').trim() === name).map(t => t.id);
+  if(!confirm('למחוק את הרשימה "' + name + '" ואת ' + ids.length + ' הפריטים שבה?')) return;
+  if(await patch(ids, {deleted:true})) await load();
+}
+const VIBS = [['STRONG','חזק'],['SHORT','קצר'],['PULSE','פולסים'],['NONE','ללא']];
+const REPS = [['NONE','חד-פעמי'],['REC','חוזרת'],['LIST','מספר חזרות מוגדר']];
+const UNITS = [['DAILY','יום'],['SCHEDULE','שבוע'],['MONTHLY','חודש']];
+const isRec = r => r === 'DAILY' || r === 'SCHEDULE' || r === 'MONTHLY';
+const DAY_N = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const rid = () => Math.floor(1e9 + Math.random() * 1.0e9);
+
+function toggleDone(){ showDone = !showDone; LS.setItem('showDone', showDone ? '1' : '0'); render(); }
+function toggleSel(id){ sel.has(id) ? sel.delete(id) : sel.add(id); render(); }
+
+async function patch(ids, fields){
+  const r = await api('/rest/v1/rem_tasks?id=in.(' + ids.join(',') + ')', {method:'PATCH', headers:{Prefer:'return=minimal'},
+    body:JSON.stringify(Object.assign({updated_at:Date.now()}, fields))});
+  if(!r.ok){ toast('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?'); return false; }
+  return true;
+}
+async function bulk(fields, ok){
+  if(await patch([...sel], fields)){ sel = new Set(); await load(); if(ok) toast(ok); }
+}
+function renderSelBar(){
+  const b = $('selbar'); b.innerHTML = '';
+  b.classList.toggle('hide', !sel.size);
+  if(!sel.size) return;
+  b.appendChild(el('b', '', sel.size + ' נבחרו'));
+  const add = (label, fn, cls) => { const x = el('button', cls || 'sec', label); x.onclick = fn; b.appendChild(x); };
+  add('הושלמו', () => bulk({done:true}));
+  add('בטל השלמה', () => bulk({done:false, fired:false}));
+  const s = el('select'); s.appendChild(new Option('קטגוריה…', ''));
+  s.appendChild(new Option('ללא קטגוריה', '0'));
+  cats.forEach(c => s.appendChild(new Option(c.name, String(c.id))));
+  s.onchange = () => { if(s.value !== '') bulk({category_id:+s.value}); };
+  b.appendChild(s);
+  if(tasks.some(t => sel.has(t.id) && t.alert_mode === 'NONE')) add('העבר לרשימה', () => {
+    const names = [...new Set(tasks.filter(t => t.alert_mode === 'NONE').map(t => (t.list_name || '').trim()).filter(Boolean))].sort();
+    const n = prompt('העבר לרשימה (השאר ריק = כללי).\nרשימות קיימות: ' + (names.join(', ') || '—'));
+    if(n !== null) bulk({list_name:n.trim()}, 'הועבר');
+  });
+  add('מחק', () => { if(confirm('למחוק ' + sel.size + ' תזכורות?')) bulk({deleted:true}); }, 'danger');
+  add('ביטול', () => { sel = new Set(); render(); });
+}
+async function clearDone(){
+  const ids = tasks.filter(t => t.done).map(t => t.id);
+  if(!ids.length){ toast('אין משימות שהושלמו'); return; }
+  if(!confirm('למחוק ' + ids.length + ' משימות שהושלמו?')) return;
+  if(await patch(ids, {deleted:true})) await load();
+}
+
+// ---------- editor
+function nextOcc(m, after){
+  const base = new Date(after); base.setHours(0,0,0,0);
+  let maxN = 1; Object.values(m).forEach(ts => ts.forEach(k => { maxN = Math.max(maxN, parseTok(k).n); }));
+  for(let d = 0; d <= 7 * maxN + 8; d++){
+    const day = new Date(base); day.setDate(base.getDate() + d);
+    const toks = m[day.getDay()]; if(!toks) continue;
+    const ep = epochDayOf(day.getTime());
+    const times = toks.map(parseTok).filter(o => slotActive(o, ep)).map(o => o.t).sort();
+    for(const t of times){
+      const [h, mi] = t.split(':'); const x = new Date(day); x.setHours(+h, +mi, 0, 0);
+      if(x.getTime() > after) return x.getTime();
+    }
+  }
+  return null;
+}
+const pad = n => String(n).padStart(2, '0');
+function toLocalInput(ms){ const d = new Date(ms); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function encodeSlots(m){
+  return Object.keys(m).map(Number).sort().filter(d => m[d].length).map(d => d + '=' + [...m[d]].sort().join(',')).join(';');
+}
+function openEd(t, preset){
+  const isNew = !t;
+  const now = new Date(); now.setHours(now.getHours() + 1, 0, 0, 0);
+  ed = isNew
+    ? {id:rid(), alert:(preset && preset.alert) || (filter === -1 ? 'NONE' : 'ONCE'), list:(preset && preset.list) || (filter === -1 && listFilter ? listFilter : ''), imp:(filter === -3), every:1, anchor:0, origRep:'NONE', origEvery:1, dates:[0,1,2].map(i => toLocalInput(now.getTime() + i * 864e5)), title:'', notes:'', cat:0, rep:'NONE', dt:toLocalInput(now.getTime()), sch:{}, vib:'STRONG', sound:'', done:false, isNew:true}
+    : {id:t.id, alert:t.alert_mode || 'ONCE', list:(t.list_name || ''), imp:!!t.important, every:t.every_n || 1, anchor:t.anchor || 0, origRep:t.repeat_mode, origEvery:t.every_n || 1, lastRec:isRec(t.repeat_mode) ? t.repeat_mode : 'SCHEDULE', dates:(t.repeat_mode === 'LIST' && dateList(t).length ? dateList(t) : [0,1,2].map(i => t.trigger_at + i * 864e5)).map(toLocalInput), title:t.title, notes:t.notes || '', cat:t.category_id, rep:t.repeat_mode, dt:toLocalInput(t.trigger_at), sch:schedule(t), vib:t.vibration, sound:t.sound || '', done:t.done, isNew:false, origNone:t.alert_mode === 'NONE', origTrig:t.trigger_at};
+  $('edTitleH').textContent = isNew ? 'תזכורת חדשה' : 'עריכת תזכורת';
+  $('edTitle').value = ed.title; $('edNotes').value = ed.notes; $('edDt').value = ed.dt; $('edErr').textContent = '';
+  $('edDel').classList.toggle('hide', isNew); $('edDone').classList.toggle('hide', isNew);
+  $('edDone').textContent = ed.done ? 'בטל השלמה' : 'סמן כהושלמה';
+  renderEd(); $('modal').classList.remove('hide');
+  if(isNew) setTimeout(() => { try{ $('edTitle').focus(); }catch(e){} }, 50);
+}
+function closeEd(){ $('modal').classList.add('hide'); ed = null; }
+function chip(label, on, fn, color){
+  const c = el('div', 'chip' + (on ? ' on' : ''));
+  if(color){ const d = el('span', 'dot'); d.style.background = color; c.appendChild(d); }
+  c.appendChild(document.createTextNode(label)); c.onclick = fn; return c;
+}
+function renderEd(){
+  const cc = $('edCats'); cc.innerHTML = '';
+  cc.appendChild(chip('ללא', !ed.cat, () => { ed.cat = 0; renderEd(); }));
+  cats.forEach(c => cc.appendChild(chip(c.name, ed.cat === c.id, () => { ed.cat = c.id; renderEd(); }, colorOf(c.color))));
+  const rr = $('edRep'); rr.innerHTML = '';
+  REPS.forEach(([k, l]) => rr.appendChild(chip(l, k === 'REC' ? isRec(ed.rep) : ed.rep === k, () => { syncEdInputs(); ed.rep = k === 'REC' ? (ed.lastRec || 'SCHEDULE') : k; renderEd(); })));
+  $('edRec').classList.toggle('hide', !isRec(ed.rep));
+  $('edEveryBox').classList.toggle('hide', ed.rep === 'SCHEDULE');
+  const uu = $('edUnit'); uu.innerHTML = '';
+  UNITS.forEach(([k, l]) => uu.appendChild(chip(l, ed.rep === k, () => { syncEdInputs(); ed.rep = k; ed.lastRec = k; renderEd(); })));
+  $('edEveryN').value = ed.every || 1; renderEdLabel();
+  const al = $('edAlert'); al.innerHTML = '';
+  [['ONCE','עם התראה'],['NONE','ללא התראה']].forEach(([k, l]) => al.appendChild(chip(l, ed.alert === k, () => { syncEdInputs(); ed.alert = k; renderEd(); })));
+  al.appendChild(chip('⭐ חשוב', ed.imp, () => { syncEdInputs(); ed.imp = !ed.imp; renderEd(); }));
+  $('edWhen').classList.toggle('hide', ed.alert === 'NONE');
+  $('edListBox').classList.toggle('hide', ed.alert !== 'NONE');
+  { const lc = $('edListChips'); lc.innerHTML = '';
+    const names = [...new Set(tasks.filter(t => t.alert_mode === 'NONE').map(t => (t.list_name || '').trim()).filter(Boolean))].sort();
+    if(ed.list && !names.includes(ed.list.trim())) { /* typed new name */ }
+    lc.appendChild(chip('כללי', !ed.list.trim(), () => { syncEdInputs(); ed.list = ''; $('edListNew').value = ''; renderEd(); }));
+    names.forEach(n => lc.appendChild(chip(n, ed.list.trim() === n, () => { syncEdInputs(); ed.list = n; $('edListNew').value = ''; renderEd(); })));
+    if(!names.includes(ed.list.trim())) $('edListNew').value = ed.list; }
+  $('edVibBox').classList.toggle('hide', ed.alert === 'NONE');
+  $('edList').classList.toggle('hide', ed.rep !== 'LIST');
+  const cn = $('edCnt'); cn.innerHTML = '';
+  for(let n = 1; n <= 10; n++) cn.appendChild(chip(String(n), ed.dates.length === n, () => {
+    syncEdInputs();
+    while(ed.dates.length < n){ const last = ed.dates.length ? new Date(ed.dates[ed.dates.length - 1]) : new Date(); last.setDate(last.getDate() + 1); ed.dates.push(toLocalInput(last.getTime())); }
+    ed.dates.length = n; renderEd();
+  }));
+  const dd2 = $('edDates'); dd2.innerHTML = '';
+  ed.dates.forEach((v, i) => {
+    const row = el('div', 'dayrow'); row.appendChild(el('b', '', 'התראה ' + (i + 1)));
+    const inp = el('input'); inp.type = 'datetime-local'; inp.value = v; inp.onchange = () => { ed.dates[i] = inp.value; };
+    row.appendChild(inp); dd2.appendChild(row);
+  });
+  const vv = $('edVib'); vv.innerHTML = '';
+  VIBS.forEach(([k, l]) => vv.appendChild(chip(l, ed.vib === k, () => { ed.vib = k; renderEd(); })));
+  $('edOnce').classList.toggle('hide', ed.rep === 'SCHEDULE' || ed.rep === 'LIST');
+  $('edSch').classList.toggle('hide', ed.rep !== 'SCHEDULE');
+  const dd = $('edDays'); dd.innerHTML = '';
+  for(let d = 0; d < 7; d++){
+    const x = el('div', 'day' + (ed.sch[d] ? ' on' : ''), DAY_L[d]);
+    x.title = DAY_N[d];
+    x.onclick = () => { syncEdInputs(); if(ed.sch[d]) delete ed.sch[d]; else ed.sch[d] = ['08:00']; renderEd(); };
+    dd.appendChild(x);
+  }
+  const tt = $('edTimes'); tt.innerHTML = '';
+  Object.keys(ed.sch).map(Number).sort().forEach(d => {
+    const row = el('div', 'dayrow'); row.appendChild(el('b', '', 'יום ' + DAY_N[d]));
+    row.style.flexWrap = 'wrap';
+    ed.sch[d].forEach((tok, i) => {
+      const o = parseTok(tok);
+      const grp = el('div'); grp.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0';
+      const inp = el('input'); inp.type = 'time'; inp.value = o.t; inp.dir = 'ltr';
+      inp.onchange = () => { const x = parseTok(ed.sch[d][i]); x.t = inp.value; ed.sch[d][i] = mkTok(x); };
+      const ev = el('input'); ev.type = 'number'; ev.min = 1; ev.max = 52; ev.value = o.n; ev.style.width = '64px'; ev.title = 'כל כמה שבועות';
+      ev.onchange = () => {
+        syncEdInputs();
+        const x = parseTok(ed.sch[d][i]); x.n = Math.max(1, Math.min(52, +ev.value || 1));
+        if(x.n > 1 && !x.a) x.a = epochDayOf(Date.now());
+        ed.sch[d][i] = mkTok(x); renderEd();
+      };
+      grp.appendChild(inp); grp.appendChild(el('span', '', 'כל')); grp.appendChild(ev); grp.appendChild(el('span', '', o.n === 1 ? 'שבוע' : 'שבועות'));
+      if(o.n > 1){
+        const dt = el('input'); dt.type = 'date'; dt.value = fromEpochDay(o.a);
+        dt.onchange = () => { const x = parseTok(ed.sch[d][i]); if(dt.value) x.a = toEpochDay(dt.value); ed.sch[d][i] = mkTok(x); };
+        grp.appendChild(el('span', '', 'מתאריך')); grp.appendChild(dt);
+      }
+      const rm = el('button', 'ghost', '✕'); rm.onclick = () => { syncEdInputs(); ed.sch[d].splice(i, 1); if(!ed.sch[d].length) delete ed.sch[d]; renderEd(); };
+      grp.appendChild(rm); row.appendChild(grp);
+    });
+    const add = el('button', 'sec', '+ שעה'); add.onclick = () => { syncEdInputs(); ed.sch[d].push('12:00'); renderEd(); };
+    row.appendChild(add); tt.appendChild(row);
+  });
+}
+function renderEdLabel(){ const n = Math.max(1, Math.min(99, +$('edEveryN').value || 1)); $('edEveryLbl').textContent = ed.rep === 'DAILY' ? (n === 1 ? 'יום' : 'ימים') : ed.rep === 'SCHEDULE' ? (n === 1 ? 'שבוע' : 'שבועות') : (n === 1 ? 'חודש' : 'חודשים'); }
+function syncEdInputs(){ ed.title = $('edTitle').value; ed.notes = $('edNotes').value; ed.dt = $('edDt').value; ed.every = Math.max(1, Math.min(99, +$('edEveryN').value || 1)); }
+async function saveEd(){
+  syncEdInputs();
+  const err = m => { $('edErr').textContent = m; };
+  if(!ed.title.trim()) return err('חסרה כותרת');
+  const sch = {}; if(ed.alert !== 'NONE') Object.keys(ed.sch).forEach(d => { const ts = ed.sch[d].filter(Boolean); if(ts.length) sch[d] = ts; });
+  let trig, slotsOut = '', fired = false;
+  if(ed.alert === 'NONE'){
+    trig = ed.origNone && ed.origTrig ? ed.origTrig : Date.now(); ed.rep = 'NONE';
+  } else if(ed.rep === 'LIST'){
+    const ms = ed.dates.map(v => new Date(v).getTime()).filter(x => x > 0).sort((a, b) => a - b);
+    if(!ms.length || ms.length !== ed.dates.length) return err('חסר תאריך באחת ההתראות');
+    slotsOut = ms.join(',');
+    const nx = ms.find(x => x > Date.now()); trig = nx || ms[ms.length - 1]; fired = !nx;
+  } else if(ed.rep === 'SCHEDULE'){
+    if(!Object.keys(sch).length) return err('בחר לפחות יום אחד עם שעה');
+    trig = nextOcc(sch, Date.now()) || Date.now() + 60000;
+  } else {
+    if(!ed.dt) return err('חסר תאריך ושעה');
+    trig = new Date(ed.dt).getTime();
+  }
+  const row = {id:ed.id, title:ed.title.trim(), notes:ed.notes.trim(), category_id:ed.cat, trigger_at:trig,
+    repeat_mode:ed.rep, days:0, times:'', slots:ed.rep === 'SCHEDULE' ? encodeSlots(sch) : slotsOut, sound:ed.sound, vibration:ed.vib,
+    done:false, fired:fired, snooze_until:0, updated_at:Date.now(), deleted:false,
+    alert_mode:ed.alert, important:!!ed.imp, list_name:(ed.alert === 'NONE' ? (ed.list || '').trim() : ''),
+    every_n:(ed.alert !== 'NONE' && (ed.rep === 'DAILY' || ed.rep === 'MONTHLY')) ? (ed.every || 1) : 1, anchor:0};
+  const r = await api('/rest/v1/rem_tasks?on_conflict=id', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
+  if(!r.ok) return err('השמירה נכשלה (' + r.status + '). האם הרצת את עדכון ה-SQL ב-Supabase?');
+  closeEd(); await load(); toast('נשמר. בטלפון זה מתעדכן תוך כ-15 שניות כשהאפליקציה פתוחה, ובכל מקרה עד 15 דקות');
+}
+async function edToggleDone(){
+  const id = ed.id, done = !ed.done; closeEd();
+  if(await patch([id], done ? {done:true} : {done:false, fired:false})) await load();
+}
+async function edDelete(){
+  if(!confirm('למחוק את התזכורת?')) return;
+  const id = ed.id; closeEd();
+  if(await patch([id], {deleted:true})) await load();
+}
+
+start();
+</script>
+</body>
+</html>
