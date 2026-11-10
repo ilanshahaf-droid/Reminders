@@ -179,7 +179,13 @@ fun Root() {
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val text = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        if (r.resultCode == Activity.RESULT_OK && !text.isNullOrBlank()) editor = newTask(ctx).copy(title = text)
+        if (r.resultCode == Activity.RESULT_OK && !text.isNullOrBlank()) {
+            val defTime = runCatching { java.time.LocalTime.parse(ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defTime", "") ?: "") }
+                .getOrDefault(java.time.LocalTime.of(9, 0))
+            val v = VoiceParse.parse(text, ZonedDateTime.now(), defTime)
+            val base = newTask(ctx)
+            editor = base.copy(title = v.title, triggerAt = v.at?.toInstant()?.toEpochMilli() ?: base.triggerAt)
+        }
     }
     fun startVoice() {
         runCatching {
@@ -717,7 +723,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v45") },
+        title = { Text("הגדרות · v46") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
