@@ -181,12 +181,25 @@ fun Root() {
         val text = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (r.resultCode == Activity.RESULT_OK && !text.isNullOrBlank()) editor = newTask(ctx).copy(title = text)
     }
+    fun startVoice() {
+        runCatching {
+            voiceLauncher.launch(
+                Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
+            )
+        }
+    }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= 33) permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         val act = ctx as? Activity
         if (act?.intent?.getBooleanExtra("new", false) == true) {
             act.intent.removeExtra("new")
             editor = newTask(ctx)
+        }
+        if (act?.intent?.action == "com.ilan.reminders.VOICE") {
+            act.intent.action = Intent.ACTION_MAIN   // so a rotation or return to the app does not start it again
+            startVoice()
         }
         val p = ctx.getSharedPreferences("app", Context.MODE_PRIVATE)
         if (!p.getBoolean("seeded", false)) {
@@ -443,15 +456,7 @@ fun Root() {
                             Spacer(Modifier.weight(1f))
                             Text(
                                 "🎤", fontSize = 28.sp,
-                                modifier = Modifier.clip(CircleShape).clickable {
-                                    runCatching {
-                                        voiceLauncher.launch(
-                                            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
-                                        )
-                                    }
-                                }.padding(8.dp)
+                                modifier = Modifier.clip(CircleShape).clickable { startVoice() }.padding(8.dp)
                             )
                         }
                     }
@@ -712,7 +717,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v44") },
+        title = { Text("הגדרות · v45") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
