@@ -177,6 +177,13 @@ fun Root() {
     }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick++ }
+    var exportText by remember { mutableStateOf("") }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) {
+            val ok = runCatching { ctx.contentResolver.openOutputStream(uri)?.use { it.write(exportText.toByteArray(Charsets.UTF_8)) } }.isSuccess
+            android.widget.Toast.makeText(ctx, if (ok) "הרשימה נשמרה" else "השמירה נכשלה", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val text = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (r.resultCode == Activity.RESULT_OK && !text.isNullOrBlank()) {
@@ -414,7 +421,19 @@ fun Root() {
                                     ListHeader(
                                         if (name.isEmpty()) "כללי" else name, rows.count { !it.done }, editable = name.isNotEmpty(),
                                         onAdd = { editor = newTask(ctx, true).copy(listName = name) },
-                                        onRename = { renameList = name }, onDelete = { deleteList = name }
+                                        onRename = { renameList = name }, onDelete = { deleteList = name },
+                                        onShare = {
+                                            val label = if (name.isEmpty()) "כללי" else name
+                                            ctx.startActivity(Intent.createChooser(
+                                                Intent(Intent.ACTION_SEND).setType("text/plain")
+                                                    .putExtra(Intent.EXTRA_SUBJECT, label)
+                                                    .putExtra(Intent.EXTRA_TEXT, listAsText(label, rows)), null))
+                                        },
+                                        onSave = {
+                                            val label = if (name.isEmpty()) "כללי" else name
+                                            exportText = listAsText(label, rows)
+                                            exportLauncher.launch("$label.txt")
+                                        }
                                     )
                                 }
                                 items(rows.sortedWith(compareByDescending<Task> { it.important }.thenBy { it.triggerAt }), key = { it.id }) { t ->
@@ -723,7 +742,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v46") },
+        title = { Text("הגדרות · v47") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -886,8 +905,21 @@ private fun TrashDialog(
     )
 }
 
+/** A list as plain text: the title, then one line per item. */
+private fun listAsText(title: String, rows: List<Task>): String {
+    val sb = StringBuilder(title).append('\n')
+    rows.sortedWith(compareByDescending<Task> { it.important }.thenBy { it.triggerAt }).forEach { t ->
+        sb.append(if (t.done) "☑ " else "☐ ").append(if (t.important) "⭐ " else "").append(t.title).append('\n')
+        if (t.notes.isNotBlank()) t.notes.lines().forEach { sb.append("    ").append(it).append('\n') }
+    }
+    return sb.toString()
+}
+
 @Composable
-private fun ListHeader(name: String, count: Int, editable: Boolean, onAdd: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun ListHeader(
+    name: String, count: Int, editable: Boolean, onAdd: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit,
+    onShare: () -> Unit, onSave: () -> Unit
+) {
     val cs = MaterialTheme.colorScheme
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 28.dp).padding(top = 16.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -895,11 +927,15 @@ private fun ListHeader(name: String, count: Int, editable: Boolean, onAdd: () ->
         Text("  $count", color = cs.onSurfaceVariant)
         Spacer(Modifier.weight(1f))
         TextButton(onAdd) { Text("＋ פריט") }
-        if (editable) Box {
+        Box {
             IconButton({ menu = true }) { Icon(Icons.Default.MoreVert, "אפשרויות הרשימה") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menu = false; onRename() })
-                DropdownMenuItem(text = { Text("מחק רשימה", color = cs.error) }, onClick = { menu = false; onDelete() })
+                DropdownMenuItem(text = { Text("שתף כטקסט") }, onClick = { menu = false; onShare() })
+                DropdownMenuItem(text = { Text("שמור כקובץ טקסט") }, onClick = { menu = false; onSave() })
+                if (editable) {
+                    DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menu = false; onRename() })
+                    DropdownMenuItem(text = { Text("מחק רשימה", color = cs.error) }, onClick = { menu = false; onDelete() })
+                }
             }
         }
     }

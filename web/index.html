@@ -326,6 +326,8 @@ function render(){
         const bar = el('span'); bar.style.cssText = 'font-size:14px;font-weight:400;margin-inline-start:12px';
         const add = el('button', 'ghost', '＋ פריט'); add.onclick = () => openEd(null, {alert:'NONE', list:n});
         bar.appendChild(add);
+        const ex = el('button', 'ghost', '⬇ ייצוא'); ex.onclick = () => exportList(n, byList[n]);
+        bar.appendChild(ex);
         if(n){
           const rn = el('button', 'ghost', '✎ שם'); rn.onclick = () => renameList(n);
           const dl = el('button', 'ghost', '🗑 מחק'); dl.onclick = () => deleteList(n);
@@ -339,6 +341,19 @@ function render(){
     if(k != 6) list.appendChild(el('h2', k == 0 ? 'late' : '', BUCKETS[k]));
     groups[k].sort(byImp).forEach(t => addCard(t, k));
   });
+}
+function exportList(name, rows){
+  const label = name || 'כללי';
+  const lines = [label];
+  rows.slice().sort((a, b) => (b.important ? 1 : 0) - (a.important ? 1 : 0) || a.trigger_at - b.trigger_at).forEach(t => {
+    lines.push((t.done ? '☑ ' : '☐ ') + (t.important ? '⭐ ' : '') + t.title);
+    if(t.notes) String(t.notes).split('\n').forEach(l => lines.push('    ' + l));
+  });
+  const blob = new Blob(['\ufeff' + lines.join('\r\n') + '\r\n'], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = label + '.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 async function renameList(old){
   const n = (prompt('שם חדש לרשימה', old) || '').trim(); if(!n || n === old) return;
