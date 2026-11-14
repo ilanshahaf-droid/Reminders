@@ -95,6 +95,7 @@ object PendingOpen {
     var file by mutableStateOf<java.io.File?>(null)
     var noteId by mutableStateOf<Long?>(null)
     var task by mutableStateOf<Task?>(null)
+    var template by mutableStateOf<String?>(null)   // HTML for a new Word document (note exported to Word)
 }
 
 private fun takeShare(ctx: Context, i: Intent?) {
@@ -803,7 +804,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v80") },
+        title = { Text("הגדרות · v81") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

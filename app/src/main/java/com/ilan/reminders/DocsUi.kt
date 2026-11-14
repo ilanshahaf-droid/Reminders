@@ -373,6 +373,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     val files = remember(tick) { Docs.list(ctx) }
     var editing by remember { mutableStateOf<File?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var template by remember { mutableStateOf("") }
     var viewing by remember { mutableStateOf<File?>(null) }
     var organizing by remember { mutableStateOf<File?>(null) }
     var toolsMenu by remember { mutableStateOf(false) }
@@ -421,6 +422,10 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             else job = PdfJobSpec("images", "תמונות", blobs)
         }
     }
+    val pendingTpl = PendingOpen.template
+    LaunchedEffect(pendingTpl) {
+        if (pendingTpl != null) { PendingOpen.template = null; template = pendingTpl; creating = true }
+    }
     val pending = PendingOpen.file
     LaunchedEffect(pending) {
         if (pending != null) {
@@ -460,7 +465,6 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var typeFilter by remember { mutableStateOf("all") }
     var newDlg by remember { mutableStateOf(false) }
     var openDlg by remember { mutableStateOf(false) }
-    var template by remember { mutableStateOf("") }
     val shown = files.filter { f ->
         (typeFilter == "all" || Docs.ext(f) == typeFilter) && (query.isBlank() || f.nameWithoutExtension.contains(query.trim(), ignoreCase = true))
     }
@@ -949,6 +953,9 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     var closeAfter by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     var delAsk by remember { mutableStateOf(false) }
+    var finding by remember { mutableStateOf(false) }
+    var findQ by remember { mutableStateOf("") }
+    var snipDlg by remember { mutableStateOf(false) }
     var pageView by remember { mutableStateOf(Docs.pageView(ctx)) }
     var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
@@ -965,6 +972,11 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     var plain by remember { mutableStateOf("") }
     var hasImg by remember { mutableStateOf(false) }
     val web = remember { mutableStateOf<WebView?>(null) }
+    val voiceDoc = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == android.app.Activity.RESULT_OK && !text.isNullOrBlank())
+            web.value?.evaluateJavascript("NE.insert(${org.json.JSONObject.quote(text + " ")})", null)
+    }
     val initial = remember { file?.let { Base64.encodeToString(it.readBytes(), Base64.NO_WRAP) } ?: "" }
 
     fun titleChanged() = cur != null && title.isNotBlank() && Docs.clean(title) != cur!!.nameWithoutExtension
@@ -1021,6 +1033,16 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
             IconButton({ requestSave(true) }) { Icon(Icons.Default.Check, "סיום") }
             Text(if (saving) "שומר…" else if (!loaded) "טוען…" else "", color = cs.onSurfaceVariant, fontSize = 13.sp)
             Spacer(Modifier.weight(1f))
+            TextButton({
+                val ok = runCatching {
+                    voiceDoc.launch(
+                        Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
+                    )
+                }.isSuccess
+                if (!ok) Toast.makeText(ctx, "הקלדה קולית לא זמינה", Toast.LENGTH_SHORT).show()
+            }) { Text("🎤", fontSize = 20.sp) }
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
@@ -1057,6 +1079,21 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                         }
                     })
                     if (cur?.exists() == true) DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true })
+                    DropdownMenuItem(text = { Text("🔍 חיפוש במסמך") }, onClick = { moreMenu = false; finding = true })
+                    DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })
+                    DropdownMenuItem(text = { Text("📄 המר ל-PDF (שמור כקובץ)") }, onClick = {
+                        moreMenu = false
+                        web.value?.let { w ->
+                            val n = Docs.clean(title.ifBlank { "מסמך" })
+                            val out = Docs.unique(ctx, n, "pdf")
+                            android.print.PdfPrinter().print(w.createPrintDocumentAdapter(n), out) { ok ->
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    Toast.makeText(ctx, if (ok) "נוצר PDF: ${out.nameWithoutExtension} (בלשונית מסמכים)" else "ההמרה נכשלה", Toast.LENGTH_LONG).show()
+                                    if (!ok) out.delete()
+                                }
+                            }
+                        }
+                    })
                     DropdownMenuItem(text = { Text("הדפס / שמור כ-PDF") }, onClick = {
                         moreMenu = false
                         web.value?.let {
@@ -1067,6 +1104,16 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                     })
                 }
             }
+        }
+        if (snipDlg) SnippetsDialog(onInsert = { t -> web.value?.evaluateJavascript("NE.insert(${org.json.JSONObject.quote(t + " ")})", null) }, onDismiss = { snipDlg = false })
+        if (finding) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                findQ, { findQ = it; web.value?.findAllAsync(it) }, singleLine = true, placeholder = { Text("חיפוש במסמך") },
+                modifier = Modifier.weight(1f)
+            )
+            TextButton({ web.value?.findNext(false) }) { Text("▲") }
+            TextButton({ web.value?.findNext(true) }) { Text("▼") }
+            TextButton({ finding = false; findQ = ""; web.value?.clearMatches() }) { Text("✕") }
         }
         if (delAsk) cur?.let { f -> DeleteDocDialog(f, { delAsk = false }, { delAsk = false; onClose() }) }
         TextField(

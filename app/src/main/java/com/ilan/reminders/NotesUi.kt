@@ -59,7 +59,7 @@ import org.json.JSONObject
 fun Home() {
     var screen by rememberSaveable { mutableStateOf("tasks") }
     if (PendingShare.text != null && screen != "notes") screen = "notes"
-    if (PendingOpen.file != null && screen != "docs") screen = "docs"
+    if ((PendingOpen.file != null || PendingOpen.template != null) && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })
@@ -556,6 +556,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
     }
     var reminder by remember { mutableStateOf<Task?>(null) }
     var finding by remember { mutableStateOf(false) }
+    var snipDlg by remember { mutableStateOf(false) }
     var findQ by remember { mutableStateOf("") }
     var full by remember { mutableStateOf(false) }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -650,6 +651,29 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                         }
                     )
                     DropdownMenuItem(text = { Text("חיפוש בפתק") }, onClick = { moreMenu = false; finding = true })
+                    DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })
+                    DropdownMenuItem(text = { Text("📄 ייצוא ל-PDF") }, onClick = {
+                        moreMenu = false
+                        web.value?.let { w ->
+                            val nm = Docs.clean(title.ifBlank { plain.lineSequence().firstOrNull().orEmpty().take(30) }.ifBlank { "פתק" })
+                            val out = Docs.unique(ctx, nm, "pdf")
+                            android.print.PdfPrinter().print(w.createPrintDocumentAdapter(nm), out) { ok ->
+                                Handler(Looper.getMainLooper()).post {
+                                    Toast.makeText(ctx, if (ok) "נוצר PDF: ${out.nameWithoutExtension} (בלשונית מסמכים)" else "הייצוא נכשל", Toast.LENGTH_LONG).show()
+                                    if (!ok) out.delete()
+                                }
+                            }
+                        }
+                    })
+                    DropdownMenuItem(text = { Text("📝 ייצוא ל-Word") }, onClick = {
+                        moreMenu = false
+                        scope.launch {
+                            if (!current().isBlank()) Notes.save(ctx, current())
+                            val esc = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                            PendingOpen.template = (if (title.isNotBlank()) "<h1>$esc</h1>" else "") + html.ifBlank { plain.replace("\n", "<br>") }
+                            onClose()
+                        }
+                    })
                     DropdownMenuItem(text = { Text("מסך מלא") }, onClick = { moreMenu = false; full = true })
                     DropdownMenuItem(text = { Text("הדפס") }, onClick = {
                         moreMenu = false
@@ -680,6 +704,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                 }
             }
         }
+        if (snipDlg) SnippetsDialog(onInsert = { t -> web.value?.evaluateJavascript("NE.insert(${JSONObject.quote(t + " ")})", null) }, onDismiss = { snipDlg = false })
         if (finding && !full) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 findQ, { findQ = it; web.value?.findAllAsync(it) }, singleLine = true, placeholder = { Text("חיפוש בפתק") },
