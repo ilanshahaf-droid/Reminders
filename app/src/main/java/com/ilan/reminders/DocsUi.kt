@@ -18,6 +18,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -35,7 +37,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -109,6 +113,26 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var editing by remember { mutableStateOf<File?>(null) }
     var creating by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<File?>(null) }
+    var organizing by remember { mutableStateOf<File?>(null) }
+    var toolsMenu by remember { mutableStateOf(false) }
+    var mergeDlg by remember { mutableStateOf(false) }
+    var mergePick by remember { mutableStateOf(listOf<String>()) }
+    var job by remember { mutableStateOf<PdfJobSpec?>(null) }
+    val scope = rememberCoroutineScope()
+    val imgPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            val blobs = withContext(Dispatchers.IO) {
+                uris.mapNotNull { u ->
+                    runCatching {
+                        val b = ctx.contentResolver.openInputStream(u)!!.use { it.readBytes() }
+                        b to (ctx.contentResolver.getType(u) ?: "image/*")
+                    }.getOrNull()
+                }
+            }
+            if (blobs.isEmpty()) Toast.makeText(ctx, "לא נמצאו תמונות", Toast.LENGTH_SHORT).show()
+            else job = PdfJobSpec("images", "תמונות", blobs)
+        }
+    }
     val pending = PendingOpen.file
     LaunchedEffect(pending) {
         if (pending != null) {
@@ -129,10 +153,12 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = editing == null && !creating && viewing == null) { onReminders() }
+    BackHandler(enabled = editing == null && !creating && viewing == null && organizing == null) { onReminders() }
 
     Box(Modifier.fillMaxSize().background(cs.background)) {
-        if (viewing != null) {
+        if (organizing != null) {
+            PdfOrganizerScreen(organizing!!, dark, onClose = { organizing = null; tick++ })
+        } else if (viewing != null) {
             PdfViewerScreen(viewing!!, dark, onClose = { viewing = null; tick++ })
         } else if (editing != null || creating) {
             DocEditorScreen(editing, dark, onClose = { editing = null; creating = false; tick++ })
@@ -182,6 +208,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 DropdownMenuItem(text = { Text(if (isPdf) "פתח וסמן" else "ערוך") }, onClick = {
                                     menuFor = null; if (isPdf) viewing = f else editing = f
                                 })
+                                if (isPdf) DropdownMenuItem(text = { Text("ארגן עמודים") }, onClick = { menuFor = null; organizing = f })
                                 DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
                                 DropdownMenuItem(text = { Text("שתף") }, onClick = { menuFor = null; Docs.share(ctx, f) })
                                 DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menuFor = null; renameText = f.nameWithoutExtension; renaming = f })
@@ -204,10 +231,78 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     shape = RoundedCornerShape(30.dp), color = cs.surface, shadowElevation = 8.dp,
                     modifier = Modifier.weight(1f).height(58.dp)
                 ) { Box(contentAlignment = Alignment.Center) { Text("ייבוא קובץ", fontWeight = FontWeight.Bold) } }
+                Box {
+                    Surface(
+                        onClick = { toolsMenu = true },
+                        shape = RoundedCornerShape(30.dp), color = cs.surface, shadowElevation = 8.dp,
+                        modifier = Modifier.width(88.dp).height(58.dp)
+                    ) { Box(contentAlignment = Alignment.Center) { Text("כלים ▾", fontWeight = FontWeight.Bold) } }
+                    DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
+                        DropdownMenuItem(text = { Text("איחוד קובצי PDF") }, onClick = {
+                            toolsMenu = false
+                            if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
+                            else { mergePick = emptyList(); mergeDlg = true }
+                        })
+                        DropdownMenuItem(text = { Text("תמונות ל-PDF") }, onClick = { toolsMenu = false; imgPicker.launch("image/*") })
+                    }
+                }
             }
         }
     }
 
+    if (mergeDlg) {
+        val pdfs = files.filter { Docs.ext(it) == "pdf" }
+        AlertDialog(
+            onDismissRequest = { mergeDlg = false }, title = { Text("איחוד קובצי PDF") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("סמן את הקבצים לפי הסדר שבו הם יחוברו", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                    pdfs.forEach { f ->
+                        val idx = mergePick.indexOf(f.name)
+                        Row(
+                            Modifier.fillMaxWidth().combinedClickable(onClick = {
+                                mergePick = if (idx >= 0) mergePick - f.name else mergePick + f.name
+                            }).padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(if (idx >= 0) "${idx + 1}" else "○", Modifier.width(28.dp), fontWeight = FontWeight.Bold, color = cs.primary)
+                            Text(f.nameWithoutExtension, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    val picked = mergePick.map { File(Docs.dir(ctx), it) }.filter { it.exists() }
+                    mergeDlg = false
+                    if (picked.size >= 2) scope.launch {
+                        val blobs = withContext(Dispatchers.IO) { picked.map { it.readBytes() to "application/pdf" } }
+                        job = PdfJobSpec("merge", "איחוד PDF", blobs)
+                    } else Toast.makeText(ctx, "בחר לפחות שני קבצים", Toast.LENGTH_SHORT).show()
+                }, enabled = mergePick.size >= 2) { Text("אחד") }
+            },
+            dismissButton = { TextButton({ mergeDlg = false }) { Text("ביטול") } }
+        )
+    }
+    job?.let { spec ->
+        PdfJobRunner(
+            spec,
+            onResult = { b64 ->
+                job = null
+                scope.launch(Dispatchers.IO) {
+                    val out = runCatching {
+                        val f = Docs.unique(ctx, spec.name, "pdf")
+                        f.writeBytes(Base64.decode(b64, Base64.DEFAULT)); f
+                    }.getOrNull()
+                    withContext(Dispatchers.Main) {
+                        if (out != null) { tick++; Toast.makeText(ctx, "נוצר: ${out.nameWithoutExtension}", Toast.LENGTH_LONG).show() }
+                        else Toast.makeText(ctx, "השמירה נכשלה", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onFail = { m -> job = null; Toast.makeText(ctx, m, Toast.LENGTH_LONG).show() }
+        )
+    }
     renaming?.let { f ->
         AlertDialog(
             onDismissRequest = { renaming = null }, title = { Text("שינוי שם") },
@@ -492,6 +587,142 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
         title = { Text("לשמור את הסימונים?") },
         text = { Text("הסימונים יישמרו בתוך קובץ ה-PDF. אפשר גם לשמור כעותק ולהשאיר את המקור כמו שהוא.") },
         confirmButton = { TextButton({ confirm = false; save(false, true) }) { Text("שמור וסגור") } },
+        dismissButton = {
+            Row {
+                TextButton({ confirm = false; onClose() }) { Text("סגור בלי לשמור", color = cs.error) }
+                TextButton({ confirm = false }) { Text("המשך") }
+            }
+        }
+    )
+}
+
+class PdfJobSpec(val kind: String, val name: String, val blobs: List<Pair<ByteArray, String>>)
+
+/** Bridge for pdf_organizer.html (page organizer and the invisible merge / images-to-PDF jobs). */
+internal class PdfToolsBridge(
+    val data: () -> String, val blobs: List<Pair<ByteArray, String>>,
+    val onReady: () -> Unit, val onOpened: () -> Unit, val onResult: (String, String) -> Unit,
+    val onFail: (String) -> Unit, val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit
+) {
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
+    @android.webkit.JavascriptInterface fun docData(): String = data()
+    @android.webkit.JavascriptInterface fun opened() { main.post { onOpened() } }
+    @android.webkit.JavascriptInterface fun fileData(i: Int): String = Base64.encodeToString(blobs[i].first, Base64.NO_WRAP)
+    @android.webkit.JavascriptInterface fun fileMime(i: Int): String = blobs[i].second
+    @android.webkit.JavascriptInterface fun result(kind: String, b64: String) { main.post { onResult(kind, b64) } }
+    @android.webkit.JavascriptInterface fun fail(m: String) { main.post { onFail(m) } }
+    @android.webkit.JavascriptInterface fun dirty(v: Boolean) { main.post { onDirty(v) } }
+    @android.webkit.JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun PdfJobRunner(spec: PdfJobSpec, onResult: (String) -> Unit, onFail: (String) -> Unit) {
+    AlertDialog(
+        onDismissRequest = {}, title = { Text("מעבד…") },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(28.dp)); Spacer(Modifier.width(14.dp))
+                Text(if (spec.kind == "merge") "מאחד את הקבצים" else "יוצר PDF מהתמונות")
+            }
+            AndroidView(Modifier.size(1.dp), factory = { c ->
+                WebView(c).apply {
+                    settings.javaScriptEnabled = true
+                    addJavascriptInterface(
+                        PdfToolsBridge(
+                            data = { "" }, blobs = spec.blobs,
+                            onReady = {
+                                evaluateJavascript(if (spec.kind == "merge") "PT.merge(${spec.blobs.size})" else "PT.images(${spec.blobs.size})", null)
+                            },
+                            onOpened = {}, onResult = { _, b64 -> onResult(b64) }, onFail = onFail, onDirty = {}, onToast = {}
+                        ), "Android"
+                    )
+                    loadUrl("file:///android_asset/pdf_organizer.html")
+                }
+            }, onRelease = { it.destroy() })
+        },
+        confirmButton = {}
+    )
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun PdfOrganizerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    var dirty by remember { mutableStateOf(false) }
+    var opened by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var closeAfter by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    val web = remember { mutableStateOf<WebView?>(null) }
+    val initial = remember { Base64.encodeToString(file.readBytes(), Base64.NO_WRAP) }
+
+    fun save(thenClose: Boolean) {
+        if (saving) return
+        saving = true; closeAfter = thenClose
+        web.value?.evaluateJavascript("PT.save()", null)
+    }
+    fun finish() { if (dirty) confirm = true else onClose() }
+    BackHandler { finish() }
+
+    Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
+            Column(Modifier.weight(1f)) {
+                Text("ארגון עמודים · " + file.nameWithoutExtension, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                Text(
+                    if (saving) "שומר…" else if (!opened) "טוען…" else if (dirty) "יש שינויים שלא נשמרו" else "בחר עמודים כדי לסובב, להזיז, למחוק או לחלץ",
+                    fontSize = 12.sp, color = cs.onSurfaceVariant
+                )
+            }
+            if (dirty) TextButton({ save(false) }) { Text("שמור") }
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            factory = { c ->
+                WebView(c).apply {
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    settings.javaScriptEnabled = true
+                    addJavascriptInterface(
+                        PdfToolsBridge(
+                            data = { initial }, blobs = emptyList(),
+                            onReady = { evaluateJavascript("PT.open($dark)", null) },
+                            onOpened = { opened = true },
+                            onResult = { kind, b64 ->
+                                val bytes = Base64.decode(b64, Base64.DEFAULT)
+                                if (kind == "extract") {
+                                    val f = Docs.unique(ctx, file.nameWithoutExtension + " - חלק", "pdf")
+                                    f.writeBytes(bytes)
+                                    Toast.makeText(ctx, "נוצר קובץ חדש: ${f.nameWithoutExtension}", Toast.LENGTH_LONG).show()
+                                } else {
+                                    val tmp = File(file.parentFile, file.name + ".tmp")
+                                    tmp.writeBytes(bytes)
+                                    if (!tmp.renameTo(file)) { file.writeBytes(bytes); tmp.delete() }
+                                    saving = false; dirty = false
+                                    Toast.makeText(ctx, "נשמר", Toast.LENGTH_SHORT).show()
+                                    if (closeAfter) { closeAfter = false; onClose() }
+                                }
+                            },
+                            onFail = { m -> saving = false; closeAfter = false; Toast.makeText(ctx, m, Toast.LENGTH_LONG).show() },
+                            onDirty = { dirty = it },
+                            onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() }
+                        ), "Android"
+                    )
+                    loadUrl("file:///android_asset/pdf_organizer.html")
+                    web.value = this
+                }
+            },
+            onRelease = { it.destroy() }
+        )
+    }
+
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("לשמור את השינויים?") },
+        text = { Text("סדר העמודים והסיבובים יישמרו בקובץ הזה.") },
+        confirmButton = { TextButton({ confirm = false; save(true) }) { Text("שמור וסגור") } },
         dismissButton = {
             Row {
                 TextButton({ confirm = false; onClose() }) { Text("סגור בלי לשמור", color = cs.error) }

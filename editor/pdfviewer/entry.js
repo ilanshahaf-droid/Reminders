@@ -406,3 +406,140 @@ window.PV = {
   theme(d) { document.documentElement.className = d ? 'dark' : ''; },
   _state() { return { pages, tool }; }
 };
+
+/* =====================  PDF tools: organize pages, merge, images → PDF  ===================== */
+const AT = () => window.Android || {};
+const PT_STATE = { items: [], sel: new Set(), hist: [], doc: null, bytes: null, dirty: false, thumbs: {}, io: null };
+
+function ptDirty(v) { if (PT_STATE.dirty !== v) { PT_STATE.dirty = v; if (AT().dirty) AT().dirty(v); } }
+function ptSnap() { PT_STATE.hist.push(PT_STATE.items.map(x => Object.assign({}, x))); if (PT_STATE.hist.length > 40) PT_STATE.hist.shift(); }
+
+async function ptThumb(src, cv) {
+  const S = PT_STATE;
+  if (S.thumbs[src]) { cv.width = S.thumbs[src].width; cv.height = S.thumbs[src].height; cv.getContext('2d').drawImage(S.thumbs[src], 0, 0); return; }
+  const page = await S.doc.getPage(src + 1);
+  const base = page.getViewport({ scale: 1 });
+  const sc = Math.min(2, (170 * Math.min(window.devicePixelRatio || 1, 2)) / base.width);
+  const vp = page.getViewport({ scale: sc });
+  const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+  await page.render({ canvasContext: c.getContext('2d'), canvas: c, viewport: vp }).promise;
+  S.thumbs[src] = c;
+  cv.width = c.width; cv.height = c.height; cv.getContext('2d').drawImage(c, 0, 0);
+}
+
+function ptRender() {
+  const S = PT_STATE, grid = $('grid'); if (!grid) return;
+  grid.innerHTML = '';
+  if (S.io) S.io.disconnect();
+  S.io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting && !e.target._done) { e.target._done = true; ptThumb(e.target._src, e.target).catch(() => {}); }
+  }), { root: $('gridwrap'), rootMargin: '400px' });
+  S.items.forEach((it, idx) => {
+    const cell = document.createElement('div'); cell.className = 'cell' + (S.sel.has(idx) ? ' sel' : '');
+    const box = document.createElement('div'); box.className = 'tb';
+    const cv = document.createElement('canvas'); cv._src = it.src;
+    cv.style.transform = 'rotate(' + it.rot + 'deg)';
+    if (it.rot % 180) { cv.style.maxWidth = '100%'; }
+    box.appendChild(cv); cell.appendChild(box);
+    const n = document.createElement('div'); n.className = 'bd'; n.textContent = idx + 1; cell.appendChild(n);
+    cell.onclick = () => { if (S.sel.has(idx)) S.sel.delete(idx); else S.sel.add(idx); ptRender(); ptCount(); };
+    grid.appendChild(cell); S.io.observe(cv);
+  });
+  ptCount();
+}
+function ptCount() { const el = $('cnt'); if (el) el.textContent = PT_STATE.sel.size ? PT_STATE.sel.size + ' נבחרו' : PT_STATE.items.length + ' עמודים'; }
+
+function ptAct(kind) {
+  const S = PT_STATE, picked = [...S.sel].sort((a, b) => a - b);
+  if (kind === 'all') { S.sel = S.sel.size === S.items.length ? new Set() : new Set(S.items.map((_, i) => i)); ptRender(); return; }
+  if (kind === 'undo') { const h = S.hist.pop(); if (h) { S.items = h; S.sel = new Set(); ptRender(); ptDirty(S.hist.length > 0); } return; }
+  if (!picked.length) { AT().toast && AT().toast('בחר עמודים קודם'); return; }
+  if (kind === 'extract') { PT.extract(); return; }
+  ptSnap();
+  if (kind === 'rot') { picked.forEach(i => { S.items[i] = Object.assign({}, S.items[i], { rot: (S.items[i].rot + 90) % 360 }); }); }
+  else if (kind === 'del') {
+    if (picked.length >= S.items.length) { S.hist.pop(); AT().toast && AT().toast('אי אפשר למחוק את כל העמודים'); return; }
+    S.items = S.items.filter((_, i) => !S.sel.has(i)); S.sel = new Set();
+  } else if (kind === 'left' || kind === 'right') {
+    const d = kind === 'left' ? -1 : 1, arr = S.items, ns = new Set();
+    const order = d < 0 ? picked : picked.slice().reverse();
+    let blocked = false;
+    for (const i of order) { const j = i + d; if (j < 0 || j >= arr.length || (S.sel.has(j) && !ns.has(j) && false)) { blocked = true; break; } }
+    if (blocked) { S.hist.pop(); return; }
+    const sel2 = new Set(S.sel);
+    for (const i of order) { const j = i + d; [arr[i], arr[j]] = [arr[j], arr[i]]; sel2.delete(i); }
+    S.sel = new Set(picked.map(i => i + d));
+  }
+  ptDirty(true); ptRender();
+}
+
+async function ptBuild(items) {
+  const src = await PDFDocument.load(PT_STATE.bytes, { ignoreEncryption: true, updateMetadata: false });
+  const out = await PDFDocument.create();
+  const copied = await out.copyPages(src, items.map(x => x.src));
+  copied.forEach((pg, i) => {
+    const base = ((pg.getRotation().angle % 360) + 360) % 360;
+    pg.setRotation(degrees((base + items[i].rot) % 360));
+    out.addPage(pg);
+  });
+  return await out.saveAsBase64({ dataUri: false });
+}
+
+window.PT = {
+  async open(dark) {
+    document.documentElement.className = dark ? 'dark' : '';
+    try {
+      const b64 = AT().docData();
+      PT_STATE.bytes = b64ToBytes(b64);
+      PT_STATE.doc = await pdfjsLib.getDocument({ data: PT_STATE.bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
+      PT_STATE.items = Array.from({ length: PT_STATE.doc.numPages }, (_, i) => ({ src: i, rot: 0 }));
+      document.querySelectorAll('#obar [data-a]').forEach(b => b.onclick = () => ptAct(b.dataset.a));
+      ptRender(); AT().opened && AT().opened();
+    } catch (e) { AT().toast && AT().toast(e && e.name === 'PasswordException' ? 'הקובץ מוגן בסיסמה' : 'פתיחת ה-PDF נכשלה'); }
+  },
+  async save() {
+    try { const b = await ptBuild(PT_STATE.items); ptDirty(false); AT().result('save', b); }
+    catch (e) { AT().fail('השמירה נכשלה: ' + (e && e.message ? e.message : e)); }
+  },
+  async extract() {
+    try {
+      const picked = [...PT_STATE.sel].sort((a, b) => a - b).map(i => PT_STATE.items[i]);
+      AT().result('extract', await ptBuild(picked));
+    } catch (e) { AT().fail('החילוץ נכשל'); }
+  },
+  async merge(n) {
+    try {
+      const out = await PDFDocument.create();
+      for (let i = 0; i < n; i++) {
+        const src = await PDFDocument.load(b64ToBytes(AT().fileData(i)), { ignoreEncryption: true, updateMetadata: false });
+        const pgs = await out.copyPages(src, src.getPageIndices());
+        pgs.forEach(p => out.addPage(p));
+      }
+      AT().result('merge', await out.saveAsBase64({ dataUri: false }));
+    } catch (e) { AT().fail('האיחוד נכשל: ' + (e && e.message ? e.message : e)); }
+  },
+  async images(n) {
+    try {
+      const out = await PDFDocument.create();
+      for (let i = 0; i < n; i++) {
+        const bytes = b64ToBytes(AT().fileData(i)), mime = (AT().fileMime(i) || '').toLowerCase();
+        let img;
+        if (mime.includes('jpeg') || mime.includes('jpg')) img = await out.embedJpg(bytes);
+        else if (mime.includes('png')) img = await out.embedPng(bytes);
+        else {
+          const url = URL.createObjectURL(new Blob([bytes], { type: mime || 'image/*' }));
+          const im = await new Promise((res, rej) => { const x = new Image(); x.onload = () => res(x); x.onerror = rej; x.src = url; });
+          const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+          const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(im, 0, 0);
+          img = await out.embedJpg(dataUrlBytes(c.toDataURL('image/jpeg', 0.9)));
+        }
+        const land = img.width > img.height, PW = land ? 842 : 595, PH = land ? 595 : 842, M = 20;
+        const k = Math.min((PW - 2 * M) / img.width, (PH - 2 * M) / img.height);
+        const w = img.width * k, h = img.height * k;
+        const pg = out.addPage([PW, PH]);
+        pg.drawImage(img, { x: (PW - w) / 2, y: (PH - h) / 2, width: w, height: h });
+      }
+      AT().result('images', await out.saveAsBase64({ dataUri: false }));
+    } catch (e) { AT().fail('היצירה נכשלה: ' + (e && e.message ? e.message : e)); }
+  }
+};
