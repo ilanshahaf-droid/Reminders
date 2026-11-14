@@ -70,19 +70,31 @@ fun Home() {
 @Composable
 fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 24.dp) {
     val cs = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("tasks" to "תזכורות", "notes" to "פתקים", "docs" to "מסמכים").forEach { (key, label) ->
-            val sel = current == key
-            Surface(
-                onClick = { if (!sel) when (key) { "notes" -> onNotes(); "docs" -> onDocs(); else -> onReminders() } },
-                shape = RoundedCornerShape(20.dp),
-                color = if (sel) cs.primaryContainer else cs.surface,
-                shadowElevation = if (sel) 0.dp else 1.dp
-            ) {
-                Text(
-                    label, Modifier.padding(horizontal = 20.dp, vertical = 9.dp), style = MaterialTheme.typography.labelLarge,
-                    color = if (sel) cs.onPrimaryContainer else cs.onSurfaceVariant
-                )
+    // segmented control: one rounded track, the selected tab is a filled, raised pill
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 6.dp),
+        shape = RoundedCornerShape(26.dp), color = cs.primary.copy(alpha = 0.10f), shadowElevation = 0.dp
+    ) {
+        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf(Triple("tasks", "⏰", "תזכורות"), Triple("notes", "📝", "פתקים"), Triple("docs", "📄", "מסמכים")).forEach { (key, icon, label) ->
+                val sel = current == key
+                Surface(
+                    onClick = { if (!sel) when (key) { "notes" -> onNotes(); "docs" -> onDocs(); else -> onReminders() } },
+                    modifier = Modifier.weight(1f).height(42.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    color = if (sel) cs.primary else Color.Transparent,
+                    shadowElevation = if (sel) 4.dp else 0.dp
+                ) {
+                    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        Text(icon, fontSize = 15.sp)
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            label, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false,
+                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (sel) cs.onPrimary else cs.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }
