@@ -493,7 +493,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(4.dp))
-                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 110.dp)) {
+                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 96.dp)) {
                     if (files.isEmpty()) item {
                         Text(
                             "לחץ על \"מסמך Word חדש\" כדי ליצור מסמך, או על \"ייבוא קובץ\" כדי להוסיף קובץ Word או PDF מהטלפון.",
@@ -558,32 +558,40 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     }
                 }
             }
-            Row(
-                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // compact floating dock: one pill with New / Open / Tools
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 14.dp),
+                shape = RoundedCornerShape(32.dp), color = cs.surface, shadowElevation = 10.dp, tonalElevation = 2.dp
             ) {
-                Surface(
-                    onClick = { newDlg = true }, shape = RoundedCornerShape(30.dp), color = cs.primary, shadowElevation = 8.dp,
-                    modifier = Modifier.weight(1f).height(58.dp)
-                ) { Box(contentAlignment = Alignment.Center) { Text("＋ מסמך Word חדש", color = cs.onPrimary, fontWeight = FontWeight.Bold) } }
-                Surface(
-                    onClick = { openDlg = true },
-                    shape = RoundedCornerShape(30.dp), color = cs.surface, shadowElevation = 8.dp,
-                    modifier = Modifier.weight(1f).height(58.dp)
-                ) { Box(contentAlignment = Alignment.Center) { Text("פתיחת קובץ", fontWeight = FontWeight.Bold) } }
-                Box {
-                    Surface(
-                        onClick = { toolsMenu = true },
-                        shape = RoundedCornerShape(30.dp), color = cs.surface, shadowElevation = 8.dp,
-                        modifier = Modifier.width(88.dp).height(58.dp)
-                    ) { Box(contentAlignment = Alignment.Center) { Text("כלים ▾", fontWeight = FontWeight.Bold) } }
-                    DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
-                        DropdownMenuItem(text = { Text("איחוד קובצי PDF") }, onClick = {
-                            toolsMenu = false
-                            if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
-                            else { mergePick = emptyList(); mergeDlg = true }
-                        })
-                        DropdownMenuItem(text = { Text("תמונות ל-PDF") }, onClick = { toolsMenu = false; imgPicker.launch("image/*") })
+                Row(Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Surface(onClick = { newDlg = true }, shape = RoundedCornerShape(26.dp), color = cs.primary, modifier = Modifier.height(46.dp)) {
+                        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("＋", color = cs.onPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Text("חדש", color = cs.onPrimary, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        }
+                    }
+                    Surface(onClick = { openDlg = true }, shape = RoundedCornerShape(26.dp), color = Color.Transparent, modifier = Modifier.height(46.dp)) {
+                        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("📂", fontSize = 18.sp); Spacer(Modifier.width(6.dp))
+                            Text("פתיחה", fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                        }
+                    }
+                    Box {
+                        Surface(onClick = { toolsMenu = true }, shape = RoundedCornerShape(26.dp), color = Color.Transparent, modifier = Modifier.height(46.dp)) {
+                            Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("🛠", fontSize = 18.sp); Spacer(Modifier.width(6.dp))
+                                Text("כלים", fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                            }
+                        }
+                        DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
+                            DropdownMenuItem(text = { Text("📑 איחוד קובצי PDF") }, onClick = {
+                                toolsMenu = false
+                                if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
+                                else { mergePick = emptyList(); mergeDlg = true }
+                            })
+                            DropdownMenuItem(text = { Text("🖼 תמונות ל-PDF") }, onClick = { toolsMenu = false; imgPicker.launch("image/*") })
+                        }
                     }
                 }
             }
