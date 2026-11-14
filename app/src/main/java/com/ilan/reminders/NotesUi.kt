@@ -3,6 +3,7 @@ package com.ilan.reminders
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.webkit.JavascriptInterface
@@ -302,9 +303,10 @@ private fun NoteCard(
 }
 
 /** What the page inside the WebView can call. */
-private class EditorBridge(val onReady: () -> Unit, val onChanged: (String, String) -> Unit) {
+private class EditorBridge(val onReady: () -> Unit, val onChanged: (String, String) -> Unit, val onToast: (String) -> Unit = {}) {
     private val main = Handler(Looper.getMainLooper())
     @JavascriptInterface fun ready() { main.post { onReady() } }
+    @JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
     @JavascriptInterface fun changed(html: String, text: String) { main.post { onChanged(html, text) } }
 }
 
@@ -369,6 +371,11 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
             )
         }.isSuccess
         if (!ok) Toast.makeText(ctx, "הקלדה קולית לא זמינה", Toast.LENGTH_SHORT).show()
+    }
+    var fileCb by remember { mutableStateOf<android.webkit.ValueCallback<Array<Uri>>?>(null) }
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        fileCb?.onReceiveValue(android.webkit.WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
+        fileCb = null
     }
     BackHandler(enabled = reminder == null) { finish() }
 
@@ -475,9 +482,21 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                             onReady = {
                                 evaluateJavascript("NE.load(${JSONObject.quote(html)}, $dark)", null)
                             },
-                            onChanged = { h, t -> html = h; plain = t }
+                            onChanged = { h, t -> html = h; plain = t },
+                            onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() }
                         ), "Android"
                     )
+                    webChromeClient = object : android.webkit.WebChromeClient() {
+                        override fun onShowFileChooser(
+                            w: WebView?, cb: android.webkit.ValueCallback<Array<Uri>>?, p: FileChooserParams?
+                        ): Boolean {
+                            fileCb?.onReceiveValue(null)
+                            fileCb = cb
+                            val ok = runCatching { fileLauncher.launch(p!!.createIntent()) }.isSuccess
+                            if (!ok) { cb?.onReceiveValue(null); fileCb = null }
+                            return ok
+                        }
+                    }
                     loadUrl("file:///android_asset/note_editor.html")
                     web.value = this
                 }

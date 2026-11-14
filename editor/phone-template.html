@@ -13,6 +13,7 @@ html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-app
 /*NE-JS*/
 var editor = createNoteEditor(document.getElementById('app'), {
   placeholder: 'כתוב כאן…',
+  onError: function(m){ if(window.Android) Android.toast(m); },
   onChange: function(html, text){ if(window.Android) Android.changed(html, text); }
 });
 window.NE = {
