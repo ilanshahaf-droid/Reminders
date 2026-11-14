@@ -38,7 +38,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("cz.adaptive:tesseract4android:4.7.0")
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.7.0")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.8.3")
