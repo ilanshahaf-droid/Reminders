@@ -219,6 +219,81 @@ object Docs {
 }
 
 
+
+/** "Save as": pick a name and where to save a copy (Google Drive / OneDrive / this device / inside the app). */
+@Composable
+fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
+    val ctx = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+    var name by remember { mutableStateOf(file.nameWithoutExtension) }
+    var mode by remember { mutableStateOf("") }
+    val ext = Docs.ext(file)
+    fun fname() = Docs.clean(name) + "." + ext
+
+    val create = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        if (mode == "drive") {
+                            val copy = Docs.unique(ctx, name, ext)
+                            file.copyTo(copy, overwrite = true)
+                            Docs.linkTo(ctx, copy, uri)
+                        } else {
+                            ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(file.readBytes()) } ?: error("no stream")
+                            true
+                        }
+                    }.getOrDefault(false)
+                }
+                Toast.makeText(
+                    ctx, if (!ok) "השמירה נכשלה" else if (mode == "drive") "נשמר ב-Drive ☁️ (נוסף גם לרשימה כקובץ מקושר)" else "נשמר במכשיר", Toast.LENGTH_LONG
+                ).show()
+                if (ok) { onSavedLocal(); onDismiss() }
+            }
+        }
+    }
+    fun launchCreate(m: String, initial: Uri?) {
+        mode = m
+        val i = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(Docs.mime(file))
+            .putExtra(Intent.EXTRA_TITLE, fname())
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        if (initial != null) runCatching { i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initial) }
+        runCatching { create.launch(i) }.onFailure { Toast.makeText(ctx, "לא ניתן לפתוח את בורר השמירה", Toast.LENGTH_SHORT).show() }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text("שמירה בשם") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("שם הקובץ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Text("שמור ב:", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                OutlinedButton({ launchCreate("drive", DocumentsContract.buildDocumentUri("com.google.android.apps.docs.storage", "root")) }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive") }
+                OutlinedButton({
+                    val f = File(File(ctx.cacheDir, "share").apply { mkdirs() }, fname())
+                    runCatching {
+                        file.copyTo(f, overwrite = true)
+                        val i = Intent(Intent.ACTION_SEND).setType(Docs.mime(file))
+                            .putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f))
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).setPackage("com.microsoft.skydrive")
+                        ctx.startActivity(i)
+                        onDismiss()
+                    }.onFailure { Toast.makeText(ctx, "OneDrive לא מותקן או לא מקבל קבצים", Toast.LENGTH_SHORT).show() }
+                }, Modifier.fillMaxWidth()) { Text("☁️ OneDrive") }
+                OutlinedButton({ launchCreate("device", DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download")) }, Modifier.fillMaxWidth()) { Text("📱 במכשיר") }
+                OutlinedButton({
+                    val c = Docs.unique(ctx, name, ext)
+                    runCatching { file.copyTo(c, overwrite = true) }
+                    Toast.makeText(ctx, "נשמר עותק: ${c.nameWithoutExtension}", Toast.LENGTH_SHORT).show()
+                    onSavedLocal(); onDismiss()
+                }, Modifier.fillMaxWidth()) { Text("📂 עותק באפליקציה") }
+            }
+        },
+        confirmButton = {}, dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
+    )
+}
+
 /** Intent for "save to Drive / OneDrive" (creates a cloud file the app can keep writing to). */
 internal fun cloudCreateIntent(f: File): Intent =
     Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(Docs.mime(f))
@@ -269,6 +344,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var deleting by remember { mutableStateOf<File?>(null) }
 
     var linkTarget by remember { mutableStateOf<File?>(null) }
+    var saveAsFor by remember { mutableStateOf<File?>(null) }
     fun pickedUri(r: androidx.activity.result.ActivityResult): Uri? {
         val d = r.data ?: return null
         return d.data ?: d.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
@@ -406,6 +482,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 if (isPdf) DropdownMenuItem(text = { Text("ארגן עמודים") }, onClick = { menuFor = null; organizing = f })
                                 DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
                                 DropdownMenuItem(text = { Text("שתף") }, onClick = { menuFor = null; Docs.share(ctx, f) })
+                                DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = { menuFor = null; saveAsFor = f })
                                 DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menuFor = null; renameText = f.nameWithoutExtension; renaming = f })
                                 DropdownMenuItem(text = { Text("מחק", color = cs.error) }, onClick = { menuFor = null; deleting = f })
                             }
@@ -458,6 +535,8 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             }
         }
     }
+
+    saveAsFor?.let { f -> SaveAsDialog(f, { saveAsFor = null }, { tick++ }) }
 
     if (mergeDlg) {
         val pdfs = files.filter { Docs.ext(it) == "pdf" }
@@ -553,6 +632,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
     var closeAfter by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     var pageView by remember { mutableStateOf(Docs.pageView(ctx)) }
+    var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
     val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = r.data?.data; val f = cur
@@ -603,6 +683,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
         if (!saving) requestSave(false)
     }
     BackHandler { requestSave(true) }
+    if (showSaveAs) cur?.let { SaveAsDialog(it, { showSaveAs = false }, {}) }
     LaunchedEffect(loaded, pageView) {
         if (loaded) {
             delay(150)
@@ -625,6 +706,13 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
                         DropdownMenuItem(text = { Text("🔍 הגדל") }, onClick = { web.value?.evaluateJavascript("NE.zoom(1.25)", null) })
                         DropdownMenuItem(text = { Text("🔍 הקטן") }, onClick = { web.value?.evaluateJavascript("NE.zoom(0.8)", null) })
                     }
+                    DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = {
+                        moreMenu = false
+                        scope.launch {
+                            requestSave(false); delay(1500)
+                            if (cur?.exists() == true) showSaveAs = true else Toast.makeText(ctx, "אין עדיין מה לשמור", Toast.LENGTH_SHORT).show()
+                        }
+                    })
                     key(linkTick) {
                         if (cur?.let { Docs.isLinked(ctx, it) } != true) DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
                             moreMenu = false
@@ -764,6 +852,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     fun finish() { if (dirty) confirm = true else onClose() }
     BackHandler { finish() }
     val scope = rememberCoroutineScope()
+    var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
     val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = r.data?.data
@@ -791,6 +880,10 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                     DropdownMenuItem(text = { Text("שמור") }, onClick = { moreMenu = false; save(false, false) })
+                    DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = {
+                        moreMenu = false
+                        scope.launch { if (dirty) { save(false, false); delay(2500) }; showSaveAs = true }
+                    })
                     DropdownMenuItem(text = { Text("שמור כעותק") }, onClick = { moreMenu = false; save(true, false) })
                     key(linkTick) {
                         if (!Docs.isLinked(ctx, cur)) DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
@@ -845,6 +938,8 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
             onRelease = { it.destroy() }
         )
     }
+
+    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {})
 
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
