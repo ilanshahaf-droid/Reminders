@@ -218,6 +218,13 @@ object Docs {
     }
 }
 
+
+/** Intent for "save to Drive / OneDrive" (creates a cloud file the app can keep writing to). */
+internal fun cloudCreateIntent(f: File): Intent =
+    Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(Docs.mime(f))
+        .putExtra(Intent.EXTRA_TITLE, f.name)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
@@ -546,6 +553,17 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
     var closeAfter by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
     var pageView by remember { mutableStateOf(Docs.pageView(ctx)) }
+    var linkTick by remember { mutableStateOf(0) }
+    val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data; val f = cur
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null && f != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { Docs.linkTo(ctx, f, uri) }
+                Toast.makeText(ctx, if (ok) "נשמר בענן ☁️ – מעכשיו כל שמירה תתעדכן גם שם" else "השמירה בענן נכשלה", Toast.LENGTH_LONG).show()
+                linkTick++
+            }
+        }
+    }
     var plain by remember { mutableStateOf("") }
     var hasImg by remember { mutableStateOf(false) }
     val web = remember { mutableStateOf<WebView?>(null) }
@@ -606,6 +624,17 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
                     if (pageView) {
                         DropdownMenuItem(text = { Text("🔍 הגדל") }, onClick = { web.value?.evaluateJavascript("NE.zoom(1.25)", null) })
                         DropdownMenuItem(text = { Text("🔍 הקטן") }, onClick = { web.value?.evaluateJavascript("NE.zoom(0.8)", null) })
+                    }
+                    key(linkTick) {
+                        if (cur?.let { Docs.isLinked(ctx, it) } != true) DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
+                            moreMenu = false
+                            scope.launch {
+                                requestSave(false); delay(1500)
+                                val f = cur
+                                if (f == null || !f.exists()) Toast.makeText(ctx, "אין עדיין מה לשמור", Toast.LENGTH_SHORT).show()
+                                else cloudSave.launch(cloudCreateIntent(f))
+                            }
+                        }) else DropdownMenuItem(text = { Text("☁️ מקושר לענן – נשמר אוטומטית") }, onClick = { moreMenu = false })
                     }
                     DropdownMenuItem(text = { Text("שתף כקובץ Word") }, onClick = {
                         moreMenu = false
@@ -734,6 +763,18 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     }
     fun finish() { if (dirty) confirm = true else onClose() }
     BackHandler { finish() }
+    val scope = rememberCoroutineScope()
+    var linkTick by remember { mutableStateOf(0) }
+    val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { Docs.linkTo(ctx, cur, uri) }
+                Toast.makeText(ctx, if (ok) "נשמר בענן ☁️ – מעכשיו כל שמירה תתעדכן גם שם" else "השמירה בענן נכשלה", Toast.LENGTH_LONG).show()
+                linkTick++
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -751,6 +792,11 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                     DropdownMenuItem(text = { Text("שמור") }, onClick = { moreMenu = false; save(false, false) })
                     DropdownMenuItem(text = { Text("שמור כעותק") }, onClick = { moreMenu = false; save(true, false) })
+                    key(linkTick) {
+                        if (!Docs.isLinked(ctx, cur)) DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
+                            moreMenu = false; cloudSave.launch(cloudCreateIntent(cur))
+                        }) else DropdownMenuItem(text = { Text("☁️ מקושר לענן – נשמר אוטומטית") }, onClick = { moreMenu = false })
+                    }
                     DropdownMenuItem(text = { Text("שתף") }, onClick = { moreMenu = false; Docs.share(ctx, cur) })
                     DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { moreMenu = false; Docs.openExternal(ctx, cur) })
                 }
