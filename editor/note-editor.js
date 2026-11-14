@@ -2,7 +2,8 @@
 (function(g){
   var TXT = ['#14161f','#d93025','#e8710a','#188038','#1a73e8','#9334e6','#d01884','#5f6368'];
   var HL  = ['#fff475','#fbbc04','#ccff90','#a7ffeb','#aecbfa','#d7aefb','#fdcfe8','#e8eaed'];
-  var SIZES = [['קטן','2'],['רגיל','3'],['גדול','5'],['ענק','7']];
+  var SIZES = [10,12,14,16,18,20,24,28,32,40];
+  var FONTS = [['רגיל','sans-serif'],['סריף','Georgia, serif'],['מונו','monospace'],['כתב יד','Comic Sans MS, Segoe Print, cursive'],['Arial','Arial, sans-serif'],['Tahoma','Tahoma, sans-serif']];
 
   function clean(html){
     var d = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html');
@@ -107,11 +108,20 @@
       var n = curList(); if(n) n.classList.remove('cl');
       changed();
     }
+    function applySize(px){
+      ed.focus(); document.execCommand('fontSize', false, '7');
+      ed.querySelectorAll('font[size="7"]').forEach(function(f){ f.removeAttribute('size'); f.style.fontSize = px + 'px'; });
+      changed();
+    }
     function showPal(kind){
       if(!pal.classList.contains('hide') && pal.getAttribute('data-k') === kind){ pal.classList.add('hide'); return; }
       pal.innerHTML = ''; pal.setAttribute('data-k', kind); pal.classList.remove('hide');
       if(kind === 'size'){
-        SIZES.forEach(function(s){ var b = document.createElement('button'); b.className = 'txt'; b.textContent = s[0]; b.onclick = function(){ cmd('fontSize', s[1]); pal.classList.add('hide'); }; pal.appendChild(b); });
+        SIZES.forEach(function(z){ var b = document.createElement('button'); b.className = 'txt'; b.textContent = z; b.onclick = function(){ applySize(z); pal.classList.add('hide'); }; pal.appendChild(b); });
+        return;
+      }
+      if(kind === 'font'){
+        FONTS.forEach(function(f){ var b = document.createElement('button'); b.className = 'txt'; b.textContent = f[0]; b.style.fontFamily = f[1]; b.onclick = function(){ cmd('fontName', f[1]); pal.classList.add('hide'); }; pal.appendChild(b); });
         return;
       }
       (kind === 'fore' ? TXT : HL).forEach(function(c){
@@ -229,7 +239,7 @@
       {id:'u', h:'<u>U</u>', f:function(){ cmd('underline'); }, t:'קו תחתון'}, {id:'s', h:'<s>S</s>', f:function(){ cmd('strikeThrough'); }, t:'קו חוצה'},
       {id:'hi', h:'<span style="background:#fff475;padding:0 4px;border-radius:4px">A</span>', f:function(){ showPal('hi'); }, t:'הדגשה בצבע'},
       {id:'fore', h:'<span style="color:#d93025;font-weight:700;border-bottom:3px solid #d93025">A</span>', f:function(){ showPal('fore'); }, t:'צבע טקסט'},
-      {id:'size', h:'Aa', f:function(){ showPal('size'); }, t:'גודל טקסט'},
+      {id:'size', h:'▾ 16', f:function(){ showPal('size'); }, t:'גודל טקסט'}, {id:'font', h:'▾ Aa', f:function(){ showPal('font'); }, t:'גופן'},
       {id:'ul', h:'•≡', f:function(){ plainList('UL'); }, t:'תבליטים'}, {id:'ol', h:'1.', f:function(){ plainList('OL'); }, t:'רשימה ממוספרת'},
       {id:'cl', h:'☑', f:checklist, t:'רשימת סימון'},
       {id:'img', h:'🖼', f:pickImage, t:'הוסף תמונה'}, {id:'draw', h:'✏️', f:draw, t:'ציור'}, {id:'delimg', h:'🗑️', f:delImage, t:'מחק תמונה נבחרת'},
@@ -241,9 +251,15 @@
     var order = ITEMS.map(function(it){ return it.id; });
     try {
       var saved = opts.loadBar && opts.loadBar();
-      if(saved){ var arr = JSON.parse(saved); if(Array.isArray(arr)) order = arr.filter(function(k){ return byId[k]; }); }
+      if(saved){
+        var obj = JSON.parse(saved), arr = Array.isArray(obj) ? obj : obj.o, known = Array.isArray(obj) ? ITEMS.map(function(i){ return i.id; }).filter(function(k){ return k !== 'font'; }) : (obj.k || []);
+        if(Array.isArray(arr)){
+          order = arr.filter(function(k){ return byId[k]; });
+          ITEMS.forEach(function(it){ if(known.indexOf(it.id) < 0) order.push(it.id); });
+        }
+      }
     } catch(e){}
-    function saveOrder(){ try { if(opts.saveBar) opts.saveBar(JSON.stringify(order)); } catch(e){} }
+    function saveOrder(){ try { if(opts.saveBar) opts.saveBar(JSON.stringify({o: order, k: ITEMS.map(function(i){ return i.id; })})); } catch(e){} }
     function mkBtn(html, label, fn){
       var b = document.createElement('button'); b.type = 'button'; b.innerHTML = html; b.setAttribute('aria-label', label); b.title = label;
       b.addEventListener('pointerdown', function(e){ e.preventDefault(); });

@@ -105,6 +105,18 @@ fun NotesHost(onReminders: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     var showTrash by remember { mutableStateOf(false) }
     var cardMenu by remember { mutableStateOf<Long?>(null) }
+    val np = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
+    var sortBy by remember { mutableStateOf(np.getString("noteSort", "modified") ?: "modified") }
+    var cols by remember { mutableStateOf(np.getInt("noteCols", 2)) }
+    var pinTop by remember { mutableStateOf(np.getBoolean("notePinTop", true)) }
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var selMode by remember { mutableStateOf(false) }
+    fun clearSel() { selected = emptySet(); selMode = false }
+    var showSort by remember { mutableStateOf(false) }
+    var showView by remember { mutableStateOf(false) }
+    var showCats by remember { mutableStateOf(false) }
+    var selColorMenu by remember { mutableStateOf(false) }
+    var selCatMenu by remember { mutableStateOf(false) }
     var syncStatus by remember { mutableStateOf(Sync.prefs(ctx).getString("status", "") ?: "") }
     DisposableEffect(Unit) {
         val p = Sync.prefs(ctx)
@@ -123,7 +135,8 @@ fun NotesHost(onReminders: () -> Unit) {
             editing = newNote(ctx).copy(html = esc, plain = shared)
         }
     }
-    BackHandler(enabled = editing == null) {
+    BackHandler(enabled = editing == null && (selMode || selected.isNotEmpty())) { clearSel() }
+    BackHandler(enabled = editing == null && !selMode && selected.isEmpty()) {
         if (searching) { searching = false; query = "" } else onReminders()
     }
 
@@ -137,13 +150,28 @@ fun NotesHost(onReminders: () -> Unit) {
                 (catFilter == null || it.categoryId == catFilter) &&
                     (q.isEmpty() || it.title.contains(q, true) || it.plain.contains(q, true))
             }
-            val pinned = shown.filter { it.pinned }
-            val others = shown.filter { !it.pinned }
+            val sorted = when (sortBy) {
+                "created" -> shown.sortedByDescending { it.createdAt }
+                "title" -> shown.sortedBy { it.title.ifBlank { it.plain }.lowercase() }
+                else -> shown.sortedByDescending { it.updatedAt }
+            }
+            val pinned = if (pinTop) sorted.filter { it.pinned } else emptyList()
+            val others = if (pinTop) sorted.filter { !it.pinned } else sorted
+            val selNotes = notes.filter { it.id in selected }
+            val card: @Composable (Note) -> Unit = { n ->
+                NoteCard(n, categories.firstOrNull { it.id == n.categoryId }, dark, false, {},
+                    onClick = {
+                        if (selMode || selected.isNotEmpty()) { selected = if (n.id in selected) selected - n.id else selected + n.id }
+                        else { editing = n }
+                    },
+                    onLong = { selMode = true; selected = selected + n.id },
+                    onPin = {}, onShare = {}, onDelete = {}, selected = n.id in selected)
+            }
             val catById = categories.associateBy { it.id }
             Scaffold(containerColor = Color.Transparent) { pad ->
                 Box(Modifier.padding(pad).fillMaxSize()) {
                     LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(2),
+                        columns = StaggeredGridCells.Fixed(cols),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 130.dp),
                         verticalItemSpacing = 10.dp,
@@ -151,6 +179,60 @@ fun NotesHost(onReminders: () -> Unit) {
                     ) {
                         item(span = StaggeredGridItemSpan.FullLine, key = "head") {
                             Column {
+                                if (selMode || selected.isNotEmpty()) Surface(
+                                    shape = RoundedCornerShape(20.dp), color = cs.surface, shadowElevation = 4.dp,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp)
+                                ) {
+                                    Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        TextButton({ clearSel() }) { Text("✕", fontSize = 20.sp, color = cs.onSurface) }
+                                        Text("${selected.size} נבחרו", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                                        TextButton({ selected = notes.map { it.id }.toSet() }) { Text("הכל") }
+                                        TextButton({
+                                            val pin = !selNotes.all { it.pinned }
+                                            scope.launch { selNotes.forEach { Notes.save(ctx, it.copy(pinned = pin)) } }
+                                            clearSel()
+                                        }) { Text("📌", fontSize = 20.sp) }
+                                        Box {
+                                            TextButton({ selColorMenu = true }) { Text("🎨", fontSize = 20.sp) }
+                                            DropdownMenu(expanded = selColorMenu, onDismissRequest = { selColorMenu = false }) {
+                                                Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    (listOf("" to null as Color?) + NOTE_COLORS.map { it.first to noteColor(it.first, dark) }).forEach { (key, c) ->
+                                                        Box(
+                                                            Modifier.size(30.dp).clip(CircleShape).background(c ?: cs.surface).border(1.dp, cs.outline, CircleShape)
+                                                                .clickable {
+                                                                    selColorMenu = false
+                                                                    scope.launch { selNotes.forEach { Notes.save(ctx, it.copy(color = key)) } }
+                                                                    clearSel()
+                                                                }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (categories.isNotEmpty()) Box {
+                                            TextButton({ selCatMenu = true }) { Text("🏷", fontSize = 20.sp) }
+                                            DropdownMenu(expanded = selCatMenu, onDismissRequest = { selCatMenu = false }) {
+                                                DropdownMenuItem(text = { Text("ללא קטגוריה") }, onClick = {
+                                                    selCatMenu = false; scope.launch { selNotes.forEach { Notes.save(ctx, it.copy(categoryId = 0)) } }; clearSel()
+                                                })
+                                                categories.forEach { c ->
+                                                    DropdownMenuItem(text = { Text(c.name) }, onClick = {
+                                                        selCatMenu = false; scope.launch { selNotes.forEach { Notes.save(ctx, it.copy(categoryId = c.id)) } }; clearSel()
+                                                    })
+                                                }
+                                            }
+                                        }
+                                        TextButton({
+                                            shareNote(ctx, selNotes.firstOrNull()?.copy(
+                                                title = "פתקים", plain = selNotes.joinToString("\n\n———\n\n") { it.asText() }, html = ""
+                                            ) ?: return@TextButton)
+                                        }) { Text("↗", fontSize = 20.sp, color = cs.onSurface) }
+                                        TextButton({
+                                            scope.launch { selNotes.forEach { Notes.trash(ctx, it) } }
+                                            clearSel()
+                                        }) { Text("🗑", fontSize = 20.sp) }
+                                    }
+                                }
                                 Row(Modifier.padding(start = 0.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text("פתקים", style = MaterialTheme.typography.headlineLarge)
@@ -168,6 +250,14 @@ fun NotesHost(onReminders: () -> Unit) {
                                             Box {
                                                 IconButton({ menuOpen = true }) { Icon(Icons.Default.MoreVert, "תפריט") }
                                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                                    DropdownMenuItem(text = { Text("בחר") }, onClick = { menuOpen = false; selMode = true })
+                                                    DropdownMenuItem(text = { Text("הצג") }, onClick = { menuOpen = false; showView = true })
+                                                    DropdownMenuItem(text = { Text("מיין") }, onClick = { menuOpen = false; showSort = true })
+                                                    DropdownMenuItem(
+                                                        text = { Text((if (pinTop) "✓ " else "") + "הצמד מועדפים למעלה") },
+                                                        onClick = { pinTop = !pinTop; np.edit().putBoolean("notePinTop", pinTop).apply(); menuOpen = false }
+                                                    )
+                                                    DropdownMenuItem(text = { Text("נהל קטגוריות") }, onClick = { menuOpen = false; showCats = true })
                                                     DropdownMenuItem(
                                                         text = { Text("סל מחזור (${trash.size})") },
                                                         onClick = { menuOpen = false; showTrash = true }
@@ -196,23 +286,11 @@ fun NotesHost(onReminders: () -> Unit) {
                         if (pinned.isNotEmpty()) item(span = StaggeredGridItemSpan.FullLine, key = "pinH") {
                             Text("מוצמדים", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = cs.onSurfaceVariant)
                         }
-                        items(pinned, key = { it.id }) { n ->
-                            NoteCard(n, catById[n.categoryId], dark, cardMenu == n.id, { cardMenu = null },
-                                onClick = { editing = n }, onLong = { cardMenu = n.id },
-                                onPin = { cardMenu = null; scope.launch { Notes.save(ctx, n.copy(pinned = !n.pinned)) } },
-                                onShare = { cardMenu = null; shareNote(ctx, n) },
-                                onDelete = { cardMenu = null; scope.launch { Notes.trash(ctx, n) } })
-                        }
+                        items(pinned, key = { it.id }) { n -> card(n) }
                         if (pinned.isNotEmpty() && others.isNotEmpty()) item(span = StaggeredGridItemSpan.FullLine, key = "othH") {
                             Text("אחרים", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = cs.onSurfaceVariant)
                         }
-                        items(others, key = { it.id }) { n ->
-                            NoteCard(n, catById[n.categoryId], dark, cardMenu == n.id, { cardMenu = null },
-                                onClick = { editing = n }, onLong = { cardMenu = n.id },
-                                onPin = { cardMenu = null; scope.launch { Notes.save(ctx, n.copy(pinned = !n.pinned)) } },
-                                onShare = { cardMenu = null; shareNote(ctx, n) },
-                                onDelete = { cardMenu = null; scope.launch { Notes.trash(ctx, n) } })
-                        }
+                        items(others, key = { it.id }) { n -> card(n) }
                         if (shown.isEmpty() && notes.isNotEmpty()) item(span = StaggeredGridItemSpan.FullLine, key = "none") {
                             Text("לא נמצאו פתקים", Modifier.padding(24.dp), color = cs.onSurfaceVariant)
                         }
@@ -233,6 +311,44 @@ fun NotesHost(onReminders: () -> Unit) {
         }
     }
 
+    if (showSort) AlertDialog(
+        onDismissRequest = { showSort = false }, title = { Text("מיון") },
+        text = {
+            Column {
+                listOf("modified" to "עודכן לאחרונה", "created" to "נוצר לאחרונה", "title" to "כותרת (א-ב)").forEach { (k, label) ->
+                    TextButton({ sortBy = k; np.edit().putString("noteSort", k).apply(); showSort = false }, Modifier.fillMaxWidth()) {
+                        Text((if (sortBy == k) "● " else "○ ") + label, Modifier.fillMaxWidth(), color = cs.onSurface)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton({ showSort = false }) { Text("סגור") } }
+    )
+    if (showView) AlertDialog(
+        onDismissRequest = { showView = false }, title = { Text("תצוגה") },
+        text = {
+            Column {
+                listOf(2 to "רשת (שתי עמודות)", 1 to "רשימה (עמודה אחת)", 3 to "רשת צפופה (שלוש עמודות)").forEach { (k, label) ->
+                    TextButton({ cols = k; np.edit().putInt("noteCols", k).apply(); showView = false }, Modifier.fillMaxWidth()) {
+                        Text((if (cols == k) "● " else "○ ") + label, Modifier.fillMaxWidth(), color = cs.onSurface)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton({ showView = false }) { Text("סגור") } }
+    )
+    if (showCats) CategoriesDialog(
+        categories,
+        onAdd = { n, c -> scope.launch { db.dao().addCategory(Category(name = n, color = c)); Sync.schedulePush(ctx) } },
+        onDelete = { c ->
+            scope.launch {
+                db.dao().clearCategory(c.id); db.dao().deleteCategory(c.id)
+                if (catFilter == c.id) catFilter = null
+                Sync.schedulePush(ctx)
+            }
+        },
+        onDismiss = { showCats = false }
+    )
     if (showTrash) AlertDialog(
         onDismissRequest = { showTrash = false },
         title = { Text("סל מחזור") },
@@ -269,16 +385,19 @@ private fun shareNote(ctx: Context, n: Note) {
 @Composable
 private fun NoteCard(
     n: Note, cat: Category?, dark: Boolean, menu: Boolean, onMenuDismiss: () -> Unit,
-    onClick: () -> Unit, onLong: () -> Unit, onPin: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit
+    onClick: () -> Unit, onLong: () -> Unit, onPin: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit,
+    selected: Boolean = false
 ) {
     val cs = MaterialTheme.colorScheme
     val bg = noteColor(n.color, dark) ?: cs.surface
     Box {
         Surface(
             shape = RoundedCornerShape(18.dp), color = bg, shadowElevation = 2.dp,
+            border = if (selected) androidx.compose.foundation.BorderStroke(3.dp, cs.primary) else null,
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).combinedClickable(onClick = onClick, onLongClick = onLong)
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (selected) Text("✔ נבחר", fontSize = 13.sp, color = cs.primary)
                 if (n.pinned) Text("📌", fontSize = 14.sp)
                 if (n.title.isNotBlank()) Text(
                     n.title, style = MaterialTheme.typography.titleMedium, color = cs.onSurface, maxLines = 3, overflow = TextOverflow.Ellipsis
@@ -361,6 +480,9 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
         }
     }
     var reminder by remember { mutableStateOf<Task?>(null) }
+    var finding by remember { mutableStateOf(false) }
+    var findQ by remember { mutableStateOf("") }
+    var full by remember { mutableStateOf(false) }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (r.resultCode == android.app.Activity.RESULT_OK && !text.isNullOrBlank())
@@ -381,7 +503,8 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
         fileCb?.onReceiveValue(android.webkit.WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
         fileCb = null
     }
-    BackHandler(enabled = reminder == null) { finish() }
+    BackHandler(enabled = reminder == null && full) { full = false }
+    BackHandler(enabled = reminder == null && !full) { finish() }
 
     var exportText by remember { mutableStateOf("") }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
@@ -408,9 +531,10 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
 
     Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
+            if (full) TextButton({ full = false }) { Text("⤡ יציאה ממסך מלא") }
+            else IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
             Spacer(Modifier.weight(1f))
-            TextButton({ dictate() }) { Text("🎤", fontSize = 20.sp) }
+            if (!full) TextButton({ dictate() }) { Text("🎤", fontSize = 20.sp) }
             TextButton({ pinned = !pinned }) { Text("📌", fontSize = 20.sp, modifier = Modifier.alpha(if (pinned) 1f else 0.35f)) }
             Box {
                 TextButton({ colorMenu = true }) { Text("🎨", fontSize = 20.sp) }
@@ -443,6 +567,16 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text("חיפוש בפתק") }, onClick = { moreMenu = false; finding = true })
+                    DropdownMenuItem(text = { Text("מסך מלא") }, onClick = { moreMenu = false; full = true })
+                    DropdownMenuItem(text = { Text("הדפס") }, onClick = {
+                        moreMenu = false
+                        val wv = web.value
+                        if (wv != null) {
+                            val pm = ctx.getSystemService(Context.PRINT_SERVICE) as android.print.PrintManager
+                            pm.print(title.ifBlank { "פתק" }, wv.createPrintDocumentAdapter(title.ifBlank { "פתק" }), null)
+                        }
+                    })
                     DropdownMenuItem(text = { Text("הוסף תזכורת לפתק") }, onClick = {
                         moreMenu = false
                         val n = current()
@@ -464,7 +598,16 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                 }
             }
         }
-        TextField(
+        if (finding && !full) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                findQ, { findQ = it; web.value?.findAllAsync(it) }, singleLine = true, placeholder = { Text("חיפוש בפתק") },
+                modifier = Modifier.weight(1f)
+            )
+            TextButton({ web.value?.findNext(false) }) { Text("▲") }
+            TextButton({ web.value?.findNext(true) }) { Text("▼") }
+            TextButton({ finding = false; findQ = ""; web.value?.clearMatches() }) { Text("✕") }
+        }
+        if (!full) TextField(
             title, { title = it }, singleLine = false, maxLines = 3,
             placeholder = { Text("כותרת", style = MaterialTheme.typography.headlineSmall, color = cs.onSurfaceVariant) },
             textStyle = MaterialTheme.typography.headlineSmall,
