@@ -86,6 +86,7 @@ function render() {
   $('count').textContent = (S.i + 1) + '/' + S.pages.length;
   $('prev').disabled = S.i === 0; $('next').disabled = S.i === S.pages.length - 1;
   $('modeBtn').querySelector('span').textContent = S.mode === 'crop' ? 'סיום חיתוך' : 'חיתוך';
+  $('doneBtn').textContent = S.mode === 'crop' ? '✓ אישור' : 'הבא';
   document.querySelectorAll('.cropOnly').forEach(e => e.classList.toggle('hide', S.mode !== 'crop'));
   document.querySelectorAll('.filterOnly').forEach(e => e.classList.toggle('hide', S.mode === 'crop'));
   const box = $('stage').getBoundingClientRect(); stage = { w: box.width, h: box.height };
@@ -182,16 +183,20 @@ window.SC = {
   async open(dark, name) {
     document.documentElement.className = dark ? 'dark' : '';
     S.set.name = name || '';
-    try { await addPage(A().fileData(0)); } catch (e) { A().toast('הצילום לא נטען'); A().close(); return; }
+    try {
+      const n = A().fileCount ? A().fileCount() : 1;
+      for (let i = 0; i < n; i++) await addPage(A().fileData(i));
+      S.i = 0;
+    } catch (e) { A().toast('התמונה לא נטענה'); A().close(); return; }
     bindCrop();
-    $('prev').onclick = () => { S.i--; render(); }; $('next').onclick = () => { S.i++; render(); };
+    $('prev').onclick = () => { if (S.i > 0) { S.i--; render(); } }; $('next').onclick = () => { if (S.i < S.pages.length - 1) { S.i++; render(); } };
     $('modeBtn').onclick = () => { S.mode = S.mode === 'crop' ? 'filter' : 'crop'; render(); };
     $('rotL').onclick = () => rotate(-90); $('rotR').onclick = () => rotate(90);
     $('delBtn').onclick = del;
-    $('retake').onclick = () => A().camera('r' + S.i); $('addBtn').onclick = () => A().camera('a');
+    $('retake').onclick = () => A().camera('r' + S.i); $('addBtn').onclick = () => A().camera('a'); $('galBtn').onclick = () => A().gallery();
     $('autoCrop').onclick = () => { cur().crop = autoCrop(cur()); render(); };
     $('fullCrop').onclick = () => { cur().crop = { x: 0, y: 0, w: 1, h: 1 }; render(); };
-    $('doneBtn').onclick = () => { if (S.mode === 'crop') { S.mode = 'filter'; render(); } showSettings(); };
+    $('doneBtn').onclick = () => { if (S.mode === 'crop') { S.mode = 'filter'; render(); return; } showSettings(); };
     $('backBtn').onclick = () => SC.back();
     $('sBack').onclick = () => SC.back();
     $('sName').oninput = () => { S.set.name = $('sName').value; };

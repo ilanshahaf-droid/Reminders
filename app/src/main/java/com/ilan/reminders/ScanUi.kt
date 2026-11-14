@@ -21,14 +21,16 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 private class ScanBridge(
-    val first: ByteArray,
+    val shots: List<ByteArray>,
     val onReady: () -> Unit, val onResult: (String, String) -> Unit, val onCamera: (String) -> Unit,
-    val onClose: () -> Unit, val onToast: (String) -> Unit
+    val onClose: () -> Unit, val onToast: (String) -> Unit, val onGallery: () -> Unit
 ) {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
     @android.webkit.JavascriptInterface fun opened() {}
-    @android.webkit.JavascriptInterface fun fileData(i: Int): String = Base64.encodeToString(first, Base64.NO_WRAP)
+    @android.webkit.JavascriptInterface fun fileCount(): Int = shots.size
+    @android.webkit.JavascriptInterface fun fileData(i: Int): String = Base64.encodeToString(shots[i], Base64.NO_WRAP)
+    @android.webkit.JavascriptInterface fun gallery() { main.post { onGallery() } }
     @android.webkit.JavascriptInterface fun result(name: String, b64: String) { main.post { onResult(name, b64) } }
     @android.webkit.JavascriptInterface fun camera(mode: String) { main.post { onCamera(mode) } }
     @android.webkit.JavascriptInterface fun close() { main.post { onClose() } }
@@ -38,7 +40,7 @@ private class ScanBridge(
 /** After a photo is taken: crop, rotate, filter and add pages, then PDF settings and save. Full screen. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun ScanEditorScreen(first: ByteArray, dark: Boolean, onClose: () -> Unit, onCreated: (File) -> Unit) {
+fun ScanEditorScreen(shots: List<ByteArray>, dark: Boolean, onClose: () -> Unit, onCreated: (File) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val web = remember { mutableStateOf<WebView?>(null) }
@@ -48,6 +50,15 @@ fun ScanEditorScreen(first: ByteArray, dark: Boolean, onClose: () -> Unit, onCre
         if (ok && shot.exists() && shot.length() > 0) {
             val b64 = Base64.encodeToString(shot.readBytes(), Base64.NO_WRAP)
             web.value?.evaluateJavascript("SC.shot('$b64','$pendingMode')", null)
+        }
+    }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            for (u in uris) {
+                val bytes = withContext(Dispatchers.IO) { runCatching { ctx.contentResolver.openInputStream(u)!!.use { it.readBytes() } }.getOrNull() } ?: continue
+                web.value?.evaluateJavascript("SC.shot('${Base64.encodeToString(bytes, Base64.NO_WRAP)}','a')", null)
+                kotlinx.coroutines.delay(400)
+            }
         }
     }
     val defName = remember { "סריקה " + java.text.SimpleDateFormat("dd-MM-yy HH.mm", java.util.Locale.US).format(java.util.Date()) }
@@ -61,7 +72,7 @@ fun ScanEditorScreen(first: ByteArray, dark: Boolean, onClose: () -> Unit, onCre
                     settings.javaScriptEnabled = true
                     addJavascriptInterface(
                         ScanBridge(
-                            first,
+                            shots,
                             onReady = { evaluateJavascript("SC.open(${dark}, ${org.json.JSONObject.quote(defName)})", null) },
                             onResult = { name, b64 ->
                                 scope.launch {
@@ -80,7 +91,8 @@ fun ScanEditorScreen(first: ByteArray, dark: Boolean, onClose: () -> Unit, onCre
                                     .onFailure { Toast.makeText(ctx, "המצלמה לא זמינה", Toast.LENGTH_SHORT).show() }
                             },
                             onClose = onClose,
-                            onToast = { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show() }
+                            onToast = { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show() },
+                            onGallery = { runCatching { gallery.launch("image/*") } }
                         ), "Android"
                     )
                     loadUrl("file:///android_asset/scan_editor.html")

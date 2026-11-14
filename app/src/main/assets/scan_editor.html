@@ -21,7 +21,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:
 [data-h=l],[data-h=r]{width:14px;height:46px;border-radius:8px;top:calc(50% - 23px)}[data-h=l]{left:-8px}[data-h=r]{right:-8px}
 #pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:4px 0}
 #pager b{font-size:22px;background:var(--chip);border-radius:20px;padding:4px 18px}
-#pager button{border:0;border-radius:50%;width:38px;height:38px;background:var(--chip);color:var(--fg);font-size:18px}
+#pager button{direction:ltr;unicode-bidi:isolate;border:0;border-radius:50%;width:38px;height:38px;background:var(--chip);color:var(--fg);font-size:18px}
 #pager button:disabled{opacity:.3}
 #filters{display:flex;gap:8px;padding:6px 10px;overflow-x:auto}
 .ft{flex:0 0 74px;text-align:center;font-size:12px;border-radius:10px;border:3px solid transparent;padding:2px}
@@ -44,12 +44,13 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--acc)}
   <div id="stage"><canvas id="cv"></canvas>
     <div id="crop" class="hide"><div id="box"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i><i data-h="t"></i><i data-h="b"></i><i data-h="l"></i><i data-h="r"></i></div></div>
   </div>
-  <div id="pager"><button id="next">›</button><b id="count">1/1</b><button id="prev">‹</button></div>
+  <div id="pager"><button id="prev">›</button><b id="count">1/1</b><button id="next">‹</button></div>
   <div id="filters" class="filterOnly"></div>
   <div id="acts">
     <button id="delBtn"><i>🗑</i>מחיקה</button>
     <button id="retake"><i>📷</i>צילום מחדש</button>
     <button id="addBtn" class="filterOnly"><i>➕</i>עוד דף</button>
+    <button id="galBtn" class="filterOnly"><i>🖼</i>מהגלריה</button>
     <button id="rotL"><i>↺</i>שמאלה</button>
     <button id="rotR"><i>↻</i>ימינה</button>
     <button id="autoCrop" class="cropOnly hide"><i>✨</i>אוטומטי</button>

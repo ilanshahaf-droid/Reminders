@@ -358,6 +358,13 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         if (ok && shotFile.exists() && shotFile.length() > 0) { scanShots = listOf(shotFile.readBytes()); scanDlg = true }
     }
+    val scanScope = rememberCoroutineScope()
+    val scanPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) scanScope.launch {
+            val blobs = withContext(Dispatchers.IO) { uris.mapNotNull { u -> runCatching { ctx.contentResolver.openInputStream(u)!!.use { it.readBytes() } }.getOrNull() } }
+            if (blobs.isEmpty()) Toast.makeText(ctx, "לא נמצאו תמונות", Toast.LENGTH_SHORT).show() else { scanShots = blobs; scanDlg = true }
+        }
+    }
     fun shoot() {
         scanDlg = false
         runCatching { shotFile.delete(); camera.launch(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", shotFile)) }
@@ -627,6 +634,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                             })
                             DropdownMenuItem(text = { Text("🔎 חיפוש בכל האפליקציה") }, onClick = { toolsMenu = false; GlobalSearch.open = true })
                             DropdownMenuItem(text = { Text("📷 סריקה ל-PDF") }, onClick = { toolsMenu = false; scanShots = emptyList(); shoot() })
+                            DropdownMenuItem(text = { Text("🖼 סריקה מתמונה קיימת") }, onClick = { toolsMenu = false; scanShots = emptyList(); scanPicker.launch("image/*") })
                             DropdownMenuItem(text = { Text("🗜 דחיסת PDF") }, onClick = {
                                 toolsMenu = false
                                 if (files.none { Docs.ext(it) == "pdf" }) Toast.makeText(ctx, "אין קובצי PDF ברשימה", Toast.LENGTH_SHORT).show() else compressDlg = true
@@ -680,7 +688,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
 
     if (scanDlg && scanShots.isNotEmpty()) ScanEditorScreen(
-        scanShots[0], dark,
+        scanShots, dark,
         onClose = { scanDlg = false; scanShots = emptyList() },
         onCreated = { f -> scanDlg = false; scanShots = emptyList(); tick++; saveAsFor = f }
     )
