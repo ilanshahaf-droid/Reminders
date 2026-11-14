@@ -66,9 +66,14 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takeShare(intent)
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        takeShare(intent)
         setContent { AppTheme { Home() } }
         // while the app is on screen: pull web changes right away and then every 15 seconds
         lifecycleScope.launch {
@@ -80,6 +85,18 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/** Text received through the system "Share" menu; shown as a new note. */
+object PendingShare { var text by mutableStateOf<String?>(null) }
+
+private fun takeShare(i: Intent?) {
+    if (i?.action != Intent.ACTION_SEND) return
+    val t = i.getStringExtra(Intent.EXTRA_TEXT)
+    val subj = i.getStringExtra(Intent.EXTRA_SUBJECT)
+    val all = listOfNotNull(subj?.takeIf { it.isNotBlank() && t?.contains(it) != true }, t).joinToString("\n")
+    if (all.isNotBlank()) PendingShare.text = all
+    i.action = Intent.ACTION_MAIN
 }
 
 private val BUCKETS = listOf("באיחור", "היום", "מחר", "השבוע", "בהמשך", "הושלמו")
@@ -119,7 +136,7 @@ fun defaultTriggerAt(c: Context): Long {
 
 fun defaultCategory(c: Context): Long = c.getSharedPreferences("app", Context.MODE_PRIVATE).getLong("defCat", 0L)
 
-private fun newTask(c: Context, noAlert: Boolean = false): Task {
+internal fun newTask(c: Context, noAlert: Boolean = false): Task {
     val vib = c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defVibration", "STRONG") ?: "STRONG"
     return Task(title = "", triggerAt = defaultTriggerAt(c), vibration = vib, categoryId = defaultCategory(c),
         alertMode = if (noAlert) "NONE" else "ONCE")
@@ -743,7 +760,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v48") },
+        title = { Text("הגדרות · v49") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

@@ -214,7 +214,8 @@ window.NE = {
   load: function(html, dark){ document.documentElement.className = dark ? 'dark' : ''; editor.setHtml(html || ''); },
   theme: function(dark){ document.documentElement.className = dark ? 'dark' : ''; },
   focus: function(){ editor.focus(); },
-  flush: function(){ editor.flush(); }
+  flush: function(){ editor.flush(); },
+  insert: function(t){ editor.focus(); document.execCommand('insertText', false, t); editor.flush(); }
 };
 if(window.Android) Android.ready();
 </script></body></html>

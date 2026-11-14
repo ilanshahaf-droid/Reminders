@@ -57,6 +57,7 @@ import org.json.JSONObject
 @Composable
 fun Home() {
     var screen by rememberSaveable { mutableStateOf("tasks") }
+    if (PendingShare.text != null && screen != "notes") screen = "notes"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" })
@@ -113,6 +114,14 @@ fun NotesHost(onReminders: () -> Unit) {
         onDispose { p.unregisterOnSharedPreferenceChangeListener(l) }
     }
     LaunchedEffect(Unit) { Notes.purgeExpired(ctx) }
+    val shared = PendingShare.text
+    LaunchedEffect(shared) {
+        if (shared != null) {
+            PendingShare.text = null
+            val esc = shared.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+            editing = newNote(ctx).copy(html = esc, plain = shared)
+        }
+    }
     BackHandler(enabled = editing == null) {
         if (searching) { searching = false; query = "" } else onReminders()
     }
@@ -345,7 +354,23 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
             onClose()
         }
     }
-    BackHandler { finish() }
+    var reminder by remember { mutableStateOf<Task?>(null) }
+    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == android.app.Activity.RESULT_OK && !text.isNullOrBlank())
+            web.value?.evaluateJavascript("NE.insert(${JSONObject.quote(text + " ")})", null)
+    }
+    fun dictate() {
+        val ok = runCatching {
+            voiceLauncher.launch(
+                Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
+            )
+        }.isSuccess
+        if (!ok) Toast.makeText(ctx, "הקלדה קולית לא זמינה", Toast.LENGTH_SHORT).show()
+    }
+    BackHandler(enabled = reminder == null) { finish() }
 
     var exportText by remember { mutableStateOf("") }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
@@ -355,10 +380,26 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
         }
     }
 
+    reminder?.let { rt ->
+        Editor(
+            initial = rt, categories = categories,
+            onManageCategories = {},
+            onBack = { reminder = null },
+            onSave = { t ->
+                reminder = null
+                scope.launch { Reminders.save(ctx, t) }
+                Toast.makeText(ctx, "התזכורת נוצרה", Toast.LENGTH_SHORT).show()
+            },
+            onDelete = null
+        )
+        return
+    }
+
     Column(Modifier.fillMaxSize().background(bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
             Spacer(Modifier.weight(1f))
+            TextButton({ dictate() }) { Text("🎤", fontSize = 20.sp) }
             TextButton({ pinned = !pinned }) { Text("📌", fontSize = 20.sp, modifier = Modifier.alpha(if (pinned) 1f else 0.35f)) }
             Box {
                 TextButton({ colorMenu = true }) { Text("🎨", fontSize = 20.sp) }
@@ -391,6 +432,11 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text("הוסף תזכורת לפתק") }, onClick = {
+                        moreMenu = false
+                        val n = current()
+                        reminder = newTask(ctx).copy(title = n.title.ifBlank { n.plain.lineSequence().firstOrNull().orEmpty().take(80) }, notes = n.plain.take(1000))
+                    })
                     DropdownMenuItem(text = { Text("שתף כטקסט") }, onClick = { moreMenu = false; shareNote(ctx, current()) })
                     DropdownMenuItem(text = { Text("שמור כקובץ טקסט") }, onClick = {
                         moreMenu = false
