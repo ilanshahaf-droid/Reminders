@@ -49,8 +49,26 @@ import java.util.Locale
 object Docs {
     fun dir(c: Context): File = File(c.filesDir, "docs").apply { mkdirs() }
     fun ext(f: File) = f.extension.lowercase()
-    fun list(c: Context): List<File> =
-        dir(c).listFiles()?.filter { it.isFile && ext(it) in setOf("docx", "pdf") }?.sortedByDescending { it.lastModified() } ?: emptyList()
+    private fun prefs(c: Context) = c.getSharedPreferences("docs", Context.MODE_PRIVATE)
+    fun favs(c: Context): Set<String> = prefs(c).getStringSet("favs", emptySet()) ?: emptySet()
+    fun isFav(c: Context, f: File) = f.name in favs(c)
+    fun setFav(c: Context, name: String, on: Boolean) {
+        val n = favs(c).toMutableSet()
+        if (on) n.add(name) else n.remove(name)
+        prefs(c).edit().putStringSet("favs", n).apply()
+    }
+    fun renameFav(c: Context, from: String, to: String) {
+        if (from in favs(c)) { setFav(c, from, false); setFav(c, to, true) }
+    }
+    fun pageView(c: Context) = prefs(c).getBoolean("pageView", false)
+    fun setPageView(c: Context, on: Boolean) = prefs(c).edit().putBoolean("pageView", on).apply()
+
+    /** Favorites always first, then newest. */
+    fun list(c: Context): List<File> {
+        val fv = favs(c)
+        return dir(c).listFiles()?.filter { it.isFile && ext(it) in setOf("docx", "pdf") }
+            ?.sortedWith(compareByDescending<File> { it.name in fv }.thenByDescending { it.lastModified() }) ?: emptyList()
+    }
 
     fun clean(name: String) = name.replace(Regex("[\\\\/:*?\"<>|\\n\\r]"), " ").trim().ifBlank { "מסמך" }.take(80)
 
@@ -194,7 +212,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                     Text(if (isPdf) "📕" else "📝", fontSize = 28.sp)
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text(f.nameWithoutExtension, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text((if (Docs.isFav(ctx, f)) "⭐ " else "") + f.nameWithoutExtension, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
                                             (if (isPdf) "PDF" else "Word") + " · " + SimpleDateFormat("d.M.yyyy HH:mm", Locale("he")).format(Date(f.lastModified())) +
                                                 " · " + (if (f.length() > 1_000_000) "%.1f MB".format(f.length() / 1e6) else "${f.length() / 1000 + 1} KB"),
@@ -207,6 +225,9 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                             DropdownMenu(expanded = menuFor == f.name, onDismissRequest = { menuFor = null }) {
                                 DropdownMenuItem(text = { Text(if (isPdf) "פתח וסמן" else "ערוך") }, onClick = {
                                     menuFor = null; if (isPdf) viewing = f else editing = f
+                                })
+                                DropdownMenuItem(text = { Text(if (Docs.isFav(ctx, f)) "הסר ממועדפים" else "⭐ הוסף למועדפים") }, onClick = {
+                                    menuFor = null; Docs.setFav(ctx, f.name, !Docs.isFav(ctx, f)); tick++
                                 })
                                 if (isPdf) DropdownMenuItem(text = { Text("ארגן עמודים") }, onClick = { menuFor = null; organizing = f })
                                 DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
@@ -312,7 +333,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     val target = File(Docs.dir(ctx), Docs.clean(renameText) + "." + Docs.ext(f))
                     if (target.name != f.name) {
                         if (target.exists()) Toast.makeText(ctx, "כבר קיים קובץ בשם הזה", Toast.LENGTH_SHORT).show()
-                        else { f.renameTo(target); tick++ }
+                        else { if (f.renameTo(target)) Docs.renameFav(ctx, f.name, target.name); tick++ }
                     }
                     renaming = null
                 }) { Text("שמור") }
@@ -324,7 +345,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deleting = null }, title = { Text("מחיקת קובץ") },
             text = { Text("למחוק את \"${f.nameWithoutExtension}\" לצמיתות? אי אפשר לשחזר.") },
-            confirmButton = { TextButton({ f.delete(); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
+            confirmButton = { TextButton({ f.delete(); Docs.setFav(ctx, f.name, false); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
             dismissButton = { TextButton({ deleting = null }) { Text("ביטול") } }
         )
     }
@@ -343,6 +364,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
     var saving by remember { mutableStateOf(false) }
     var closeAfter by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
+    var pageView by remember { mutableStateOf(Docs.pageView(ctx)) }
     var plain by remember { mutableStateOf("") }
     var hasImg by remember { mutableStateOf(false) }
     val web = remember { mutableStateOf<WebView?>(null) }
@@ -381,6 +403,12 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
         if (!saving) requestSave(false)
     }
     BackHandler { requestSave(true) }
+    LaunchedEffect(loaded, pageView) {
+        if (loaded) {
+            delay(150)
+            web.value?.evaluateJavascript("NE.view('" + (if (pageView) "page" else "phone") + "')", null)
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -390,6 +418,13 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text(if (pageView) "📱 תצוגה מותאמת לטלפון" else "📄 תצוגת עמוד (כמו Word)") }, onClick = {
+                        moreMenu = false; pageView = !pageView; Docs.setPageView(ctx, pageView)
+                    })
+                    if (pageView) {
+                        DropdownMenuItem(text = { Text("🔍 הגדל") }, onClick = { web.value?.evaluateJavascript("NE.zoom(1.25)", null) })
+                        DropdownMenuItem(text = { Text("🔍 הקטן") }, onClick = { web.value?.evaluateJavascript("NE.zoom(0.8)", null) })
+                    }
                     DropdownMenuItem(text = { Text("שתף כקובץ Word") }, onClick = {
                         moreMenu = false
                         scope.launch {
@@ -465,7 +500,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
                             return ok
                         }
                     }
-                    loadUrl("file:///android_asset/note_editor.html")
+                    loadUrl("file:///android_asset/note_editor.html?doc=1")
                     web.value = this
                 }
             },

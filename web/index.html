@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>תזכורות</title>
+<title>סדר יום</title>
 <style>
 :root{--bg1:#f8f8fd;--bg2:#ebe9fa;--card:#fdfdff;--text:#14161f;--sub:#626880;--accent:#4f46e5;--err:#dc2626;--line:#d9dbe6}
 @media (prefers-color-scheme:dark){:root{--bg1:#0e1015;--bg2:#15142a;--card:#1a1d26;--text:#e8eaf2;--sub:#9aa0b8;--accent:#9ea0ff;--err:#ff6b6b;--line:#2f3345}}
@@ -102,6 +102,23 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 .ne-cr button,.ne-cf button{border:0;border-radius:10px;background:var(--ne-chip,rgba(79,70,229,.16));color:inherit;min-width:40px;height:38px;font-size:16px;cursor:pointer}
 .ne-cr button:disabled{opacity:.25}
 .ne-cf{display:flex;gap:10px;justify-content:space-between;padding-top:10px}.ne-cf button{padding:0 18px}.ne-cf .ok{background:var(--ne-accent,#4f46e5);color:#fff;font-weight:700}
+
+/* tables */
+.ne-ed table{border-collapse:collapse;margin:8px 0;max-width:100%}
+.ne-ed td,.ne-ed th{border:1px solid var(--ne-tb,#8a8fa3);padding:4px 7px;vertical-align:top;min-width:24px}
+.ne-ed th{font-weight:700}
+.dark .ne-ed td,.dark .ne-ed th{--ne-tb:#6b7088}
+.ne-ed td p,.ne-ed th p{margin:0}
+.ne-ed table{width:100%;table-layout:fixed}
+.ne-ed td,.ne-ed th{overflow-wrap:anywhere}
+/* Word documents: every paragraph takes its own direction */
+.ne.doc .ne-ed p,.ne.doc .ne-ed h1,.ne.doc .ne-ed h2,.ne.doc .ne-ed h3,.ne.doc .ne-ed li,.ne.doc .ne-ed td,.ne.doc .ne-ed th{unicode-bidi:plaintext;text-align:start}
+.ne.doc .ne-ed p{margin:0 0 6px}
+/* "page layout" view: a white A4 sheet shown whole, zoomable */
+.ne.page .ne-body{overflow:auto;background:#cfd2dc}
+.dark .ne.page .ne-body{background:#1a1c24}
+.ne.page .ne-ed{width:794px;min-height:1123px;box-sizing:border-box;margin:8px auto;padding:56px 64px;background:#fff;color:#14161f;box-shadow:0 2px 10px #0004;zoom:var(--pz,.5);font-size:16px;--ne-tb:#555}
+.ne.page .ne-ed table{table-layout:auto}
 
 /*NE-CSS-END*/
 .tabs{display:flex;gap:8px;margin:6px 0 4px}
@@ -555,7 +572,18 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
       getText: function(){ return toText(ed); },
       focus: function(){ ed.focus(); },
       flush: flush,
-      setTheme: function(t){ root.setAttribute('data-theme', t); }
+      setTheme: function(t){ root.setAttribute('data-theme', t); },
+      setDoc: function(on){ root.classList.toggle('doc', !!on); },
+      setView: function(mode){
+        var page = mode === 'page';
+        root.classList.toggle('page', page);
+        if(page){ var w = Math.max(200, body.clientWidth - 16); root.style.setProperty('--pz', String(Math.min(1.2, w / 794))); }
+        else root.style.removeProperty('--pz');
+      },
+      pageZoom: function(f){
+        var cur = parseFloat(root.style.getPropertyValue('--pz')) || 0.5;
+        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2, cur * f))));
+      }
     };
   }
   g.createNoteEditor = createNoteEditor;

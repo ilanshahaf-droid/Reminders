@@ -24,8 +24,12 @@ window.NE = {
   theme: function(dark){ document.documentElement.className = dark ? 'dark' : ''; },
   focus: function(){ editor.focus(); },
   flush: function(){ editor.flush(); },
+  doc: function(on){ editor.setDoc(on); },
+  view: function(mode){ editor.setView(mode); },
+  zoom: function(f){ editor.pageZoom(f); },
   insert: function(t){ editor.focus(); document.execCommand('insertText', false, t); editor.flush(); }
 };
+if(/[?&]doc=1/.test(location.search)) editor.setDoc(true);
 window.DOC = {
   ensure: function(cb){
     if(window.DocLib) return cb();

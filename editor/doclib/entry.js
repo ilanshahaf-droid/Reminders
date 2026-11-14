@@ -1,5 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType, LevelFormat, ShadingType, UnderlineType } from 'docx';
 import mammoth from 'mammoth/mammoth.browser.js';
+import JSZip from 'jszip';
 
 const HEB = /[֐-׿]/;
 const BLOCK = new Set(['DIV','P','H1','H2','H3','H4','H5','H6','UL','OL','LI','TABLE','BLOCKQUOTE','PRE']);
@@ -139,11 +140,22 @@ async function htmlToDocxB64(html, title) {
               if (td.tagName !== 'TD' && td.tagName !== 'TH') continue;
               let kids = await blocks(td, ctx);
               if (!kids.length) kids = [new Paragraph('')];
-              cells.push(new TableCell({ children: kids }));
+              const co = { children: kids };
+              const cs = parseInt(td.getAttribute('colspan') || '1', 10), rs = parseInt(td.getAttribute('rowspan') || '1', 10);
+              if (cs > 1) co.columnSpan = cs;
+              if (rs > 1) co.rowSpan = rs;
+              const bgc = hex(style(td, 'backgroundColor'));
+              if (bgc) co.shading = { type: ShadingType.CLEAR, fill: bgc, color: 'auto' };
+              cells.push(new TableCell(co));
             }
             if (cells.length) rows.push(new TableRow({ children: cells }));
           }
-          if (rows.length) { out.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE }, visuallyRightToLeft: HEB.test(node.textContent) })); out.push(new Paragraph('')); }
+          if (rows.length) {
+            const to = { rows, width: { size: 100, type: WidthType.PERCENTAGE }, visuallyRightToLeft: node.getAttribute('dir') ? node.getAttribute('dir') === 'rtl' : HEB.test(node.textContent) };
+            const cols = Array.from(node.querySelectorAll('col')).map(c => parseFloat((c.getAttribute('style') || '').replace(/.*width:\s*([\d.]+)%.*/, '$1')));
+            if (cols.length && cols.every(n => n > 0)) to.columnWidths = cols.map(n => Math.round(n * 90));
+            out.push(new Table(to)); out.push(new Paragraph(''));
+          }
           return;
         }
         const align = (node.style && node.style.textAlign) || node.getAttribute('align') || ctx.align;
@@ -191,7 +203,55 @@ async function docxToHtml(b64) {
   const r = await mammoth.convertToHtml({ arrayBuffer: ab }, {
     styleMap: ['u => u', 'strike => s', "p[style-name='Title'] => h1:fresh", "p[style-name='Heading 1'] => h1:fresh", "p[style-name='Heading 2'] => h2:fresh", "p[style-name='Heading 3'] => h3:fresh"]
   });
-  return r.value;
+  try { return await tableLayout(b64, r.value); } catch (e) { return r.value; }
+}
+
+const WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const wattr = (el, n) => el ? (el.getAttributeNS(WNS, n) || el.getAttribute('w:' + n)) : null;
+function kids(el, name) { return Array.from(el.children).filter(c => c.localName === name); }
+
+/** mammoth drops the table design; read widths, direction and cell shading from the docx itself. */
+async function tableLayout(b64, html) {
+  const zip = await JSZip.loadAsync(b64ToBytes(b64));
+  const f = zip.file('word/document.xml'); if (!f) return html;
+  const xml = new DOMParser().parseFromString(await f.async('string'), 'application/xml');
+  const body = xml.getElementsByTagNameNS(WNS, 'body')[0]; if (!body) return html;
+  const tbls = kids(body, 'tbl');
+  const doc = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html');
+  const hts = Array.from(doc.body.children).filter(e => e.tagName === 'TABLE');
+  if (!tbls.length || tbls.length !== hts.length) return html;
+  tbls.forEach((t, ti) => {
+    const ht = hts[ti];
+    const pr = kids(t, 'tblPr')[0];
+    const bidi = pr && kids(pr, 'bidiVisual')[0];
+    ht.setAttribute('dir', bidi ? 'rtl' : 'ltr');
+    const grid = kids(t, 'tblGrid')[0];
+    if (grid) {
+      const ws = kids(grid, 'gridCol').map(c => parseInt(wattr(c, 'w') || '0', 10)).filter(n => n > 0);
+      const tot = ws.reduce((a, b) => a + b, 0);
+      if (ws.length && tot) {
+        const cg = doc.createElement('colgroup');
+        ws.forEach(w => { const c = doc.createElement('col'); c.setAttribute('style', 'width:' + (w * 100 / tot).toFixed(2) + '%'); cg.appendChild(c); });
+        ht.insertBefore(cg, ht.firstChild);
+      }
+    }
+    const hrows = Array.from(ht.querySelectorAll('tr'));
+    kids(t, 'tr').forEach((tr, ri) => {
+      const hr = hrows[ri]; if (!hr) return;
+      const hcells = Array.from(hr.children).filter(c => c.tagName === 'TD' || c.tagName === 'TH');
+      const tcs = kids(tr, 'tc').filter(tc => {
+        const tcPr = kids(tc, 'tcPr')[0], vm = tcPr && kids(tcPr, 'vMerge')[0];
+        return !(vm && wattr(vm, 'val') !== 'restart');
+      });
+      tcs.forEach((tc, ci) => {
+        const hc = hcells[ci]; if (!hc) return;
+        const tcPr = kids(tc, 'tcPr')[0], shd = tcPr && kids(tcPr, 'shd')[0];
+        const fill = shd && wattr(shd, 'fill');
+        if (fill && /^[0-9a-f]{6}$/i.test(fill)) hc.setAttribute('style', 'background-color:#' + fill);
+      });
+    });
+  });
+  return doc.body.innerHTML;
 }
 
 window.DocLib = { htmlToDocxB64, docxToHtml };

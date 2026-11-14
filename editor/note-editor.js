@@ -337,7 +337,18 @@
       getText: function(){ return toText(ed); },
       focus: function(){ ed.focus(); },
       flush: flush,
-      setTheme: function(t){ root.setAttribute('data-theme', t); }
+      setTheme: function(t){ root.setAttribute('data-theme', t); },
+      setDoc: function(on){ root.classList.toggle('doc', !!on); },
+      setView: function(mode){
+        var page = mode === 'page';
+        root.classList.toggle('page', page);
+        if(page){ var w = Math.max(200, body.clientWidth - 16); root.style.setProperty('--pz', String(Math.min(1.2, w / 794))); }
+        else root.style.removeProperty('--pz');
+      },
+      pageZoom: function(f){
+        var cur = parseFloat(root.style.getPropertyValue('--pz')) || 0.5;
+        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2, cur * f))));
+      }
     };
   }
   g.createNoteEditor = createNoteEditor;

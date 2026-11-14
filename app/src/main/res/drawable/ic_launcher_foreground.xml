@@ -1,13 +1,17 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
+    <!-- sheet -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M54,26c-9.4,0 -17,7.6 -17,17v11l-5,8h44l-5,-8v-11c0,-9.4 -7.6,-17 -17,-17z" />
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M49,67a5,5 0,1 0,10 0a5,5 0,1 0,-10 0z" />
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M51,24a3,3 0,1 0,6 0a3,3 0,1 0,-6 0z" />
-    <path android:fillColor="#00000000" android:strokeColor="#4F46E5" android:strokeWidth="4"
+        android:pathData="M36,30h36a6,6 0,0 1,6 6v38a6,6 0,0 1,-6 6h-36a6,6 0,0 1,-6 -6v-38a6,6 0,0 1,6 -6z" />
+    <!-- header band -->
+    <path android:fillColor="#C7D2FE"
+        android:pathData="M36,30h36a6,6 0,0 1,6 6v6h-48v-6a6,6 0,0 1,6 -6z" />
+    <!-- binding rings -->
+    <path android:fillColor="#4F46E5" android:pathData="M41,25h4a1.5,1.5 0,0 1,1.5 1.5v9a1.5,1.5 0,0 1,-1.5 1.5h-4a1.5,1.5 0,0 1,-1.5 -1.5v-9a1.5,1.5 0,0 1,1.5 -1.5z" />
+    <path android:fillColor="#4F46E5" android:pathData="M63,25h4a1.5,1.5 0,0 1,1.5 1.5v9a1.5,1.5 0,0 1,-1.5 1.5h-4a1.5,1.5 0,0 1,-1.5 -1.5v-9a1.5,1.5 0,0 1,1.5 -1.5z" />
+    <!-- check mark -->
+    <path android:fillColor="#00000000" android:strokeColor="#4F46E5" android:strokeWidth="5"
         android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M46,45l6,6l10,-12" />
+        android:pathData="M42,61l8,8l16,-17" />
 </vector>
