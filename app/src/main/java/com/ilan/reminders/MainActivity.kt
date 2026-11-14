@@ -91,7 +91,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 object PendingShare { var text by mutableStateOf<String?>(null) }
 
 /** A Word / PDF file opened from another app ("Open with" or Share). */
-object PendingOpen { var file by mutableStateOf<java.io.File?>(null) }
+object PendingOpen {
+    var file by mutableStateOf<java.io.File?>(null)
+    var noteId by mutableStateOf<Long?>(null)
+    var task by mutableStateOf<Task?>(null)
+}
 
 private fun takeShare(ctx: Context, i: Intent?) {
     if (i == null) return
@@ -280,6 +284,8 @@ fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
         lifecycle.addObserver(obs)
         onDispose { lifecycle.removeObserver(obs) }
     }
+    val pendTask = PendingOpen.task
+    LaunchedEffect(pendTask) { if (pendTask != null) { PendingOpen.task = null; editor = pendTask } }
     BackHandler(enabled = editor != null || selected.isNotEmpty() || searching) {
         when {
             editor != null -> editor = null
@@ -366,6 +372,10 @@ fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
                                                 DropdownMenuItem(
                                                     text = { Text((if (healthy) "" else "⚠ ") + "הגדרות") },
                                                     onClick = { menuOpen = false; showSettings = true }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("🔎 חיפוש בכל האפליקציה") },
+                                                    onClick = { menuOpen = false; GlobalSearch.open = true }
                                                 )
                                                 val doneCount = tasks.count { it.done }
                                                 DropdownMenuItem(

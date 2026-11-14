@@ -64,6 +64,11 @@ fun Home() {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })
         if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" })
+        if (GlobalSearch.open) GlobalSearchScreen(
+            onTask = { PendingOpen.task = it; screen = "tasks" },
+            onNote = { PendingOpen.noteId = it.id; screen = "notes" },
+            onDoc = { PendingOpen.file = it; screen = "docs" }
+        )
     }
 }
 
@@ -141,6 +146,20 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
         onDispose { p.unregisterOnSharedPreferenceChangeListener(l) }
     }
     LaunchedEffect(Unit) { Notes.purgeExpired(ctx) }
+    val pendNote = PendingOpen.noteId
+    LaunchedEffect(pendNote, all) {
+        if (pendNote != null) {
+            val n = all.firstOrNull { it.id == pendNote }
+            if (n != null) { PendingOpen.noteId = null; if (n.locked) authenticate(ctx) { editing = n } else editing = n }
+        }
+    }
+    val voiceNote = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == android.app.Activity.RESULT_OK && !text.isNullOrBlank()) {
+            val esc = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            editing = newNote(ctx).copy(html = esc, plain = text)
+        }
+    }
     val shared = PendingShare.text
     LaunchedEffect(shared) {
         if (shared != null) {
@@ -262,10 +281,22 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
                                     }
                                     Surface(shape = RoundedCornerShape(28.dp), color = cs.surface, shadowElevation = 2.dp) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton({
+                                                val ok = runCatching {
+                                                    voiceNote.launch(
+                                                        Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
+                                                            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "דבר – הפתק ייווצר מהתמלול")
+                                                    )
+                                                }.isSuccess
+                                                if (!ok) Toast.makeText(ctx, "הקלטה קולית לא זמינה", Toast.LENGTH_SHORT).show()
+                                            }) { Text("🎤", fontSize = 18.sp) }
                                             IconButton({ searching = !searching; if (!searching) query = "" }) { Icon(Icons.Default.Search, "חיפוש") }
                                             Box {
                                                 IconButton({ menuOpen = true }) { Icon(Icons.Default.MoreVert, "תפריט") }
                                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                                    DropdownMenuItem(text = { Text("🔎 חיפוש בכל האפליקציה") }, onClick = { menuOpen = false; GlobalSearch.open = true })
                                                     DropdownMenuItem(text = { Text("בחר") }, onClick = { menuOpen = false; selMode = true })
                                                     DropdownMenuItem(text = { Text("הצג") }, onClick = { menuOpen = false; showView = true })
                                                     DropdownMenuItem(text = { Text("מיין") }, onClick = { menuOpen = false; showSort = true })

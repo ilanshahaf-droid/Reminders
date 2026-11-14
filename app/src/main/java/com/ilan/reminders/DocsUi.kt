@@ -590,6 +590,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
                                 else { mergePick = emptyList(); mergeDlg = true }
                             })
+                            DropdownMenuItem(text = { Text("🔎 חיפוש בכל האפליקציה") }, onClick = { toolsMenu = false; GlobalSearch.open = true })
                             DropdownMenuItem(text = { Text("🖼 תמונות ל-PDF") }, onClick = { toolsMenu = false; imgPicker.launch("image/*") })
                         }
                     }
