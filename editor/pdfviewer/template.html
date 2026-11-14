@@ -24,7 +24,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:
 #fsBody .sigprev img{max-height:56px;max-width:100%}
 #fsheet .nav{display:flex;gap:8px}#fsheet .nav button{flex:1}
 #fsNext{background:var(--acc)!important;color:#fff!important}
-#fsheet .more{display:flex}#fsheet .more button{background:transparent;font-size:12px;opacity:.7;padding:0}
+#fsheet .more{display:flex}#fsheet .more{gap:12px}#fsheet .more button{background:transparent;font-size:13px;opacity:.85;padding:0}
 #mdModal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
 #mdModal .box{background:var(--bar);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;width:min(86vw,360px)}
 #mdModal input{font-size:16px;padding:9px;border:1px solid #0004;border-radius:10px;background:var(--bg);color:var(--fg)}
@@ -56,7 +56,7 @@ button{font:inherit;color:var(--fg)}
   <div id="fbar"><button id="fillGo" class="hide">📝 מילוי השדות</button><button id="dateGo">📅 תאריך</button><button id="myGo">👤 הפרטים שלי</button></div>
   <div id="scroller"><div id="pages"></div></div>
   <div id="fsheet" class="hide"><div class="top"><span id="fsPos"></span><button id="fsX">✕</button></div><div id="fsLabel"></div><div id="fsBody"></div>
-    <div class="nav"><button id="fsPrev">הקודם</button><button id="fsNext">הבא</button></div><div class="more"><button id="fsDel">זה לא שדה – הסרה</button></div></div>
+    <div class="nav"><button id="fsPrev">הקודם</button><button id="fsNext">הבא</button></div><div class="more"><button id="fsMove">↔ הזז</button><button id="fsWp">▭+</button><button id="fsWm">▭−</button><button id="fsRen">✏️ שם</button><button id="fsDel" style="margin-inline-start:auto">זה לא שדה – הסרה</button></div></div>
   <div id="tray" class="hide"></div>
   <div id="bar">
     <button data-t="scroll" class="on" aria-label="גלילה">✋</button>
@@ -75,6 +75,7 @@ button{font:inherit;color:var(--fg)}
   <div class="row"><button id="mdCancel">ביטול</button><button id="mdOk">שמירה</button></div></div></div>
 <div id="sigModal" class="hide"><div class="box"><div style="font-weight:700">צייר את החתימה</div><canvas id="sigCv"></canvas>
   <div class="row"><button id="sigClear">נקה</button><button id="sigCancel">ביטול</button><button id="sigOk">אישור</button></div></div></div>
+<div id="stModal" class="hide" style="position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50"><div style="background:var(--bar);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;width:min(90vw,380px)"><b>טקסט החותמת</b><textarea id="stText" rows="3" style="font-size:16px;border-radius:10px;padding:8px"></textarea><div class="row" style="display:flex;gap:8px"><button id="stCancel" style="flex:1;height:40px;border:0;border-radius:10px">ביטול</button><button id="stOk" style="flex:1;height:40px;border:0;border-radius:10px;background:var(--acc);color:#fff">הוספה</button></div></div></div>
 <script src="pdfviewer.js"></script>
 <script>if(window.Android) Android.ready();</script>
 </body></html>

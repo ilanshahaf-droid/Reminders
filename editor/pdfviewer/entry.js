@@ -16,7 +16,7 @@ const TSIZES = [0.022, 0.032, 0.05];   // text size relative to page width
 
 let doc = null, bytes = null, pages = [], zoom = 1, tool = 'scroll';
 let color = COLORS[1], hlColor = HL_COLORS[0], sizeIdx = 1, tsizeIdx = 1;
-let history = [], dirty = false, sigData = '';
+let history = [], dirty = false, sigData = '', sigs = [], pendingImg = null;
 
 function markDirty(v) { if (dirty !== v) { dirty = v; A().dirty(v); } }
 function snapshot() { history.push(pages.map(p => p.anns.slice())); if (history.length > 60) history.shift(); }
@@ -130,6 +130,8 @@ function attach(p) {
       if (i >= 0 && p.anns[i].t === 'text') editText(p, p.anns[i], null); else editText(p, null, [u, v]);
     } else if (tool === 'date') {
       placeDate(p, u, v);
+    } else if (tool === 'fmove') {
+      moveFieldTo(p, u, v);
     } else if (tool === 'sig') {
       placeSig(p, u, v);
     } else if (tool === 'move') {
@@ -204,14 +206,44 @@ function closeEditor(silent) {
 
 let sigTarget = null;
 /* signature */
+function loadSigs() {
+  const raw = A().getSig() || '';
+  try { sigs = raw.startsWith('[') ? JSON.parse(raw) : raw ? [raw] : []; } catch (_) { sigs = []; }
+  sigData = sigs[0] || '';
+}
+function saveSigs() { sigs = sigs.slice(0, 6); sigData = sigs[0] || ''; A().saveSig(JSON.stringify(sigs)); }
+function useSig(i) { const x = sigs.splice(i, 1)[0]; sigs.unshift(x); saveSigs(); renderTray(); toast2('נבחרה חתימה – הקש על הדף'); }
+function stampImage(text) {
+  const c = document.createElement('canvas'), x = c.getContext('2d'), fs = 34, pad = 18;
+  x.font = 'bold ' + fs + 'px sans-serif'; x.direction = 'rtl';
+  const lines = text.split('\n'), w = Math.max(...lines.map(l => x.measureText(l).width)) + pad * 2, h = lines.length * (fs + 8) + pad * 2 - 8;
+  c.width = Math.ceil(w); c.height = Math.ceil(h);
+  x.font = 'bold ' + fs + 'px sans-serif'; x.direction = 'rtl'; x.textAlign = 'center'; x.textBaseline = 'top';
+  x.strokeStyle = '#1a237e'; x.fillStyle = '#1a237e'; x.lineWidth = 4;
+  x.beginPath(); x.roundRect ? x.roundRect(3, 3, c.width - 6, c.height - 6, 14) : x.rect(3, 3, c.width - 6, c.height - 6); x.stroke();
+  lines.forEach((l, i) => x.fillText(l, c.width / 2, pad + i * (fs + 8)));
+  return c.toDataURL('image/png');
+}
+function openStamp() {
+  const name = store.get('pv_name') || '';
+  $('stText').value = (name ? name + '\n' : '') + dmyFull();
+  $('stModal').classList.remove('hide');
+  $('stCancel').onclick = () => $('stModal').classList.add('hide');
+  $('stOk').onclick = () => {
+    const t = $('stText').value.trim(); if (!t) return;
+    pendingImg = { src: stampImage(t), w: 0.34 }; $('stModal').classList.add('hide');
+    setTool('sig'); toast2('הקש על הדף במקום החותמת');
+  };
+}
 function placeSig(p, u, v) {
-  if (!sigData) { openSig(); return; }
-  imgCache(sigData, () => {});
+  const src = pendingImg ? pendingImg.src : sigData, wFix = pendingImg ? pendingImg.w : 0.28;
+  if (!src) { openSig(); return; }
+  const stamp = !!pendingImg; pendingImg = null;
   const im = new Image(); im.onload = () => {
-    const w = 0.28, h = w * im.naturalHeight / im.naturalWidth;
-    snapshot(); const a = { t: 'img', src: sigData, u: Math.max(0, Math.min(1 - w, u - w / 2)), v: Math.max(0, v - h / 2), w, h };
+    const w = wFix, h = w * im.naturalHeight / im.naturalWidth;
+    snapshot(); const a = { t: 'img', src, u: Math.max(0, Math.min(1 - w, u - w / 2)), v: Math.max(0, v - h / 2), w, h };
     p.anns.push(a); markDirty(true); setTool('move'); setSel(p, a);
-  }; im.src = sigData;
+  }; im.src = src;
 }
 function openSig() {
   const m = $('sigModal'); m.classList.remove('hide');
@@ -234,7 +266,7 @@ function openSig() {
     const pad = 8; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(cv.width, x1 + pad); y1 = Math.min(cv.height, y1 + pad);
     const c2 = document.createElement('canvas'); c2.width = Math.max(1, x1 - x0); c2.height = Math.max(1, y1 - y0);
     c2.getContext('2d').drawImage(cv, x0, y0, c2.width, c2.height, 0, 0, c2.width, c2.height);
-    sigData = c2.toDataURL('image/png'); A().saveSig(sigData); m.classList.add('hide');
+    sigs.unshift(c2.toDataURL('image/png')); saveSigs(); m.classList.add('hide'); renderTray();
     if (sigTarget) { const f = sigTarget; sigTarget = null; setFieldValue(f, sigData).then(() => openFill(f.id)); } else toast2('הקש במקום החתימה על הדף');
   };
 }
@@ -308,7 +340,7 @@ function setTool(t) {
   $('pages').classList.toggle('active', t !== 'scroll');
   if (t !== 'move') setSel(null, null);
   renderTray();
-  if (t === 'sig') { if (!sigData) openSig(); else toast2('הקש על הדף במקום החתימה'); }
+  if (t === 'sig') { if (!sigData && !pendingImg) openSig(); else if (!pendingImg) toast2('הקש על הדף במקום החתימה'); }
   if (t === 'date') toast2('הקש במקום התאריך על הדף');
 }
 function renderTray() {
@@ -323,7 +355,10 @@ function renderTray() {
   } else if (tool === 'hl') {
     HL_COLORS.forEach(c => mk('sw' + (c === hlColor ? ' on' : ''), '', () => { hlColor = c; renderTray(); }, c));
   } else if (tool === 'sig') {
-    mk('sz', 'חתימה חדשה', () => openSig());
+    sigs.forEach((sg, i) => { const b = mk('sz' + (i === 0 ? ' on' : ''), '<img src="' + sg + '" style="height:26px;max-width:70px">', () => useSig(i)); b.oncontextmenu = ev => { ev.preventDefault(); }; });
+    mk('sz', '➕ חדשה', () => openSig());
+    mk('sz', '🏷 חותמת', () => openStamp());
+    if (sigs.length) mk('sz', '🗑', () => { sigs.shift(); saveSigs(); renderTray(); toast2('החתימה הנוכחית נמחקה'); });
   } else if (tool === 'move' && sel) {
     mk('sz', '🗑 מחק', () => { if (!sel) return; snapshot(); const p = selPage; p.anns.splice(p.anns.indexOf(sel), 1); setSel(null, null); redraw(p); markDirty(true); renderTray(); });
   }
@@ -524,6 +559,7 @@ function bindFill() {
     fields = fields.filter(z => z !== f); curField = null; drawBoxes(); fillBarUpdate();
     const n = fieldOrder(fields)[Math.min(i, fields.length - 1)]; if (n) openFill(n.id); else $('fsheet').classList.add('hide');
   };
+  bindFieldTools();
   $('dateGo').onclick = () => setTool('date');
   $('myGo').onclick = () => { $('mdName').value = store.get('pv_name'); $('mdTz').value = store.get('pv_tz'); $('mdModal').classList.remove('hide'); };
   $('mdCancel').onclick = () => $('mdModal').classList.add('hide');
@@ -533,6 +569,28 @@ function bindFill() {
     Promise.all(fields.filter(f => f.auto && filledF(f)).map(syncField)).then(() => { drawBoxes(); fillBarUpdate(); if (fields.filter(filledF).length > before) markDirty(true); });
     toast2('הפרטים נשמרו');
   };
+}
+let moveFld = null;
+async function moveFieldTo(p, u, v) {
+  const f = moveFld; moveFld = null; if (!f) { setTool('scroll'); return; }
+  snapshot();
+  f.page = p.i - 1; f.x = Math.max(0, Math.min(1 - f.w, u - f.w / 2)); f.y = Math.max(0, Math.min(1 - f.h, v - f.h / 2));
+  await syncField(f); markDirty(true); setTool('scroll'); drawBoxes(); openFill(f.id);
+}
+function bindFieldTools() {
+  $('fsMove').onclick = () => {
+    const f = fields.find(q => q.id === curField); if (!f) return;
+    if (f.kind === 'radio') { toast2('אי אפשר להזיז בחירה מרובה'); return; }
+    moveFld = f; $('fsheet').classList.add('hide'); setTool('fmove'); toast2('הקש על הדף במקום החדש של השדה');
+  };
+  $('fsRen').onclick = () => {
+    const f = fields.find(q => q.id === curField); if (!f) return;
+    const l = $('fsLabel'); l.innerHTML = '<input id="fsLbl" type="text" style="width:100%">'; const i = $('fsLbl'); i.value = f.label || ''; i.focus();
+    const done = () => { f.label = i.value.trim(); openFill(f.id); };
+    i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); done(); } }; i.onblur = done;
+  };
+  const wid = d => { const f = fields.find(q => q.id === curField); if (!f || f.kind === 'radio') return; snapshot(); f.w = Math.max(0.02, Math.min(1 - f.x, f.w * d)); syncField(f).then(() => { drawBoxes(); markDirty(true); }); };
+  $('fsWp').onclick = () => wid(1.2); $('fsWm').onclick = () => wid(1 / 1.2);
 }
 function placeDate(p, u, v) {
   const a = { t: 'text', c: FINK, s: 0.026, u: 0, v: 0, text: dmyFull() };
@@ -544,7 +602,7 @@ function placeDate(p, u, v) {
 window.PV = {
   async open(dark) {
     document.documentElement.className = dark ? 'dark' : '';
-    sigData = A().getSig() || '';
+    loadSigs();
     try {
       bytes = b64ToBytes(A().docData());
       doc = await pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
