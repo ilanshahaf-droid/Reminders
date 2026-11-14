@@ -161,14 +161,20 @@ object Docs {
     /** Overwrite cloud with the local copy, ignoring a conflict. */
     fun forcePush(c: Context, f: File) { val u = linkOf(c, f) ?: return; setLink(c, f, u, cloudMod(c, u)); push(c, f) }
 
-    fun keep(c: Context, uri: Uri) {
-        runCatching { c.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
-            .recoverCatching { c.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    /** True when the app got a lasting WRITE permission, i.e. saving back to the cloud will work. */
+    fun keep(c: Context, uri: Uri): Boolean {
+        val rw = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        if (runCatching { c.contentResolver.takePersistableUriPermission(uri, rw) }.isSuccess) return true
+        runCatching { c.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        return false
     }
+
+    @Volatile var lastLinked = false
 
     /** Open a cloud file: keep a local working copy linked to it. */
     fun importLinked(c: Context, uri: Uri): File? {
-        keep(c, uri)
+        lastLinked = keep(c, uri)
+        if (!lastLinked) return import(c, uri)
         val j = linksJson(c)
         j.keys().forEach { k ->
             if (j.getJSONObject(k).optString("u") == uri.toString()) {
@@ -260,7 +266,11 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             scope.launch {
                 val f = withContext(Dispatchers.IO) { Docs.importLinked(ctx, uri) }
                 if (f == null) Toast.makeText(ctx, "אפשר לפתוח רק קובצי Word ו-PDF", Toast.LENGTH_SHORT).show()
-                else { tick++; if (Docs.ext(f) == "pdf") viewing = f else editing = f }
+                else {
+                    tick++
+                    if (!Docs.isLinked(ctx, f)) Toast.makeText(ctx, "נפתח כעותק – השירות לא מאפשר שמירה חזרה. אפשר לשמור בענן מתפריט ⋮", Toast.LENGTH_LONG).show()
+                    if (Docs.ext(f) == "pdf") viewing = f else editing = f
+                }
             }
         }
     }
@@ -274,16 +284,16 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             }
         }
     }
-    fun openIn(authority: String, name: String) {
-        if (ctx.packageManager.resolveContentProvider(authority, 0) == null) {
-            Toast.makeText(ctx, "$name לא מותקן במכשיר", Toast.LENGTH_SHORT).show(); return
+    /** Opens the service's own file picker (Drive / OneDrive app UI); falls back to the system picker. */
+    fun openIn(pkg: String, name: String) {
+        val mimes = arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        val grant = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        fun mk(action: String) = Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+            .putExtra(Intent.EXTRA_MIME_TYPES, mimes).addFlags(grant).setPackage(pkg)
+        val ok = listOf(Intent.ACTION_OPEN_DOCUMENT, Intent.ACTION_GET_CONTENT).any { a ->
+            runCatching { cloudOpen.launch(mk(a)) }.isSuccess
         }
-        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-        // ask the picker to start inside this service (ignored by the system if the id is not valid)
-        runCatching { i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri(authority, "root")) }
-        cloudOpen.launch(i)
+        if (!ok) Toast.makeText(ctx, "$name לא מותקן או לא מאפשר בחירת קבצים", Toast.LENGTH_SHORT).show()
     }
     val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = r.data?.data; val f = linkTarget; linkTarget = null
@@ -407,11 +417,11 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         modifier = Modifier.width(88.dp).height(58.dp)
                     ) { Box(contentAlignment = Alignment.Center) { Text("כלים ▾", fontWeight = FontWeight.Bold) } }
                     DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
-                        DropdownMenuItem(text = { Text("☁️ Google Drive (עם שמירה חזרה)") }, onClick = {
-                            toolsMenu = false; openIn("com.google.android.apps.docs.storage", "Google Drive")
+                        DropdownMenuItem(text = { Text("☁️ Google Drive (מתוך האפליקציה)") }, onClick = {
+                            toolsMenu = false; openIn("com.google.android.apps.docs", "Google Drive")
                         })
-                        DropdownMenuItem(text = { Text("☁️ OneDrive (עם שמירה חזרה)") }, onClick = {
-                            toolsMenu = false; openIn("com.microsoft.skydrive.content.StorageAccessProvider", "OneDrive")
+                        DropdownMenuItem(text = { Text("☁️ OneDrive (מתוך האפליקציה)") }, onClick = {
+                            toolsMenu = false; openIn("com.microsoft.skydrive", "OneDrive")
                         })
                         DropdownMenuItem(text = { Text("☁️ כל מקור אחר / דרך אפליקציית הענן (עותק)") }, onClick = {
                             toolsMenu = false
