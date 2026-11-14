@@ -82,7 +82,9 @@ object Docs {
         return f
     }
 
+    @Volatile var lastError = ""
     fun import(c: Context, uri: Uri): File? = runCatching {
+        lastError = ""
         var name = "מסמך"
         c.contentResolver.query(uri, null, null, null, null)?.use {
             if (it.moveToFirst()) {
@@ -93,14 +95,14 @@ object Docs {
         val ext = name.substringAfterLast('.', "").lowercase().ifBlank {
             if (c.contentResolver.getType(uri)?.contains("pdf") == true) "pdf" else "docx"
         }
-        if (ext !in setOf("docx", "pdf")) return null
+        if (ext !in setOf("docx", "pdf")) { lastError = "סוג קובץ לא נתמך ($name)"; return null }
         val same = File(dir(c), clean(name.substringBeforeLast('.')) + "." + ext)
         val size = runCatching { c.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull() ?: -1L
         if (same.exists() && size > 0 && same.length() == size) return same.also { it.setLastModified(System.currentTimeMillis()) }
         val out = unique(c, name.substringBeforeLast('.'), ext)
         c.contentResolver.openInputStream(uri)?.use { ins -> out.outputStream().use { ins.copyTo(it) } }
         out
-    }.getOrNull()
+    }.onFailure { lastError = (it::class.java.simpleName + ": " + (it.message ?: "")).take(120) }.getOrNull()
 
     // ---- cloud links (Google Drive / OneDrive via the system file picker) ----
     private fun linksJson(c: Context) = runCatching { JSONObject(prefs(c).getString("links", "{}") ?: "{}") }.getOrElse { JSONObject() }
@@ -260,26 +262,32 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var deleting by remember { mutableStateOf<File?>(null) }
 
     var linkTarget by remember { mutableStateOf<File?>(null) }
+    fun pickedUri(r: androidx.activity.result.ActivityResult): Uri? {
+        val d = r.data ?: return null
+        return d.data ?: d.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+    }
     val cloudOpen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        val uri = r.data?.data
+        val uri = pickedUri(r)
         if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
             scope.launch {
                 val f = withContext(Dispatchers.IO) { Docs.importLinked(ctx, uri) }
-                if (f == null) Toast.makeText(ctx, "אפשר לפתוח רק קובצי Word ו-PDF", Toast.LENGTH_SHORT).show()
+                if (f == null) Toast.makeText(ctx, "לא הצלחתי לפתוח את הקובץ: " + Docs.lastError, Toast.LENGTH_LONG).show()
                 else {
                     tick++
                     if (!Docs.isLinked(ctx, f)) Toast.makeText(ctx, "נפתח כעותק – השירות לא מאפשר שמירה חזרה. אפשר לשמור בענן מתפריט ⋮", Toast.LENGTH_LONG).show()
                     if (Docs.ext(f) == "pdf") viewing = f else editing = f
                 }
             }
+        } else if (r.resultCode == android.app.Activity.RESULT_OK) {
+            Toast.makeText(ctx, "האפליקציה לא החזירה קובץ (לא התקבלה כתובת)", Toast.LENGTH_LONG).show()
         }
     }
     val cloudGet = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        val uri = r.data?.data
+        val uri = pickedUri(r)
         if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
             scope.launch {
                 val f = withContext(Dispatchers.IO) { Docs.import(ctx, uri) }
-                if (f == null) Toast.makeText(ctx, "אפשר לפתוח רק קובצי Word ו-PDF", Toast.LENGTH_SHORT).show()
+                if (f == null) Toast.makeText(ctx, "לא הצלחתי לפתוח את הקובץ: " + Docs.lastError, Toast.LENGTH_LONG).show()
                 else { tick++; if (Docs.ext(f) == "pdf") viewing = f else editing = f }
             }
         }
