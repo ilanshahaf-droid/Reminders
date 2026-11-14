@@ -373,6 +373,7 @@ fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
                                                     text = { Text((if (healthy) "" else "⚠ ") + "הגדרות") },
                                                     onClick = { menuOpen = false; showSettings = true }
                                                 )
+                                                DropdownMenuItem(text = { Text("📆 לוח שנה (תזכורות + יומן)") }, onClick = { menuOpen = false; CalendarView.open = true })
                                                 DropdownMenuItem(
                                                     text = { Text("🔎 חיפוש בכל האפליקציה") },
                                                     onClick = { menuOpen = false; GlobalSearch.open = true }
@@ -802,7 +803,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v70") },
+        title = { Text("הגדרות · v76") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -904,6 +905,22 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
                 }) { Text("אפשר ללא הגבלה") }
 
                 Text("בסמסונג: הגדרות ← סוללה ← הגבלות שימוש ברקע, והוצא את האפליקציה מ-Sleeping apps ו-Deep sleeping apps.")
+                HorizontalDivider()
+                Text("גיבוי ושחזור", fontWeight = FontWeight.Bold)
+                val scopeB = rememberCoroutineScope()
+                val bkSave = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { u ->
+                    if (u != null) scopeB.launch { Toast.makeText(ctx, Backup.export(ctx, u), Toast.LENGTH_LONG).show() }
+                }
+                val bkLoad = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
+                    if (u != null) scopeB.launch { Toast.makeText(ctx, Backup.restore(ctx, u), Toast.LENGTH_LONG).show() }
+                }
+                Text("קובץ אחד עם התזכורות, הפתקים והמסמכים. אפשר לשמור אותו ב-Drive או ב-OneDrive דרך בורר הקבצים.", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        bkSave.launch("סדר יום גיבוי " + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()) + ".zip")
+                    }) { Text("💾 גיבוי") }
+                    OutlinedButton(onClick = { bkLoad.launch(arrayOf("application/zip", "application/octet-stream")) }) { Text("♻️ שחזור") }
+                }
                 OutlinedButton(onClick = {
                     ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                         .setData(Uri.parse("package:${ctx.packageName}")))

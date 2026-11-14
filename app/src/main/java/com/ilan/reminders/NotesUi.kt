@@ -64,6 +64,7 @@ fun Home() {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })
         if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" })
+        if (CalendarView.open) CalendarScreen(onTask = { PendingOpen.task = it; screen = "tasks" })
         if (GlobalSearch.open) GlobalSearchScreen(
             onTask = { PendingOpen.task = it; screen = "tasks" },
             onNote = { PendingOpen.noteId = it.id; screen = "notes" },

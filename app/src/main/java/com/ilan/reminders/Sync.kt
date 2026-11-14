@@ -144,7 +144,7 @@ object Sync {
         }
     }
 
-    private fun fromJson(r: JSONObject) = Task(
+    internal fun fromJson(r: JSONObject) = Task(
         id = r.getLong("id"), title = r.optString("title"), notes = r.optString("notes"),
         categoryId = r.optLong("category_id"), triggerAt = r.optLong("trigger_at"),
         repeat = r.optString("repeat_mode", "NONE"), days = r.optInt("days"), times = r.optString("times"),
@@ -155,7 +155,7 @@ object Sync {
         every = r.optInt("every_n", 1).coerceAtLeast(1), anchor = r.optLong("anchor", 0), listName = r.optString("list_name", "")
     )
 
-    private fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
+    internal fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
         .put("category_id", it.categoryId).put("trigger_at", it.triggerAt)
         .put("repeat_mode", it.repeat).put("days", it.days).put("times", it.times)
         .put("slots", it.slots).put("sound", it.sound).put("vibration", it.vibration)
@@ -170,14 +170,14 @@ object Sync {
         p.edit().putStringSet("notesPurge", (p.getStringSet("notesPurge", emptySet()) ?: emptySet()) + id.toString()).apply()
     }
 
-    private fun noteFromJson(r: JSONObject) = Note(
+    internal fun noteFromJson(r: JSONObject) = Note(
         id = r.getLong("id"), title = r.optString("title"), html = r.optString("html"), plain = r.optString("plain"),
         color = r.optString("color"), pinned = r.optBoolean("pinned", false), categoryId = r.optLong("category_id"),
         createdAt = r.optLong("created_at"), updatedAt = r.optLong("updated_at"), deletedAt = r.optLong("deleted_at"),
         locked = r.optBoolean("locked", false)
     )
 
-    private fun noteToJson(n: Note) = JSONObject().put("id", n.id).put("title", n.title).put("html", n.html)
+    internal fun noteToJson(n: Note) = JSONObject().put("id", n.id).put("title", n.title).put("html", n.html)
         .put("plain", n.plain).put("color", n.color).put("pinned", n.pinned).put("category_id", n.categoryId)
         .put("created_at", n.createdAt).put("updated_at", n.updatedAt).put("deleted_at", n.deletedAt).put("locked", n.locked).put("deleted", false)
 
