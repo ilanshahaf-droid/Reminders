@@ -164,6 +164,65 @@ object Sync {
         .put("alert_mode", it.alertMode).put("important", it.important)
         .put("every_n", it.every).put("anchor", it.anchor).put("list_name", it.listName)
 
+    /** Notes deleted for good on the phone; the cloud copy is marked deleted on the next sync. */
+    fun markNotePurged(c: Context, id: Long) {
+        val p = prefs(c)
+        p.edit().putStringSet("notesPurge", (p.getStringSet("notesPurge", emptySet()) ?: emptySet()) + id.toString()).apply()
+    }
+
+    private fun noteFromJson(r: JSONObject) = Note(
+        id = r.getLong("id"), title = r.optString("title"), html = r.optString("html"), plain = r.optString("plain"),
+        color = r.optString("color"), pinned = r.optBoolean("pinned", false), categoryId = r.optLong("category_id"),
+        createdAt = r.optLong("created_at"), updatedAt = r.optLong("updated_at"), deletedAt = r.optLong("deleted_at")
+    )
+
+    private fun noteToJson(n: Note) = JSONObject().put("id", n.id).put("title", n.title).put("html", n.html)
+        .put("plain", n.plain).put("color", n.color).put("pinned", n.pinned).put("category_id", n.categoryId)
+        .put("created_at", n.createdAt).put("updated_at", n.updatedAt).put("deleted_at", n.deletedAt).put("deleted", false)
+
+    /** Two-way note sync. Returns null when fine, otherwise a short message (the notes table may not exist yet). */
+    private suspend fun syncNotes(c: Context, base: String, h: Map<String, String>): String? {
+        val p = prefs(c)
+        val dao = AppDb.get(c).notes()
+        val rr = http("GET", "$base/rest/v1/rem_notes?select=*", h, null)
+        if (rr.first == 404 || (rr.first == 400 && rr.second.contains("rem_notes"))) return "טבלת הפתקים חסרה בענן (צריך להריץ את קובץ ה-SQL)"
+        if (rr.first !in 200..299) return "פתקים: ${rr.first} ${rr.second.take(100)}"
+        val remote = JSONArray(rr.second)
+        val purging = (p.getStringSet("notesPurge", emptySet()) ?: emptySet()).mapNotNull { it.toLongOrNull() }.toSet()
+        val local = dao.allNow().associateBy { it.id }
+        val remoteUpdated = HashMap<Long, Long>()
+        var changed = false
+        for (i in 0 until remote.length()) {
+            val r = remote.getJSONObject(i)
+            val id = r.getLong("id")
+            if (id in purging) continue
+            val ru = r.optLong("updated_at")
+            remoteUpdated[id] = ru
+            val l = local[id]
+            if (r.optBoolean("deleted", false)) {
+                if (l != null) { dao.delete(id); changed = true }
+            } else if (l == null || ru > l.updatedAt) {
+                dao.upsert(noteFromJson(r)); changed = true
+            }
+        }
+        val out = JSONArray()
+        dao.allNow().forEach { n ->
+            val ru = remoteUpdated[n.id]
+            if (ru == null || n.updatedAt > ru) out.put(noteToJson(n))
+        }
+        if (out.length() > 0) {
+            val r = http("POST", "$base/rest/v1/rem_notes?on_conflict=id", h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), out.toString())
+            if (r.first !in 200..299) return "פתקים: ${r.first} ${r.second.take(100)}"
+        }
+        if (purging.isNotEmpty()) {
+            val r = http("PATCH", "$base/rest/v1/rem_notes?id=in.(${purging.joinToString(",")})", h + ("Prefer" to "return=minimal"),
+                JSONObject().put("deleted", true).put("updated_at", System.currentTimeMillis()).toString())
+            if (r.first !in 200..299) return "פתקים: ${r.first} ${r.second.take(100)}"
+            p.edit().putStringSet("notesPurge", emptySet()).apply()
+        }
+        return null
+    }
+
     suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) { mutex.withLock {
         val p = prefs(c)
         val status = try {
@@ -261,7 +320,9 @@ object Sync {
                 ReminderWidget.refreshNow(c)
                 WearBridge.pushList(c)
             }
-            "✅ סונכרן ב-" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
+            // notes never make the reminders sync fail: a problem is only shown next to the status
+            val notesMsg = try { syncNotes(c, base, h) } catch (e: Exception) { "פתקים: " + (e.message ?: e.javaClass.simpleName) }
+            "✅ סונכרן ב-" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")) + (if (notesMsg != null) " · ⚠ $notesMsg" else "")
         } catch (e: Exception) {
             "❌ " + (e.message ?: e.javaClass.simpleName)
         }

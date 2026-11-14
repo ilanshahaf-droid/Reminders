@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { AppTheme { Root() } }
+        setContent { AppTheme { Home() } }
         // while the app is on screen: pull web changes right away and then every 15 seconds
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -133,7 +133,7 @@ private fun batteryOk(c: Context) =
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun Root() {
+fun Root(onOpenNotes: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
@@ -271,6 +271,7 @@ fun Root() {
             Scaffold(containerColor = Color.Transparent) { pad ->
                 Box(Modifier.padding(pad).fillMaxSize()) {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 130.dp)) {
+                        if (selected.isEmpty()) item(key = "tabs") { TabSwitch(false, onReminders = {}, onNotes = onOpenNotes) }
                         if (selected.isNotEmpty()) item {
                             SelectionBar(
                                 selected.size, onClose = { selected = emptySet() },
@@ -742,7 +743,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v47") },
+        title = { Text("הגדרות · v48") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

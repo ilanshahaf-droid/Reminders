@@ -1,0 +1,22 @@
+.ne{display:flex;flex-direction:column;height:100%;min-height:0;background:transparent;color:var(--ne-fg,#14161f)}
+.ne-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.ne-ed{min-height:100%;box-sizing:border-box;padding:6px 16px 90px;outline:none;font-size:18px;line-height:1.6;direction:rtl;text-align:start;word-break:break-word;caret-color:var(--ne-accent,#4f46e5)}
+.ne-ed:empty::before{content:attr(data-ph);color:var(--ne-mute,#8a8fa3);pointer-events:none}
+.ne-ed ul,.ne-ed ol{margin:4px 0;padding-inline-start:26px}
+.ne-ed font[size="1"]{font-size:13px}.ne-ed font[size="2"]{font-size:15px}.ne-ed font[size="3"]{font-size:18px}
+.ne-ed font[size="4"]{font-size:21px}.ne-ed font[size="5"]{font-size:26px}.ne-ed font[size="6"]{font-size:32px}.ne-ed font[size="7"]{font-size:40px}
+.ne-ed ul.cl{list-style:none;padding-inline-start:0}
+.ne-ed ul.cl>li{position:relative;padding-inline-start:38px;min-height:30px;margin:2px 0}
+.ne-ed ul.cl>li::before{content:"";position:absolute;inset-inline-start:6px;top:5px;width:20px;height:20px;border:2px solid var(--ne-mute,#8a8fa3);border-radius:6px;box-sizing:border-box}
+.ne-ed ul.cl>li.done::before{content:"\2713";background:var(--ne-accent,#4f46e5);border-color:var(--ne-accent,#4f46e5);color:#fff;font-size:15px;line-height:16px;text-align:center;font-weight:700}
+.ne-ed ul.cl>li.done{text-decoration:line-through;opacity:.55}
+.ne-bar{flex:none;border-top:1px solid var(--ne-line,rgba(0,0,0,.12));background:var(--ne-bar,#fdfdff);padding-bottom:env(safe-area-inset-bottom)}
+.ne-row{display:flex;gap:2px;overflow-x:auto;padding:4px 6px;scrollbar-width:none;direction:rtl}
+.ne-row::-webkit-scrollbar{display:none}
+.ne-row button{flex:none;min-width:42px;height:42px;border:0;border-radius:10px;background:transparent;color:var(--ne-fg,#14161f);font-size:19px;font-family:inherit;padding:0 8px;cursor:pointer}
+.ne-row button:active,.ne-row button.on{background:var(--ne-chip,rgba(79,70,229,.16))}
+.ne-sep{flex:none;width:1px;margin:8px 4px;background:var(--ne-line,rgba(0,0,0,.14))}
+.ne-pal{border-bottom:1px solid var(--ne-line,rgba(0,0,0,.1))}
+.ne-pal button{min-width:36px;width:36px;height:36px;border-radius:50%;border:2px solid var(--ne-line,rgba(0,0,0,.2));padding:0;margin:3px 4px}
+.ne-pal button.txt{width:auto;border-radius:10px;border:0;padding:0 12px;font-size:16px}
+.hide{display:none!important}

@@ -87,15 +87,16 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class], version = 8, exportSchema = false)
+@Database(entities = [Task::class, Category::class, Note::class], version = 9, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
+    abstract fun notes(): NoteDao
 
     companion object {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -117,6 +118,16 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notes` (`id` INTEGER NOT NULL, `title` TEXT NOT NULL, `html` TEXT NOT NULL, " +
+                "`plain` TEXT NOT NULL, `color` TEXT NOT NULL, `pinned` INTEGER NOT NULL, `categoryId` INTEGER NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+        )
     }
 }
 
