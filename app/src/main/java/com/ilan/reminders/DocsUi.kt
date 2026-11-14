@@ -268,9 +268,10 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
     val cloudOpen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = pickedUri(r)
-        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+        if (uri != null) {
+            Toast.makeText(ctx, "טוען את הקובץ מהענן…", Toast.LENGTH_SHORT).show()
             scope.launch {
-                val f = withContext(Dispatchers.IO) { Docs.importLinked(ctx, uri) }
+                val f = withContext(Dispatchers.IO) { runCatching { Docs.importLinked(ctx, uri) }.getOrNull() }
                 if (f == null) Toast.makeText(ctx, "לא הצלחתי לפתוח את הקובץ: " + Docs.lastError, Toast.LENGTH_LONG).show()
                 else {
                     tick++
@@ -278,13 +279,13 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     if (Docs.ext(f) == "pdf") viewing = f else editing = f
                 }
             }
-        } else if (r.resultCode == android.app.Activity.RESULT_OK) {
-            Toast.makeText(ctx, "האפליקציה לא החזירה קובץ (לא התקבלה כתובת)", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(ctx, "האפליקציה חזרה בלי קובץ (קוד ${r.resultCode}, נתונים: ${if (r.data == null) "אין" else "יש"})", Toast.LENGTH_LONG).show()
         }
     }
     val cloudGet = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = pickedUri(r)
-        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+        if (uri != null) {
             scope.launch {
                 val f = withContext(Dispatchers.IO) { Docs.import(ctx, uri) }
                 if (f == null) Toast.makeText(ctx, "לא הצלחתי לפתוח את הקובץ: " + Docs.lastError, Toast.LENGTH_LONG).show()
@@ -298,7 +299,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         val grant = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
         fun mk(action: String) = Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
             .putExtra(Intent.EXTRA_MIME_TYPES, mimes).addFlags(grant).setPackage(pkg)
-        val ok = listOf(Intent.ACTION_OPEN_DOCUMENT, Intent.ACTION_GET_CONTENT).any { a ->
+        val ok = listOf(Intent.ACTION_GET_CONTENT, Intent.ACTION_OPEN_DOCUMENT).any { a ->
             runCatching { cloudOpen.launch(mk(a)) }.isSuccess
         }
         if (!ok) Toast.makeText(ctx, "$name לא מותקן או לא מאפשר בחירת קבצים", Toast.LENGTH_SHORT).show()
