@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
+import org.json.JSONObject
 import android.provider.OpenableColumns
 import android.util.Base64
 import android.webkit.WebView
@@ -100,6 +102,94 @@ object Docs {
         out
     }.getOrNull()
 
+    // ---- cloud links (Google Drive / OneDrive via the system file picker) ----
+    private fun linksJson(c: Context) = runCatching { JSONObject(prefs(c).getString("links", "{}") ?: "{}") }.getOrElse { JSONObject() }
+    private fun saveLinks(c: Context, j: JSONObject) = prefs(c).edit().putString("links", j.toString()).apply()
+    fun linkOf(c: Context, f: File): Uri? = linksJson(c).optJSONObject(f.name)?.optString("u")?.takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+    fun isLinked(c: Context, f: File) = linkOf(c, f) != null
+    @Synchronized fun setLink(c: Context, f: File, uri: Uri, mod: Long) {
+        val j = linksJson(c); j.put(f.name, JSONObject().put("u", uri.toString()).put("m", mod)); saveLinks(c, j)
+    }
+    @Synchronized fun unlink(c: Context, name: String) { val j = linksJson(c); j.remove(name); saveLinks(c, j) }
+    @Synchronized fun renameLink(c: Context, from: String, to: String) {
+        val j = linksJson(c); val o = j.optJSONObject(from) ?: return
+        j.remove(from); j.put(to, o); saveLinks(c, j)
+    }
+    private fun recMod(c: Context, f: File) = linksJson(c).optJSONObject(f.name)?.optLong("m", 0L) ?: 0L
+    fun cloudMod(c: Context, uri: Uri): Long = runCatching {
+        c.contentResolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)?.use {
+            if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
+        }
+    }.getOrNull() ?: 0L
+
+    /** Refresh the local copy from the cloud file when it changed elsewhere. Returns false if the cloud could not be read. */
+    fun pull(c: Context, f: File): Boolean {
+        val u = linkOf(c, f) ?: return true
+        return runCatching {
+            val m = cloudMod(c, u)
+            if (m == 0L || m != recMod(c, f)) {
+                val tmp = File(f.parentFile, f.name + ".dl")
+                c.contentResolver.openInputStream(u)?.use { ins -> tmp.outputStream().use { ins.copyTo(it) } } ?: error("no stream")
+                if (tmp.length() > 0) { f.writeBytes(tmp.readBytes()); setLink(c, f, u, m) }
+                tmp.delete()
+            }
+            true
+        }.getOrDefault(false)
+    }
+
+    /** Write the local file back to its cloud file (in the background). */
+    fun push(c: Context, f: File) {
+        val u = linkOf(c, f) ?: return
+        val app = c.applicationContext
+        Thread {
+            val h = android.os.Handler(android.os.Looper.getMainLooper())
+            try {
+                val now = cloudMod(app, u); val rec = recMod(app, f)
+                if (now > 0 && rec > 0 && now != rec) {
+                    h.post { Toast.makeText(app, "הקובץ בענן השתנה במקום אחר – השינויים נשמרו רק בטלפון. השתמש ב\"שמור בענן\" כדי לדרוס.", Toast.LENGTH_LONG).show() }
+                    return@Thread
+                }
+                app.contentResolver.openOutputStream(u, "wt")?.use { it.write(f.readBytes()) } ?: error("no stream")
+                setLink(app, f, u, cloudMod(app, u))
+                h.post { Toast.makeText(app, "נשמר גם בענן ☁️", Toast.LENGTH_SHORT).show() }
+            } catch (e: Exception) {
+                h.post { Toast.makeText(app, "השמירה בענן נכשלה – נשמר בטלפון", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
+    }
+
+    /** Overwrite cloud with the local copy, ignoring a conflict. */
+    fun forcePush(c: Context, f: File) { val u = linkOf(c, f) ?: return; setLink(c, f, u, cloudMod(c, u)); push(c, f) }
+
+    fun keep(c: Context, uri: Uri) {
+        runCatching { c.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+            .recoverCatching { c.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    }
+
+    /** Open a cloud file: keep a local working copy linked to it. */
+    fun importLinked(c: Context, uri: Uri): File? {
+        keep(c, uri)
+        val j = linksJson(c)
+        j.keys().forEach { k ->
+            if (j.getJSONObject(k).optString("u") == uri.toString()) {
+                val f = File(dir(c), k)
+                if (f.exists()) { pull(c, f); f.setLastModified(System.currentTimeMillis()); return f }
+            }
+        }
+        val f = import(c, uri) ?: return null
+        setLink(c, f, uri, cloudMod(c, uri))
+        return f
+    }
+
+    /** Create/choose a cloud file and copy the local file into it, linking them. */
+    fun linkTo(c: Context, f: File, uri: Uri): Boolean {
+        keep(c, uri)
+        return runCatching {
+            c.contentResolver.openOutputStream(uri, "wt")?.use { it.write(f.readBytes()) } ?: error("no stream")
+            setLink(c, f, uri, cloudMod(c, uri)); true
+        }.getOrDefault(false)
+    }
+
     fun uri(c: Context, f: File): Uri = FileProvider.getUriForFile(c, c.packageName + ".files", f)
     fun mime(f: File) =
         if (ext(f) == "pdf") "application/pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -163,6 +253,34 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var renameText by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<File?>(null) }
 
+    var linkTarget by remember { mutableStateOf<File?>(null) }
+    val cloudOpen = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+            scope.launch {
+                val f = withContext(Dispatchers.IO) { Docs.importLinked(ctx, uri) }
+                if (f == null) Toast.makeText(ctx, "אפשר לפתוח רק קובצי Word ו-PDF", Toast.LENGTH_SHORT).show()
+                else { tick++; if (Docs.ext(f) == "pdf") viewing = f else editing = f }
+            }
+        }
+    }
+    val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data; val f = linkTarget; linkTarget = null
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null && f != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { Docs.linkTo(ctx, f, uri) }
+                Toast.makeText(ctx, if (ok) "נשמר בענן ☁️ ומקושר לקובץ" else "השמירה בענן נכשלה", Toast.LENGTH_SHORT).show()
+                tick++
+            }
+        }
+    }
+    fun openDoc(f: File) {
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { Docs.pull(ctx, f) }
+            if (!ok) Toast.makeText(ctx, "אין גישה לענן – נפתח העותק שבטלפון", Toast.LENGTH_SHORT).show()
+            if (Docs.ext(f) == "pdf") viewing = f else editing = f
+        }
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val f = Docs.import(ctx, uri)
@@ -204,7 +322,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                             Surface(
                                 shape = RoundedCornerShape(16.dp), color = cs.surface, shadowElevation = 1.dp,
                                 modifier = Modifier.fillMaxWidth().combinedClickable(
-                                    onClick = { if (isPdf) viewing = f else editing = f },
+                                    onClick = { openDoc(f) },
                                     onLongClick = { menuFor = f.name }
                                 )
                             ) {
@@ -212,7 +330,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                     Text(if (isPdf) "📕" else "📝", fontSize = 28.sp)
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text((if (Docs.isFav(ctx, f)) "⭐ " else "") + f.nameWithoutExtension, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text((if (Docs.isFav(ctx, f)) "⭐ " else "") + (if (Docs.isLinked(ctx, f)) "☁️ " else "") + f.nameWithoutExtension, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
                                             (if (isPdf) "PDF" else "Word") + " · " + SimpleDateFormat("d.M.yyyy HH:mm", Locale("he")).format(Date(f.lastModified())) +
                                                 " · " + (if (f.length() > 1_000_000) "%.1f MB".format(f.length() / 1e6) else "${f.length() / 1000 + 1} KB"),
@@ -224,10 +342,19 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                             }
                             DropdownMenu(expanded = menuFor == f.name, onDismissRequest = { menuFor = null }) {
                                 DropdownMenuItem(text = { Text(if (isPdf) "פתח וסמן" else "ערוך") }, onClick = {
-                                    menuFor = null; if (isPdf) viewing = f else editing = f
+                                    menuFor = null; openDoc(f)
                                 })
                                 DropdownMenuItem(text = { Text(if (Docs.isFav(ctx, f)) "הסר ממועדפים" else "⭐ הוסף למועדפים") }, onClick = {
                                     menuFor = null; Docs.setFav(ctx, f.name, !Docs.isFav(ctx, f)); tick++
+                                })
+                                if (Docs.isLinked(ctx, f)) {
+                                    DropdownMenuItem(text = { Text("☁️ דרוס את הקובץ בענן") }, onClick = { menuFor = null; Docs.forcePush(ctx, f) })
+                                    DropdownMenuItem(text = { Text("נתק מהענן") }, onClick = { menuFor = null; Docs.unlink(ctx, f.name); tick++ })
+                                } else DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
+                                    menuFor = null; linkTarget = f
+                                    cloudSave.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(Docs.mime(f))
+                                        .putExtra(Intent.EXTRA_TITLE, f.name)
+                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
                                 })
                                 if (isPdf) DropdownMenuItem(text = { Text("ארגן עמודים") }, onClick = { menuFor = null; organizing = f })
                                 DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
@@ -259,6 +386,12 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         modifier = Modifier.width(88.dp).height(58.dp)
                     ) { Box(contentAlignment = Alignment.Center) { Text("כלים ▾", fontWeight = FontWeight.Bold) } }
                     DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
+                        DropdownMenuItem(text = { Text("☁️ פתח מ-Drive / OneDrive") }, onClick = {
+                            toolsMenu = false
+                            cloudOpen.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                                .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
+                        })
                         DropdownMenuItem(text = { Text("איחוד קובצי PDF") }, onClick = {
                             toolsMenu = false
                             if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
@@ -333,7 +466,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     val target = File(Docs.dir(ctx), Docs.clean(renameText) + "." + Docs.ext(f))
                     if (target.name != f.name) {
                         if (target.exists()) Toast.makeText(ctx, "כבר קיים קובץ בשם הזה", Toast.LENGTH_SHORT).show()
-                        else { if (f.renameTo(target)) Docs.renameFav(ctx, f.name, target.name); tick++ }
+                        else { if (f.renameTo(target)) { Docs.renameFav(ctx, f.name, target.name); Docs.renameLink(ctx, f.name, target.name) }; tick++ }
                     }
                     renaming = null
                 }) { Text("שמור") }
@@ -345,7 +478,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deleting = null }, title = { Text("מחיקת קובץ") },
             text = { Text("למחוק את \"${f.nameWithoutExtension}\" לצמיתות? אי אפשר לשחזר.") },
-            confirmButton = { TextButton({ f.delete(); Docs.setFav(ctx, f.name, false); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
+            confirmButton = { TextButton({ f.delete(); Docs.setFav(ctx, f.name, false); Docs.unlink(ctx, f.name); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
             dismissButton = { TextButton({ deleting = null }) { Text("ביטול") } }
         )
     }
@@ -388,11 +521,12 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
         if (f == null) f = Docs.unique(ctx, wanted, "docx")
         else if (wanted != f.nameWithoutExtension) {
             val t = File(Docs.dir(ctx), "$wanted.docx")
-            if (!t.exists() && f.renameTo(t)) f = t
+            if (!t.exists() && f.renameTo(t)) { Docs.renameFav(ctx, f.name, t.name); Docs.renameLink(ctx, f.name, t.name); f = t }
         }
         val tmp = File(f.parentFile, f.name + ".tmp")
         tmp.writeBytes(bytes)
         if (!tmp.renameTo(f)) { f.writeBytes(bytes); tmp.delete() }
+        Docs.push(ctx, f)
         cur = f
     }
 
@@ -593,6 +727,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                                     tmp.writeBytes(bytes)
                                     if (!tmp.renameTo(target)) { target.writeBytes(bytes); tmp.delete() }
                                     cur = target
+                                    Docs.push(ctx, target)
                                 }.isSuccess
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                                     saving = false
@@ -735,6 +870,7 @@ fun PdfOrganizerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                                     val tmp = File(file.parentFile, file.name + ".tmp")
                                     tmp.writeBytes(bytes)
                                     if (!tmp.renameTo(file)) { file.writeBytes(bytes); tmp.delete() }
+                                    Docs.push(ctx, file)
                                     saving = false; dirty = false
                                     Toast.makeText(ctx, "נשמר", Toast.LENGTH_SHORT).show()
                                     if (closeAfter) { closeAfter = false; onClose() }
