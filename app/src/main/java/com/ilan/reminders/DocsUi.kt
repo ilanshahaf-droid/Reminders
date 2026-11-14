@@ -91,6 +91,11 @@ object Docs {
             ?.sortedWith(compareByDescending<File> { it.name in fv }.thenByDescending { it.lastModified() }) ?: emptyList()
     }
 
+    /** Removes the document and everything kept next to it (favorite, cloud link, source label, OCR text, cloud copy). */
+    fun deleteDoc(c: Context, f: File) {
+        f.delete(); Sync.markDocGone(c, f.name); setFav(c, f.name, false); unlink(c, f.name); moveSource(c, f.name, null); Ocr.forget(c, f)
+    }
+
     fun clean(name: String) = name.replace(Regex("[\\\\/:*?\"<>|\\n\\r]"), " ").trim().ifBlank { "מסמך" }.take(80)
 
     fun unique(c: Context, base: String, ext: String): File {
@@ -359,12 +364,15 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         if (ok && shotFile.exists() && shotFile.length() > 0) { scanShots = listOf(shotFile.readBytes()); scanDlg = true }
     }
     val scanScope = rememberCoroutineScope()
-    val scanPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+    var scanSrcDlg by remember { mutableStateOf(false) }
+    val onScanUris: (List<android.net.Uri>) -> Unit = { uris ->
         if (uris.isNotEmpty()) scanScope.launch {
             val blobs = withContext(Dispatchers.IO) { uris.mapNotNull { u -> runCatching { ctx.contentResolver.openInputStream(u)!!.use { it.readBytes() } }.getOrNull() } }
             if (blobs.isEmpty()) Toast.makeText(ctx, "לא נמצאו תמונות", Toast.LENGTH_SHORT).show() else { scanShots = blobs; scanDlg = true }
         }
     }
+    val galleryPick = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { onScanUris(it) }
+    val filesPick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { onScanUris(it) }
     fun shoot() {
         scanDlg = false
         runCatching { shotFile.delete(); camera.launch(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", shotFile)) }
@@ -627,19 +635,22 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                             }
                         }
                         DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
-                            DropdownMenuItem(text = { Text("📑 איחוד קובצי PDF") }, onClick = {
-                                toolsMenu = false
-                                if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
-                                else { mergePick = emptyList(); mergeDlg = true }
-                            })
+                            DropdownMenuItem(text = { Text("📷 סריקה ל-PDF") }, onClick = { toolsMenu = false; scanShots = emptyList(); scanSrcDlg = true })
                             DropdownMenuItem(text = { Text("🔎 חיפוש בכל האפליקציה") }, onClick = { toolsMenu = false; GlobalSearch.open = true })
-                            DropdownMenuItem(text = { Text("📷 סריקה ל-PDF") }, onClick = { toolsMenu = false; scanShots = emptyList(); shoot() })
-                            DropdownMenuItem(text = { Text("🖼 סריקה מתמונה קיימת") }, onClick = { toolsMenu = false; scanShots = emptyList(); scanPicker.launch("image/*") })
-                            DropdownMenuItem(text = { Text("🗜 דחיסת PDF") }, onClick = {
-                                toolsMenu = false
-                                if (files.none { Docs.ext(it) == "pdf" }) Toast.makeText(ctx, "אין קובצי PDF ברשימה", Toast.LENGTH_SHORT).show() else compressDlg = true
-                            })
-                            DropdownMenuItem(text = { Text("🖼 תמונות ל-PDF") }, onClick = { toolsMenu = false; imgPicker.launch("image/*") })
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Column { Text("📑 איחוד קובצי PDF"); Text("חיבור כמה קבצים לקובץ אחד", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant) } },
+                                onClick = {
+                                    toolsMenu = false
+                                    if (files.count { Docs.ext(it) == "pdf" } < 2) Toast.makeText(ctx, "צריך לפחות שני קובצי PDF ברשימה", Toast.LENGTH_SHORT).show()
+                                    else { mergePick = emptyList(); mergeDlg = true }
+                                })
+                            DropdownMenuItem(
+                                text = { Column { Text("🗜 דחיסת PDF"); Text("הקטנת הקובץ, למשל לשליחה במייל", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant) } },
+                                onClick = {
+                                    toolsMenu = false
+                                    if (files.none { Docs.ext(it) == "pdf" }) Toast.makeText(ctx, "אין קובצי PDF ברשימה", Toast.LENGTH_SHORT).show() else compressDlg = true
+                                })
                         }
                     }
                 }
@@ -691,6 +702,22 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         scanShots, dark,
         onClose = { scanDlg = false; scanShots = emptyList() },
         onCreated = { f -> scanDlg = false; scanShots = emptyList(); tick++; saveAsFor = f }
+    )
+
+    if (scanSrcDlg) AlertDialog(
+        onDismissRequest = { scanSrcDlg = false }, title = { Text("סריקה ל-PDF – מאיפה?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton({ scanSrcDlg = false; shoot() }, Modifier.fillMaxWidth()) { Text("📷 מצלמה") }
+                OutlinedButton({
+                    scanSrcDlg = false
+                    runCatching { galleryPick.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                        .onFailure { Toast.makeText(ctx, "הגלריה לא זמינה", Toast.LENGTH_SHORT).show() }
+                }, Modifier.fillMaxWidth()) { Text("🖼 גלריה") }
+                OutlinedButton({ scanSrcDlg = false; filesPick.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) { Text("📁 הקבצים שלי") }
+            }
+        },
+        confirmButton = {}, dismissButton = { TextButton({ scanSrcDlg = false }) { Text("ביטול") } }
     )
 
     if (compressDlg) AlertDialog(
@@ -841,6 +868,17 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
 }
 
+@Composable
+fun DeleteDocDialog(file: File, onDismiss: () -> Unit, onDeleted: () -> Unit) {
+    val ctx = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text("מחיקת קובץ") },
+        text = { Text("למחוק את \"${file.nameWithoutExtension}\"? אי אפשר לשחזר, והוא יימחק גם מהמכשירים האחרים בסנכרון.") },
+        confirmButton = { TextButton({ Docs.deleteDoc(ctx, file); onDeleted() }) { Text("מחק", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
+    )
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: () -> Unit) {
@@ -854,6 +892,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     var saving by remember { mutableStateOf(false) }
     var closeAfter by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
+    var delAsk by remember { mutableStateOf(false) }
     var pageView by remember { mutableStateOf(Docs.pageView(ctx)) }
     var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
@@ -961,6 +1000,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                             cur?.let { Docs.share(ctx, it) }
                         }
                     })
+                    if (cur?.exists() == true) DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true })
                     DropdownMenuItem(text = { Text("הדפס / שמור כ-PDF") }, onClick = {
                         moreMenu = false
                         web.value?.let {
@@ -972,6 +1012,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                 }
             }
         }
+        if (delAsk) cur?.let { f -> DeleteDocDialog(f, { delAsk = false }, { delAsk = false; onClose() }) }
         TextField(
             title, { title = it; edited = true }, singleLine = true,
             placeholder = { Text("שם המסמך", style = MaterialTheme.typography.headlineSmall, color = cs.onSurfaceVariant) },
@@ -1067,6 +1108,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     var dirty by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var delAsk by remember { mutableStateOf(false) }
     var closeAfter by remember { mutableStateOf(false) }
     var asCopy by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
@@ -1122,6 +1164,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                     }
                     DropdownMenuItem(text = { Text("שתף") }, onClick = { moreMenu = false; Docs.share(ctx, cur) })
                     DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { moreMenu = false; Docs.openExternal(ctx, cur) })
+                    DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true })
                 }
             }
         }
@@ -1171,6 +1214,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
 
     if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {})
 
+    if (delAsk) DeleteDocDialog(cur, { delAsk = false }, { delAsk = false; onClose() })
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text("לשמור את הסימונים?") },
