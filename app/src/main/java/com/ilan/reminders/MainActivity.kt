@@ -106,8 +106,16 @@ private fun takeShare(ctx: Context, i: Intent?) {
     if (fileUri != null) {
         i.action = Intent.ACTION_MAIN
         val app = ctx.applicationContext
+        val refPkg = runCatching { (ctx as? android.app.Activity)?.referrer?.host }.getOrNull()
+        val label = when (refPkg) {
+            null, "", app.packageName -> ""
+            "com.whatsapp", "com.whatsapp.w4b" -> "WhatsApp"
+            "com.google.android.gm" -> "Gmail"
+            else -> runCatching { app.packageManager.getApplicationLabel(app.packageManager.getApplicationInfo(refPkg, 0)).toString() }.getOrDefault("")
+        }
         Thread {
             val f = Docs.import(app, fileUri)
+            if (f != null && label.isNotBlank()) Docs.setSource(app, f.name, label)
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 if (f != null) PendingOpen.file = f
                 else android.widget.Toast.makeText(app, "אי אפשר לפתוח את הקובץ הזה", android.widget.Toast.LENGTH_SHORT).show()
@@ -784,7 +792,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v65") },
+        title = { Text("הגדרות · v66") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
