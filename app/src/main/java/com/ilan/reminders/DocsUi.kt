@@ -263,24 +263,28 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
         runCatching { create.launch(i) }.onFailure { Toast.makeText(ctx, "לא ניתן לפתוח את בורר השמירה", Toast.LENGTH_SHORT).show() }
     }
 
+    fun sendTo(pkg: String, label: String) {
+        val f = File(File(ctx.cacheDir, "share").apply { mkdirs() }, fname())
+        runCatching {
+            file.copyTo(f, overwrite = true)
+            val i = Intent(Intent.ACTION_SEND).setType(Docs.mime(file))
+                .putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f))
+                .putExtra(Intent.EXTRA_TITLE, fname()).putExtra(Intent.EXTRA_SUBJECT, fname())
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).setPackage(pkg)
+            ctx.startActivity(i)
+            onDismiss()
+        }.onFailure { Toast.makeText(ctx, "$label לא מותקן או לא מקבל קבצים", Toast.LENGTH_SHORT).show() }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss, title = { Text("שמירה בשם") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("שם הקובץ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Text("שמור ב:", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                OutlinedButton({ launchCreate("drive", DocumentsContract.buildDocumentUri("com.google.android.apps.docs.storage", "root")) }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive") }
-                OutlinedButton({
-                    val f = File(File(ctx.cacheDir, "share").apply { mkdirs() }, fname())
-                    runCatching {
-                        file.copyTo(f, overwrite = true)
-                        val i = Intent(Intent.ACTION_SEND).setType(Docs.mime(file))
-                            .putExtra(Intent.EXTRA_STREAM, FileProvider.getUriForFile(ctx, ctx.packageName + ".files", f))
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).setPackage("com.microsoft.skydrive")
-                        ctx.startActivity(i)
-                        onDismiss()
-                    }.onFailure { Toast.makeText(ctx, "OneDrive לא מותקן או לא מקבל קבצים", Toast.LENGTH_SHORT).show() }
-                }, Modifier.fillMaxWidth()) { Text("☁️ OneDrive") }
+                OutlinedButton({ sendTo("com.google.android.apps.docs", "Google Drive") }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive – באפליקציה (עותק)") }
+                OutlinedButton({ launchCreate("drive", DocumentsContract.buildDocumentUri("com.google.android.apps.docs.storage", "root")) }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive – מקושר (בורר המערכת)") }
+                OutlinedButton({ sendTo("com.microsoft.skydrive", "OneDrive") }, Modifier.fillMaxWidth()) { Text("☁️ OneDrive") }
                 OutlinedButton({ launchCreate("device", DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download")) }, Modifier.fillMaxWidth()) { Text("📱 במכשיר") }
                 OutlinedButton({
                     val c = Docs.unique(ctx, name, ext)
