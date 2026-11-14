@@ -148,7 +148,7 @@ fun NotesHost(onReminders: () -> Unit) {
             val q = query.trim()
             val shown = notes.filter {
                 (catFilter == null || it.categoryId == catFilter) &&
-                    (q.isEmpty() || it.title.contains(q, true) || it.plain.contains(q, true))
+                    (q.isEmpty() || it.title.contains(q, true) || (!it.locked && it.plain.contains(q, true)))
             }
             val sorted = when (sortBy) {
                 "created" -> shown.sortedByDescending { it.createdAt }
@@ -162,6 +162,7 @@ fun NotesHost(onReminders: () -> Unit) {
                 NoteCard(n, categories.firstOrNull { it.id == n.categoryId }, dark, false, {},
                     onClick = {
                         if (selMode || selected.isNotEmpty()) { selected = if (n.id in selected) selected - n.id else selected + n.id }
+                        else if (n.locked) authenticate(ctx) { editing = n }
                         else { editing = n }
                     },
                     onLong = { selMode = true; selected = selected + n.id },
@@ -224,7 +225,7 @@ fun NotesHost(onReminders: () -> Unit) {
                                         }
                                         TextButton({
                                             shareNote(ctx, selNotes.firstOrNull()?.copy(
-                                                title = "פתקים", plain = selNotes.joinToString("\n\n———\n\n") { it.asText() }, html = ""
+                                                title = "פתקים", plain = selNotes.filter { !it.locked }.joinToString("\n\n———\n\n") { it.asText() }, html = ""
                                             ) ?: return@TextButton)
                                         }) { Text("↗", fontSize = 20.sp, color = cs.onSurface) }
                                         TextButton({
@@ -371,6 +372,28 @@ fun NotesHost(onReminders: () -> Unit) {
     )
 }
 
+/** Biometric / device-credential check before a locked note is opened. */
+fun authenticate(ctx: Context, onOk: () -> Unit) {
+    val act = ctx as? androidx.fragment.app.FragmentActivity
+    if (act == null) { onOk(); return }
+    val auth = androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+        androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    if (androidx.biometric.BiometricManager.from(act).canAuthenticate(auth) != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
+        Toast.makeText(act, "הגדר נעילת מסך או טביעת אצבע בטלפון כדי לפתוח פתקים נעולים", Toast.LENGTH_LONG).show()
+        return
+    }
+    val prompt = androidx.biometric.BiometricPrompt(
+        act, androidx.core.content.ContextCompat.getMainExecutor(act),
+        object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) { onOk() }
+        }
+    )
+    prompt.authenticate(
+        androidx.biometric.BiometricPrompt.PromptInfo.Builder()
+            .setTitle("פתק נעול").setSubtitle("אמת זהות כדי להמשיך").setAllowedAuthenticators(auth).build()
+    )
+}
+
 private fun shareNote(ctx: Context, n: Note) {
     ctx.startActivity(
         Intent.createChooser(
@@ -402,11 +425,12 @@ private fun NoteCard(
                 if (n.title.isNotBlank()) Text(
                     n.title, style = MaterialTheme.typography.titleMedium, color = cs.onSurface, maxLines = 3, overflow = TextOverflow.Ellipsis
                 )
-                if (n.plain.isNotBlank()) Text(
+                if (n.locked) Text("🔒 פתק נעול", color = cs.onSurfaceVariant)
+                else if (n.plain.isNotBlank()) Text(
                     n.plain, style = MaterialTheme.typography.bodyMedium, color = cs.onSurface.copy(alpha = 0.85f),
                     maxLines = 8, overflow = TextOverflow.Ellipsis
                 )
-                if (n.title.isBlank() && n.plain.isBlank()) Text("פתק ריק", color = cs.onSurfaceVariant)
+                if (!n.locked && n.title.isBlank() && n.plain.isBlank()) Text("פתק ריק", color = cs.onSurfaceVariant)
                 if (cat != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(10.dp).clip(CircleShape).background(Color(cat.color)))
                     Text("  " + cat.name, fontSize = 13.sp, color = cs.onSurfaceVariant)
@@ -445,6 +469,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
     var plain by remember { mutableStateOf(note.plain) }
     var color by remember { mutableStateOf(note.color) }
     var pinned by remember { mutableStateOf(note.pinned) }
+    var locked by remember { mutableStateOf(note.locked) }
     var catId by remember { mutableStateOf(note.categoryId) }
     var colorMenu by remember { mutableStateOf(false) }
     var catMenu by remember { mutableStateOf(false) }
@@ -455,12 +480,12 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
     val swatches: List<Pair<String, Color?>> =
         listOf<Pair<String, Color?>>("" to null) + NOTE_COLORS.map { it.first to noteColor(it.first, dark) }
 
-    fun current() = note.copy(title = title, html = html, plain = plain, color = color, pinned = pinned, categoryId = catId)
+    fun current() = note.copy(title = title, html = html, plain = plain, color = color, pinned = pinned, categoryId = catId, locked = locked)
     fun dirty() = title != note.title || html != note.html || plain != note.plain || color != note.color ||
-        pinned != note.pinned || catId != note.categoryId
+        pinned != note.pinned || catId != note.categoryId || locked != note.locked
 
     // keep what was written even if the app is closed while typing
-    LaunchedEffect(title, html, plain, color, pinned, catId) {
+    LaunchedEffect(title, html, plain, color, pinned, catId, locked) {
         delay(800)
         val n = current()
         if (dirty() && (!n.isBlank() || !isNew)) Notes.save(ctx, n)
@@ -567,6 +592,13 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (locked) "🔓 בטל נעילה" else "🔒 נעל פתק") },
+                        onClick = {
+                            moreMenu = false
+                            if (locked) authenticate(ctx) { locked = false } else locked = true
+                        }
+                    )
                     DropdownMenuItem(text = { Text("חיפוש בפתק") }, onClick = { moreMenu = false; finding = true })
                     DropdownMenuItem(text = { Text("מסך מלא") }, onClick = { moreMenu = false; full = true })
                     DropdownMenuItem(text = { Text("הדפס") }, onClick = {

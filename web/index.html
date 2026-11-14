@@ -1044,7 +1044,7 @@ function renderNotes(){
     mk('הכל', null); cats.forEach(c => mk(c.name, c.id, colorOf(c.color)));
   }
   const q = ($('nq').value || '').trim().toLowerCase();
-  const shown = vis.filter(n => (nCat === null || n.category_id === nCat) && (!q || (n.title + ' ' + n.plain).toLowerCase().includes(q)))
+  const shown = vis.filter(n => (nCat === null || n.category_id === nCat) && (!q || (n.title + ' ' + (n.locked ? '' : n.plain)).toLowerCase().includes(q)))
     .sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
   const byCat = Object.fromEntries(cats.map(c => [c.id, c]));
   const fill = (box, arr) => {
@@ -1053,6 +1053,7 @@ function renderNotes(){
       const d = el('div', 'note'); const bg = ncolor(n.color); if(bg) d.style.background = bg;
       if(n.pinned) d.appendChild(el('span', 'pin', '📌'));
       if(n.title) d.appendChild(el('div', 'nt', n.title));
+      if(n.locked){ d.appendChild(el('div', 'np', '🔒 פתק נעול')); d.onclick = () => toast('פתק נעול נפתח רק באפליקציה בטלפון'); box.appendChild(d); return; }
       const im = /<img[^>]+src="(data:image\/[^"]+)"/i.exec(n.html || '');
       if(im){ const i = document.createElement('img'); i.src = im[1]; i.style.cssText = 'width:100%;border-radius:10px;margin:4px 0'; d.appendChild(i); }
       if(n.plain) d.appendChild(el('div', 'np', n.plain.replace(/\[תמונה\]\n?/g, '').trim() || (im ? '' : n.plain)));

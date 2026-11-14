@@ -23,3 +23,6 @@ create policy "rem own notes" on public.rem_notes for all to authenticated
   using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 grant select, insert, update, delete on public.rem_notes to authenticated, service_role;
+
+-- v53: lock a note with biometrics (safe to run again)
+alter table public.rem_notes add column if not exists locked boolean not null default false;

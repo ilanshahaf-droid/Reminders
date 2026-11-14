@@ -2,6 +2,7 @@ package com.ilan.reminders
 
 import android.content.Context
 import androidx.compose.ui.graphics.Color
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -22,7 +23,8 @@ data class Note(
     val categoryId: Long,
     val createdAt: Long,
     val updatedAt: Long,
-    val deletedAt: Long       // > 0 = in the recycle bin since this time (kept 30 days)
+    val deletedAt: Long,      // > 0 = in the recycle bin since this time (kept 30 days)
+    @ColumnInfo(defaultValue = "0") val locked: Boolean = false   // opens only after biometrics / device credentials
 )
 
 @Dao

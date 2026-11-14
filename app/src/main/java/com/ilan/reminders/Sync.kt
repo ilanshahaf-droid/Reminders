@@ -173,12 +173,13 @@ object Sync {
     private fun noteFromJson(r: JSONObject) = Note(
         id = r.getLong("id"), title = r.optString("title"), html = r.optString("html"), plain = r.optString("plain"),
         color = r.optString("color"), pinned = r.optBoolean("pinned", false), categoryId = r.optLong("category_id"),
-        createdAt = r.optLong("created_at"), updatedAt = r.optLong("updated_at"), deletedAt = r.optLong("deleted_at")
+        createdAt = r.optLong("created_at"), updatedAt = r.optLong("updated_at"), deletedAt = r.optLong("deleted_at"),
+        locked = r.optBoolean("locked", false)
     )
 
     private fun noteToJson(n: Note) = JSONObject().put("id", n.id).put("title", n.title).put("html", n.html)
         .put("plain", n.plain).put("color", n.color).put("pinned", n.pinned).put("category_id", n.categoryId)
-        .put("created_at", n.createdAt).put("updated_at", n.updatedAt).put("deleted_at", n.deletedAt).put("deleted", false)
+        .put("created_at", n.createdAt).put("updated_at", n.updatedAt).put("deleted_at", n.deletedAt).put("locked", n.locked).put("deleted", false)
 
     /** Two-way note sync. Returns null when fine, otherwise a short message (the notes table may not exist yet). */
     private suspend fun syncNotes(c: Context, base: String, h: Map<String, String>): String? {

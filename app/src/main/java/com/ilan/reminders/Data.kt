@@ -87,7 +87,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class, Note::class], version = 9, exportSchema = false)
+@Database(entities = [Task::class, Category::class, Note::class], version = 10, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
     abstract fun notes(): NoteDao
@@ -96,7 +96,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -118,6 +118,12 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")
     }
 }
 
