@@ -64,7 +64,7 @@ fun Home() {
         if (PendingOpen.task == null && PendingOpen.noteId == null && PendingOpen.file == null && PendingShare.text == null &&
             startCtx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).getBoolean("startToday", false)) TodayView.open = true
     }
-    if (PendingShare.text != null && screen != "notes") screen = "notes"
+    if ((PendingShare.text != null || PendingOpen.newNote) && screen != "notes") screen = "notes"
     if ((PendingOpen.file != null || PendingOpen.template != null) && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
@@ -133,6 +133,7 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
     val trash = remember(all) { all.filter { it.deletedAt > 0L } }
     var editing by remember { mutableStateOf<Note?>(null) }
     var tplDlg by remember { mutableStateOf(false) }
+    LaunchedEffect(PendingOpen.newNote) { if (PendingOpen.newNote) { PendingOpen.newNote = false; editing = newNote(ctx) } }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var catFilter by remember { mutableStateOf<Long?>(null) }

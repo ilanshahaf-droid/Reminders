@@ -68,11 +68,13 @@ import java.time.ZonedDateTime
 class MainActivity : androidx.fragment.app.FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
         takeShare(this, intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
         takeShare(this, intent)
         setContent { AppTheme { Home() } }
         // while the app is on screen: pull web changes right away and then every 15 seconds
@@ -95,6 +97,7 @@ object PendingOpen {
     var file by mutableStateOf<java.io.File?>(null)
     var noteId by mutableStateOf<Long?>(null)
     var task by mutableStateOf<Task?>(null)
+    var newNote by mutableStateOf(false)   // quick-note widget
     var template by mutableStateOf<String?>(null)   // HTML for a new Word document (note exported to Word)
 }
 
@@ -805,7 +808,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v83") },
+        title = { Text("הגדרות · v84") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -950,6 +953,24 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
                         bkSave.launch("סדר יום גיבוי " + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()) + ".zip")
                     }) { Text("💾 גיבוי") }
                     OutlinedButton(onClick = { bkLoad.launch(arrayOf("application/zip", "application/octet-stream")) }) { Text("♻️ שחזור") }
+                }
+                var autoDir by remember { mutableStateOf(Backup.autoFolder(ctx)) }
+                var autoAt by remember { mutableLongStateOf(Backup.autoLast(ctx)) }
+                val pickDir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { u ->
+                    if (u != null) { Backup.setAutoFolder(ctx, u); autoDir = u }
+                }
+                Text("גיבוי שבועי אוטומטי", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text(
+                    if (autoDir == null) "בחר תיקייה (למשל בתוך Drive) והאפליקציה תעדכן בה קובץ גיבוי אחד פעם בשבוע."
+                    else "פעיל. גיבוי אחרון: " + (if (autoAt == 0L) "עדיין לא בוצע" else java.text.SimpleDateFormat("d/M/yyyy HH:mm", java.util.Locale.US).format(java.util.Date(autoAt))),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { pickDir.launch(null) }) { Text(if (autoDir == null) "📁 בחירת תיקייה" else "החלפת תיקייה") }
+                    if (autoDir != null) {
+                        OutlinedButton(onClick = { scopeB.launch { Toast.makeText(ctx, Backup.runAuto(ctx), Toast.LENGTH_LONG).show(); autoAt = Backup.autoLast(ctx) } }) { Text("גבה עכשיו") }
+                        TextButton(onClick = { Backup.setAutoFolder(ctx, null); autoDir = null }) { Text("כבה") }
+                    }
                 }
                 OutlinedButton(onClick = {
                     ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)

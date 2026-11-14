@@ -1,7 +1,9 @@
 package com.ilan.reminders
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -83,4 +85,48 @@ object Backup {
             "שוחזרו: $t תזכורות, $n פתקים, $docsBack מסמכים"
         }.getOrElse { "השחזור נכשל: " + (it.message ?: it.javaClass.simpleName) }
     }
+
+    // ---- weekly automatic backup into a folder the user picked once (Drive / OneDrive / device) ----
+    private const val AUTO_NAME = "סדר יום - גיבוי אוטומטי.zip"
+    fun autoFolder(c: Context): Uri? = c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("autoBackupDir", null)?.let { Uri.parse(it) }
+    fun autoLast(c: Context): Long = c.getSharedPreferences("app", Context.MODE_PRIVATE).getLong("autoBackupAt", 0L)
+
+    fun setAutoFolder(c: Context, tree: Uri?) {
+        val p = c.getSharedPreferences("app", Context.MODE_PRIVATE)
+        if (tree == null) {
+            p.edit().remove("autoBackupDir").apply()
+            androidx.work.WorkManager.getInstance(c).cancelUniqueWork("autoBackup")
+            return
+        }
+        runCatching { c.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+        p.edit().putString("autoBackupDir", tree.toString()).apply()
+        androidx.work.WorkManager.getInstance(c).enqueueUniquePeriodicWork(
+            "autoBackup", androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+            androidx.work.PeriodicWorkRequestBuilder<AutoBackupWorker>(7, java.util.concurrent.TimeUnit.DAYS).build()
+        )
+    }
+
+    /** Writes (overwrites) one zip in the chosen folder. */
+    suspend fun runAuto(c: Context): String {
+        val tree = autoFolder(c) ?: return "לא נבחרה תיקיית גיבוי"
+        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val target = withContext(Dispatchers.IO) {
+            runCatching {
+                val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+                var found: Uri? = null
+                c.contentResolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { q ->
+                    while (q.moveToNext()) if (q.getString(1) == AUTO_NAME) { found = DocumentsContract.buildDocumentUriUsingTree(tree, q.getString(0)); break }
+                }
+                found ?: DocumentsContract.createDocument(c.contentResolver, parent, "application/zip", AUTO_NAME)
+            }.getOrNull()
+        } ?: return "לא ניתן לכתוב לתיקיית הגיבוי"
+        val msg = export(c, target)
+        if (msg.startsWith("הגיבוי נשמר")) c.getSharedPreferences("app", Context.MODE_PRIVATE).edit().putLong("autoBackupAt", System.currentTimeMillis()).apply()
+        return msg
+    }
+}
+
+class AutoBackupWorker(c: Context, p: androidx.work.WorkerParameters) : androidx.work.CoroutineWorker(c, p) {
+    override suspend fun doWork(): Result =
+        if (Backup.runAuto(applicationContext).startsWith("הגיבוי נשמר")) Result.success() else Result.retry()
 }
