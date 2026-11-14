@@ -349,6 +349,21 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var mergeDlg by remember { mutableStateOf(false) }
     var mergePick by remember { mutableStateOf(listOf<String>()) }
     var job by remember { mutableStateOf<PdfJobSpec?>(null) }
+    var scanShots by remember { mutableStateOf(listOf<ByteArray>()) }
+    var scanDlg by remember { mutableStateOf(false) }
+    var compressDlg by remember { mutableStateOf(false) }
+    var compressFile by remember { mutableStateOf<File?>(null) }
+    var compressOrig by remember { mutableStateOf(0L) }
+    val shotFile = remember { File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, "scan.jpg") } }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        if (ok && shotFile.exists() && shotFile.length() > 0) { scanShots = scanShots + shotFile.readBytes(); scanDlg = true }
+        else scanDlg = scanShots.isNotEmpty()
+    }
+    fun shoot() {
+        scanDlg = false
+        runCatching { shotFile.delete(); camera.launch(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", shotFile)) }
+            .onFailure { Toast.makeText(ctx, "המצלמה לא זמינה", Toast.LENGTH_SHORT).show() }
+    }
     val scope = rememberCoroutineScope()
     val imgPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         if (uris.isNotEmpty()) scope.launch {
@@ -591,6 +606,11 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 else { mergePick = emptyList(); mergeDlg = true }
                             })
                             DropdownMenuItem(text = { Text("🔎 חיפוש בכל האפליקציה") }, onClick = { toolsMenu = false; GlobalSearch.open = true })
+                            DropdownMenuItem(text = { Text("📷 סריקה ל-PDF") }, onClick = { toolsMenu = false; scanShots = emptyList(); shoot() })
+                            DropdownMenuItem(text = { Text("🗜 דחיסת PDF") }, onClick = {
+                                toolsMenu = false
+                                if (files.none { Docs.ext(it) == "pdf" }) Toast.makeText(ctx, "אין קובצי PDF ברשימה", Toast.LENGTH_SHORT).show() else compressDlg = true
+                            })
                             DropdownMenuItem(text = { Text("🖼 תמונות ל-PDF") }, onClick = { toolsMenu = false; imgPicker.launch("image/*") })
                         }
                     }
@@ -600,6 +620,44 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
 
     saveAsFor?.let { f -> SaveAsDialog(f, { saveAsFor = null }, { tick++ }) }
+
+    if (scanDlg) AlertDialog(
+        onDismissRequest = {}, title = { Text("סריקה ל-PDF") },
+        text = { Text("צולמו ${scanShots.size} עמודים. הצילום יעובד לדף נקי וחד.") },
+        confirmButton = {
+            TextButton({ scanDlg = false; job = PdfJobSpec("scan", "סריקה " + java.text.SimpleDateFormat("dd-MM-yy HH.mm", java.util.Locale.US).format(java.util.Date()), scanShots.map { it to "image/jpeg" }) }) { Text("סיום ויצירת PDF") }
+        },
+        dismissButton = {
+            Row {
+                TextButton({ shoot() }) { Text("📷 עוד דף") }
+                TextButton({ scanDlg = false; scanShots = emptyList() }) { Text("ביטול") }
+            }
+        }
+    )
+
+    if (compressDlg) AlertDialog(
+        onDismissRequest = { compressDlg = false; compressFile = null }, title = { Text(if (compressFile == null) "דחיסת PDF – בחר קובץ" else "רמת דחיסה") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val cf = compressFile
+                if (cf == null) files.filter { Docs.ext(it) == "pdf" }.forEach { f ->
+                    OutlinedButton({ compressFile = f }, Modifier.fillMaxWidth()) { Text(f.nameWithoutExtension + "  ·  " + f.length() / 1024 + " KB", maxLines = 1) }
+                } else {
+                    Text("הדחיסה הופכת כל עמוד לתמונה, כך שהטקסט כבר לא ניתן לסימון או חיפוש. נוצר קובץ חדש והמקור נשמר.", style = MaterialTheme.typography.bodySmall)
+                    listOf("medium" to "בינונית (איכות טובה)", "strong" to "חזקה (קטן יותר)").forEach { (lv, label) ->
+                        Button({
+                            compressDlg = false; compressFile = null; compressOrig = cf.length()
+                            scope.launch {
+                                val b = withContext(Dispatchers.IO) { cf.readBytes() }
+                                job = PdfJobSpec("compress", cf.nameWithoutExtension + " (דחוס)", listOf(b to "application/pdf"), lv)
+                            }
+                        }, Modifier.fillMaxWidth()) { Text(label) }
+                    }
+                }
+            }
+        },
+        confirmButton = {}, dismissButton = { TextButton({ compressDlg = false; compressFile = null }) { Text("ביטול") } }
+    )
 
     if (newDlg) AlertDialog(
         onDismissRequest = { newDlg = false }, title = { Text("מסמך Word חדש") },
@@ -681,7 +739,16 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         f.writeBytes(Base64.decode(b64, Base64.DEFAULT)); f
                     }.getOrNull()
                     withContext(Dispatchers.Main) {
-                        if (out != null) { tick++; Toast.makeText(ctx, "נוצר: ${out.nameWithoutExtension}", Toast.LENGTH_LONG).show() }
+                        if (out != null) {
+                            if (spec.kind == "compress" && out.length() >= compressOrig) {
+                                out.delete()
+                                Toast.makeText(ctx, "הקובץ כבר קטן – הדחיסה לא הקטינה אותו", Toast.LENGTH_LONG).show()
+                            } else {
+                                tick++
+                                val extra = if (spec.kind == "compress") " (${compressOrig / 1024} KB ← ${out.length() / 1024} KB)" else ""
+                                Toast.makeText(ctx, "נוצר: ${out.nameWithoutExtension}$extra", Toast.LENGTH_LONG).show()
+                            }
+                        }
                         else Toast.makeText(ctx, "השמירה נכשלה", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -1060,7 +1127,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     )
 }
 
-class PdfJobSpec(val kind: String, val name: String, val blobs: List<Pair<ByteArray, String>>)
+class PdfJobSpec(val kind: String, val name: String, val blobs: List<Pair<ByteArray, String>>, val arg: String = "")
 
 /** Bridge for pdf_organizer.html (page organizer and the invisible merge / images-to-PDF jobs). */
 internal class PdfToolsBridge(
@@ -1088,7 +1155,7 @@ fun PdfJobRunner(spec: PdfJobSpec, onResult: (String) -> Unit, onFail: (String) 
         text = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(28.dp)); Spacer(Modifier.width(14.dp))
-                Text(if (spec.kind == "merge") "מאחד את הקבצים" else "יוצר PDF מהתמונות")
+                Text(when (spec.kind) { "merge" -> "מאחד את הקבצים"; "scan" -> "מעבד את הסריקה"; "compress" -> "דוחס את ה-PDF"; else -> "יוצר PDF מהתמונות" })
             }
             AndroidView(modifier = Modifier.size(1.dp), factory = { c ->
                 WebView(c).apply {
@@ -1097,7 +1164,13 @@ fun PdfJobRunner(spec: PdfJobSpec, onResult: (String) -> Unit, onFail: (String) 
                         PdfToolsBridge(
                             data = { "" }, blobs = spec.blobs,
                             onReady = {
-                                evaluateJavascript(if (spec.kind == "merge") "PT.merge(${spec.blobs.size})" else "PT.images(${spec.blobs.size})", null)
+                                evaluateJavascript(
+                                    when (spec.kind) {
+                                        "merge" -> "PT.merge(${spec.blobs.size})"
+                                        "scan" -> "PT.scan(${spec.blobs.size})"
+                                        "compress" -> "PT.compress('${spec.arg}')"
+                                        else -> "PT.images(${spec.blobs.size})"
+                                    }, null)
                             },
                             onOpened = {}, onResult = { _, b64 -> onResult(b64) }, onFail = onFail, onDirty = {}, onToast = {}
                         ), "Android"

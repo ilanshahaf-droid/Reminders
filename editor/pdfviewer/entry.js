@@ -699,6 +699,42 @@ async function ptBuild(items) {
   return await out.saveAsBase64({ dataUri: false });
 }
 
+/* camera photo -> flat, high-contrast "scanned" page, cropped to the content */
+function scanEnhance(im) {
+  const L = 1800, k = Math.min(1, L / Math.max(im.naturalWidth, im.naturalHeight));
+  const W = Math.max(1, Math.round(im.naturalWidth * k)), H = Math.max(1, Math.round(im.naturalHeight * k));
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, W, H);
+  // blurred background (paper lighting) = tiny copy scaled back up
+  const sm = document.createElement('canvas'); sm.width = Math.max(1, Math.round(W / 24)); sm.height = Math.max(1, Math.round(H / 24));
+  const sx = sm.getContext('2d', { willReadFrequently: true }); sx.drawImage(c, 0, 0, sm.width, sm.height);
+  const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
+  const bx = bg.getContext('2d', { willReadFrequently: true }); bx.imageSmoothingQuality = 'high'; bx.drawImage(sm, 0, 0, W, H);
+  const a = x.getImageData(0, 0, W, H), b = bx.getImageData(0, 0, W, H).data, d = a.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2], gb = 0.299 * b[i] + 0.587 * b[i + 1] + 0.114 * b[i + 2] + 1;
+    let v = (g / gb) * 255;                       // flatten lighting
+    v = (v - 90) * (255 / (235 - 90));            // contrast stretch
+    v = v < 0 ? 0 : v > 255 ? 255 : v;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  x.putImageData(a, 0, 0);
+  // crop to ink bounds (rows/cols with enough dark pixels) + margin
+  const rows = new Uint32Array(H), cols = new Uint32Array(W);
+  for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (d[(yy * W + xx) * 4] < 140) { rows[yy]++; cols[xx]++; }
+  // text rows/cols only: very dark, full-width lines are the paper edge or table, not content
+  const okR = i => rows[i] >= 2 && rows[i] <= W * 0.5, okC = i => cols[i] >= 2 && cols[i] <= H * 0.5;
+  const first = (n, ok) => { for (let i = 0; i < n; i++) if (ok(i)) return i; return 0; };
+  const last = (n, ok) => { for (let i = n - 1; i >= 0; i--) if (ok(i)) return i; return n - 1; };
+  let y0 = first(H, okR), y1 = last(H, okR), x0 = first(W, okC), x1 = last(W, okC);
+  const mx = Math.round(W * 0.03), my = Math.round(H * 0.03);
+  x0 = Math.max(0, x0 - mx); y0 = Math.max(0, y0 - my); x1 = Math.min(W - 1, x1 + mx); y1 = Math.min(H - 1, y1 + my);
+  if ((x1 - x0) < W * 0.25 || (y1 - y0) < H * 0.25) { x0 = 0; y0 = 0; x1 = W - 1; y1 = H - 1; }
+  const o = document.createElement('canvas'); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
+  o.getContext('2d').drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+  return o;
+}
+
 window.PT = {
   async open(dark) {
     document.documentElement.className = dark ? 'dark' : '';
@@ -731,6 +767,44 @@ window.PT = {
       }
       AT().result('merge', await out.saveAsBase64({ dataUri: false }));
     } catch (e) { AT().fail('האיחוד נכשל: ' + (e && e.message ? e.message : e)); }
+  },
+  async scan(n) {
+    try {
+      const out = await PDFDocument.create();
+      for (let i = 0; i < n; i++) {
+        const bytes = b64ToBytes(AT().fileData(i));
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
+        const im = await new Promise((res, rej) => { const x = new Image(); x.onload = () => res(x); x.onerror = rej; x.src = url; });
+        const cv = scanEnhance(im);
+        const img = await out.embedJpg(dataUrlBytes(cv.toDataURL('image/jpeg', 0.82)));
+        const PW = 595, PH = 842, M = 14, k = Math.min((PW - 2 * M) / img.width, (PH - 2 * M) / img.height);
+        const w = img.width * k, h = img.height * k, pg = out.addPage([PW, PH]);
+        pg.drawImage(img, { x: (PW - w) / 2, y: (PH - h) / 2, width: w, height: h });
+        URL.revokeObjectURL(url);
+      }
+      AT().result('scan', await out.saveAsBase64({ dataUri: false }));
+    } catch (e) { AT().fail('הסריקה נכשלה: ' + (e && e.message ? e.message : e)); }
+  },
+  async compress(level) {
+    try {
+      const bytes = b64ToBytes(AT().fileData(0));
+      const d = await pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
+      const maxPx = level === 'strong' ? 1100 : 1600, q = level === 'strong' ? 0.5 : 0.68;
+      const out = await PDFDocument.create();
+      for (let i = 1; i <= d.numPages; i++) {
+        const page = await d.getPage(i), base = page.getViewport({ scale: 1 });
+        const sc = Math.min(3, maxPx / Math.max(base.width, base.height));
+        const vp = page.getViewport({ scale: sc });
+        const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+        const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: cx, canvas: c, viewport: vp }).promise;
+        const img = await out.embedJpg(dataUrlBytes(c.toDataURL('image/jpeg', q)));
+        const pg = out.addPage([base.width, base.height]);
+        pg.drawImage(img, { x: 0, y: 0, width: base.width, height: base.height });
+        c.width = c.height = 1;
+      }
+      AT().result('compress', await out.saveAsBase64({ dataUri: false }));
+    } catch (e) { AT().fail('הדחיסה נכשלה: ' + (e && e.message ? e.message : e)); }
   },
   async images(n) {
     try {
