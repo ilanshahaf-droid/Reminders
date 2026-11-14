@@ -264,6 +264,27 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             }
         }
     }
+    val cloudGet = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+            scope.launch {
+                val f = withContext(Dispatchers.IO) { Docs.import(ctx, uri) }
+                if (f == null) Toast.makeText(ctx, "אפשר לפתוח רק קובצי Word ו-PDF", Toast.LENGTH_SHORT).show()
+                else { tick++; if (Docs.ext(f) == "pdf") viewing = f else editing = f }
+            }
+        }
+    }
+    fun openIn(authority: String, name: String) {
+        if (ctx.packageManager.resolveContentProvider(authority, 0) == null) {
+            Toast.makeText(ctx, "$name לא מותקן במכשיר", Toast.LENGTH_SHORT).show(); return
+        }
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        // ask the picker to start inside this service (ignored by the system if the id is not valid)
+        runCatching { i.putExtra(DocumentsContract.EXTRA_INITIAL_URI, DocumentsContract.buildDocumentUri(authority, "root")) }
+        cloudOpen.launch(i)
+    }
     val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = r.data?.data; val f = linkTarget; linkTarget = null
         if (r.resultCode == android.app.Activity.RESULT_OK && uri != null && f != null) {
@@ -386,11 +407,19 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         modifier = Modifier.width(88.dp).height(58.dp)
                     ) { Box(contentAlignment = Alignment.Center) { Text("כלים ▾", fontWeight = FontWeight.Bold) } }
                     DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
-                        DropdownMenuItem(text = { Text("☁️ פתח מ-Drive / OneDrive") }, onClick = {
+                        DropdownMenuItem(text = { Text("☁️ Google Drive (עם שמירה חזרה)") }, onClick = {
+                            toolsMenu = false; openIn("com.google.android.apps.docs.storage", "Google Drive")
+                        })
+                        DropdownMenuItem(text = { Text("☁️ OneDrive (עם שמירה חזרה)") }, onClick = {
+                            toolsMenu = false; openIn("com.microsoft.skydrive.content.StorageAccessProvider", "OneDrive")
+                        })
+                        DropdownMenuItem(text = { Text("☁️ כל מקור אחר / דרך אפליקציית הענן (עותק)") }, onClick = {
                             toolsMenu = false
-                            cloudOpen.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-                                .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
+                            cloudGet.launch(Intent.createChooser(
+                                Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                                    .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+                                "פתח מ…"
+                            ))
                         })
                         DropdownMenuItem(text = { Text("איחוד קובצי PDF") }, onClick = {
                             toolsMenu = false
