@@ -609,6 +609,12 @@ window.PV = {
       doc = await pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
       await buildPages(); bindBar(); bindFill(); setTool('scroll'); $('zl').textContent = '100%';
       A().opened();
+      try {
+        const sc = $('scroller'), r = parseFloat(A().getPos ? A().getPos() : '') || 0;
+        if (r > 0.02) setTimeout(() => { sc.scrollTop = r * sc.scrollHeight; }, 350);
+        let tm = null;
+        sc.addEventListener('scroll', () => { clearTimeout(tm); tm = setTimeout(() => { if (A().savePos) A().savePos(String(sc.scrollTop / Math.max(1, sc.scrollHeight))); }, 700); });
+      } catch (_) {}
       detectAll().catch(() => {});
     } catch (e) {
       A().toast(e && e.name === 'PasswordException' ? 'הקובץ מוגן בסיסמה' : 'פתיחת ה-PDF נכשלה');

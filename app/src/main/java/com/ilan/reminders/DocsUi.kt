@@ -91,9 +91,34 @@ object Docs {
             ?.sortedWith(compareByDescending<File> { it.name in fv }.thenByDescending { it.lastModified() }) ?: emptyList()
     }
 
-    /** Removes the document and everything kept next to it (favorite, cloud link, source label, OCR text, cloud copy). */
+    // ---- recycle bin: deleted documents are kept 30 days as "<deletedAt>__<name>" ----
+    fun trashDir(c: Context): File = File(c.filesDir, "docs_trash").apply { mkdirs() }
+    class Trashed(val file: File, val name: String, val deletedAt: Long)
+    fun trashList(c: Context): List<Trashed> = (trashDir(c).listFiles() ?: emptyArray()).mapNotNull { f ->
+        val ts = f.name.substringBefore("__").toLongOrNull() ?: return@mapNotNull null
+        Trashed(f, f.name.substringAfter("__"), ts)
+    }.sortedByDescending { it.deletedAt }
+
+    /** Moves the document to the bin and removes what is kept next to it (favorite, cloud link, source label). The cloud copy is marked deleted. */
     fun deleteDoc(c: Context, f: File) {
-        f.delete(); Sync.markDocGone(c, f.name); setFav(c, f.name, false); unlink(c, f.name); moveSource(c, f.name, null); Ocr.forget(c, f)
+        val dest = File(trashDir(c), System.currentTimeMillis().toString() + "__" + f.name)
+        if (!f.renameTo(dest)) { f.copyTo(dest, true); f.delete() }
+        Sync.markDocGone(c, f.name); setFav(c, f.name, false); unlink(c, f.name); moveSource(c, f.name, null)
+    }
+
+    /** Puts a document back. It gets a new modified time so the sync treats it as newer than the cloud's "deleted" mark. */
+    fun restore(c: Context, t: Trashed): File {
+        val target = unique(c, t.name.substringBeforeLast('.'), ext(t.file.let { File(t.name) }))
+        if (!t.file.renameTo(target)) { t.file.copyTo(target, true); t.file.delete() }
+        target.setLastModified(System.currentTimeMillis())
+        Sync.unmarkDocGone(c, target.name)
+        return target
+    }
+
+    fun purge(c: Context, t: Trashed) { t.file.delete(); Ocr.forget(c, File(dir(c), t.name)) }
+    fun purgeExpired(c: Context) {
+        val limit = System.currentTimeMillis() - 30L * 24 * 3600 * 1000
+        trashList(c).filter { it.deletedAt < limit }.forEach { purge(c, it) }
     }
 
     fun clean(name: String) = name.replace(Regex("[\\\\/:*?\"<>|\\n\\r]"), " ").trim().ifBlank { "מסמך" }.take(80)
@@ -365,6 +390,9 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
     val scanScope = rememberCoroutineScope()
     var scanSrcDlg by remember { mutableStateOf(false) }
+    var trashDlg by remember { mutableStateOf(false) }
+    var trashTick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { Docs.purgeExpired(ctx) }
     val onScanUris: (List<android.net.Uri>) -> Unit = { uris ->
         if (uris.isNotEmpty()) scanScope.launch {
             val blobs = withContext(Dispatchers.IO) { uris.mapNotNull { u -> runCatching { ctx.contentResolver.openInputStream(u)!!.use { it.readBytes() } }.getOrNull() } }
@@ -637,6 +665,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
                             DropdownMenuItem(text = { Text("📷 סריקה ל-PDF") }, onClick = { toolsMenu = false; scanShots = emptyList(); scanSrcDlg = true })
                             DropdownMenuItem(text = { Text("🔎 חיפוש בכל האפליקציה") }, onClick = { toolsMenu = false; GlobalSearch.open = true })
+                            DropdownMenuItem(text = { Text("🗑 סל מחזור (${trashTick.let { Docs.trashList(ctx).size }})") }, onClick = { toolsMenu = false; trashDlg = true })
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Column { Text("📑 איחוד קובצי PDF"); Text("חיבור כמה קבצים לקובץ אחד", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant) } },
@@ -703,6 +732,33 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         onClose = { scanDlg = false; scanShots = emptyList() },
         onCreated = { f -> scanDlg = false; scanShots = emptyList(); tick++; saveAsFor = f }
     )
+
+    if (trashDlg) {
+        val items = remember(trashTick) { Docs.trashList(ctx) }
+        AlertDialog(
+            onDismissRequest = { trashDlg = false }, title = { Text("סל מחזור") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (items.isEmpty()) Text("הסל ריק. קבצים שנמחקים נשמרים כאן 30 יום.")
+                    items.forEach { t ->
+                        val left = 30 - ((System.currentTimeMillis() - t.deletedAt) / 86400000L).toInt()
+                        Surface(shape = RoundedCornerShape(12.dp), color = cs.surfaceVariant) {
+                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(t.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("יימחק סופית בעוד ${left.coerceAtLeast(0)} ימים", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                                }
+                                TextButton({ Docs.restore(ctx, t); trashTick++; tick++ }) { Text("שחזר") }
+                                TextButton({ Docs.purge(ctx, t); trashTick++ }) { Text("מחק", color = cs.error) }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { if (items.isNotEmpty()) TextButton({ items.forEach { Docs.purge(ctx, it) }; trashTick++ }) { Text("רוקן סל", color = cs.error) } },
+            dismissButton = { TextButton({ trashDlg = false }) { Text("סגור") } }
+        )
+    }
 
     if (scanSrcDlg) AlertDialog(
         onDismissRequest = { scanSrcDlg = false }, title = { Text("סריקה ל-PDF – מאיפה?") },
@@ -862,7 +918,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deleting = null }, title = { Text("מחיקת קובץ") },
             text = { Text("למחוק את \"${f.nameWithoutExtension}\" לצמיתות? אי אפשר לשחזר.") },
-            confirmButton = { TextButton({ f.delete(); Sync.markDocGone(ctx, f.name); Docs.setFav(ctx, f.name, false); Docs.unlink(ctx, f.name); Docs.moveSource(ctx, f.name, null); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
+            confirmButton = { TextButton({ Docs.deleteDoc(ctx, f); deleting = null; tick++ }) { Text("העבר לסל", color = cs.error) } },
             dismissButton = { TextButton({ deleting = null }) { Text("ביטול") } }
         )
     }
@@ -873,8 +929,8 @@ fun DeleteDocDialog(file: File, onDismiss: () -> Unit, onDeleted: () -> Unit) {
     val ctx = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss, title = { Text("מחיקת קובץ") },
-        text = { Text("למחוק את \"${file.nameWithoutExtension}\"? אי אפשר לשחזר, והוא יימחק גם מהמכשירים האחרים בסנכרון.") },
-        confirmButton = { TextButton({ Docs.deleteDoc(ctx, file); onDeleted() }) { Text("מחק", color = MaterialTheme.colorScheme.error) } },
+        text = { Text("להעביר את \"${file.nameWithoutExtension}\" לסל המחזור? אפשר לשחזר אותו במשך 30 יום.") },
+        confirmButton = { TextButton({ Docs.deleteDoc(ctx, file); onDeleted() }) { Text("העבר לסל", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
     )
 }
@@ -1081,7 +1137,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
 
 /** JS side of the PDF viewer (pdf_viewer.html). */
 internal class PdfBridge(
-    val ctx: Context, val data: () -> String, val onOpened: () -> Unit, val onSaved: (String) -> Unit, val onSaveFailed: () -> Unit,
+    val ctx: Context, val file: String, val data: () -> String, val onOpened: () -> Unit, val onSaved: (String) -> Unit, val onSaveFailed: () -> Unit,
     val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit, val onReady: () -> Unit
 ) {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
@@ -1092,6 +1148,11 @@ internal class PdfBridge(
     @android.webkit.JavascriptInterface fun saveFailed() { main.post { onSaveFailed() } }
     @android.webkit.JavascriptInterface fun dirty(v: Boolean) { main.post { onDirty(v) } }
     @android.webkit.JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
+    @android.webkit.JavascriptInterface fun getPos(): String =
+        ctx.getSharedPreferences("docs", Context.MODE_PRIVATE).getString("pos_" + file, "") ?: ""
+    @android.webkit.JavascriptInterface fun savePos(r: String) {
+        ctx.getSharedPreferences("docs", Context.MODE_PRIVATE).edit().putString("pos_" + file, r).apply()
+    }
     @android.webkit.JavascriptInterface fun getSig(): String =
         ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("pdfSig", "") ?: ""
     @android.webkit.JavascriptInterface fun saveSig(s: String) {
@@ -1177,7 +1238,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                     settings.domStorageEnabled = true
                     addJavascriptInterface(
                         PdfBridge(
-                            c, data = { initial },
+                            c, cur.name, data = { initial },
                             onOpened = { opened = true },
                             onSaved = { b64 ->
                                 val ok = runCatching {

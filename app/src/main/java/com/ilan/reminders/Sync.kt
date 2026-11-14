@@ -231,6 +231,11 @@ object Sync {
         schedulePush(c)
     }
 
+    fun unmarkDocGone(c: Context, name: String) {
+        val p = prefs(c)
+        p.edit().putStringSet("docsGone", (p.getStringSet("docsGone", emptySet()) ?: emptySet()) - name).apply()
+    }
+
     private fun q(s: String) = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
     /** Two-way document sync (Word / PDF files, up to ~6 MB each, stored as base64 in rem_docs). */
