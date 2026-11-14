@@ -6,6 +6,7 @@ html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-app
 :root{--ne-fg:#14161f;--ne-mute:#7b8094;--ne-accent:#4f46e5;--ne-bar:rgba(255,255,255,.82);--ne-line:rgba(0,0,0,.14);--ne-chip:rgba(79,70,229,.18)}
 .dark{--ne-fg:#e8eaf2;--ne-mute:#9aa0b8;--ne-accent:#9ea0ff;--ne-bar:rgba(22,24,32,.88);--ne-line:rgba(255,255,255,.16);--ne-chip:rgba(158,160,255,.24)}
 #app{position:fixed;left:0;right:0;top:0;bottom:0}
+@media print{#app{position:static}.ne{height:auto!important;display:block!important}.ne-bar,.ne-draw,.ne-cfg{display:none!important}.ne-body,.ne-ed{overflow:visible!important;height:auto!important;min-height:0!important}}
 /*NE-CSS*/
 </style></head>
 <body><div id="app"></div>
@@ -24,6 +25,27 @@ window.NE = {
   focus: function(){ editor.focus(); },
   flush: function(){ editor.flush(); },
   insert: function(t){ editor.focus(); document.execCommand('insertText', false, t); editor.flush(); }
+};
+window.DOC = {
+  ensure: function(cb){
+    if(window.DocLib) return cb();
+    var s = document.createElement('script'); s.src = 'doclib.js'; s.onload = cb;
+    s.onerror = function(){ Android.toast('רכיב המסמכים לא נטען'); };
+    document.head.appendChild(s);
+  },
+  open: function(dark){
+    DOC.ensure(function(){
+      DocLib.docxToHtml(Android.docData()).then(function(h){ NE.load(h, dark); Android.docOpened(); })
+        .catch(function(){ Android.toast('פתיחת הקובץ נכשלה'); });
+    });
+  },
+  save: function(title){
+    DOC.ensure(function(){
+      editor.flush();
+      DocLib.htmlToDocxB64(editor.getHtml(), title).then(function(b){ Android.docSaved(b); })
+        .catch(function(e){ Android.toast('השמירה נכשלה'); });
+    });
+  }
 };
 if(window.Android) Android.ready();
 </script></body></html>

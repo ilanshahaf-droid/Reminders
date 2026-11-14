@@ -60,25 +60,26 @@ fun Home() {
     var screen by rememberSaveable { mutableStateOf("tasks") }
     if (PendingShare.text != null && screen != "notes") screen = "notes"
     Box(Modifier.fillMaxSize()) {
-        Root(onOpenNotes = { screen = "notes" })
-        if (screen == "notes") NotesHost(onReminders = { screen = "tasks" })
+        Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
+        if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })
+        if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" })
     }
 }
 
 @Composable
-fun TabSwitch(notesSelected: Boolean, onReminders: () -> Unit, onNotes: () -> Unit, hPad: Dp = 24.dp) {
+fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 24.dp) {
     val cs = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("תזכורות" to false, "פתקים" to true).forEach { (label, isNotes) ->
-            val sel = notesSelected == isNotes
+        listOf("tasks" to "תזכורות", "notes" to "פתקים", "docs" to "מסמכים").forEach { (key, label) ->
+            val sel = current == key
             Surface(
-                onClick = { if (!sel) { if (isNotes) onNotes() else onReminders() } },
+                onClick = { if (!sel) when (key) { "notes" -> onNotes(); "docs" -> onDocs(); else -> onReminders() } },
                 shape = RoundedCornerShape(20.dp),
                 color = if (sel) cs.primaryContainer else cs.surface,
                 shadowElevation = if (sel) 0.dp else 1.dp
             ) {
                 Text(
-                    label, Modifier.padding(horizontal = 22.dp, vertical = 9.dp), style = MaterialTheme.typography.labelLarge,
+                    label, Modifier.padding(horizontal = 20.dp, vertical = 9.dp), style = MaterialTheme.typography.labelLarge,
                     color = if (sel) cs.onPrimaryContainer else cs.onSurfaceVariant
                 )
             }
@@ -88,7 +89,7 @@ fun TabSwitch(notesSelected: Boolean, onReminders: () -> Unit, onNotes: () -> Un
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NotesHost(onReminders: () -> Unit) {
+fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val dark = isSystemInDarkTheme()
@@ -268,7 +269,7 @@ fun NotesHost(onReminders: () -> Unit) {
                                         }
                                     }
                                 }
-                                TabSwitch(true, onReminders = onReminders, onNotes = {}, hPad = 0.dp)
+                                TabSwitch("notes", onReminders = onReminders, onNotes = {}, onDocs = onDocs, hPad = 0.dp)
                                 if (searching) OutlinedTextField(
                                     query, { query = it }, singleLine = true, placeholder = { Text("חיפוש בפתקים") },
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
@@ -446,13 +447,17 @@ private fun NoteCard(
 }
 
 /** What the page inside the WebView can call. */
-private class EditorBridge(
-    val ctx: android.content.Context, val onReady: () -> Unit, val onChanged: (String, String) -> Unit, val onToast: (String) -> Unit = {}
+internal class EditorBridge(
+    val ctx: android.content.Context, val onReady: () -> Unit, val onChanged: (String, String) -> Unit, val onToast: (String) -> Unit = {},
+    val docData: () -> String = { "" }, val onDocOpened: () -> Unit = {}, val onDocSaved: (String) -> Unit = {}
 ) {
     private val main = Handler(Looper.getMainLooper())
     @JavascriptInterface fun ready() { main.post { onReady() } }
     @JavascriptInterface fun getBar(): String = ctx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).getString("noteBar", "") ?: ""
     @JavascriptInterface fun saveBar(v: String) { ctx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).edit().putString("noteBar", v).apply() }
+    @JavascriptInterface fun docData(): String = docData.invoke()
+    @JavascriptInterface fun docOpened() { main.post { onDocOpened() } }
+    @JavascriptInterface fun docSaved(b64: String) { onDocSaved(b64) }
     @JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
     @JavascriptInterface fun changed(html: String, text: String) { main.post { onChanged(html, text) } }
 }
