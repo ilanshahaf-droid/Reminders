@@ -44,8 +44,11 @@ fun GlobalSearchScreen(onTask: (Task) -> Unit, onNote: (Note) -> Unit, onDoc: (j
                 val body = if (n.locked) "🔒 נעול" else snippet(n.plain, term)
                 add(Hit("📝", n.title.ifBlank { n.plain.lineSequence().firstOrNull().orEmpty().take(40) }, body) { onNote(n) })
             }
-            Docs.list(ctx).filter { it.name.contains(term, true) }.take(30).forEach { f ->
-                add(Hit(if (Docs.ext(f) == "pdf") "📕" else "📄", f.nameWithoutExtension, f.extension.uppercase()) { onDoc(f) })
+            Docs.list(ctx).forEach { f ->
+                val byName = f.name.contains(term, true)
+                val ocr = if (byName) null else Ocr.text(ctx, f)?.takeIf { it.contains(term, true) }
+                if (byName || ocr != null)
+                    add(Hit(if (Docs.ext(f) == "pdf") "📕" else "📄", f.nameWithoutExtension, if (ocr != null) "🔤 " + snippet(ocr, term) else f.extension.uppercase()) { onDoc(f) })
             }
         }
     }

@@ -15,6 +15,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     // Fixed keystore so every CI build has the same signature (updates install over the old version, data kept)
@@ -37,6 +38,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("cz.adaptive:tesseract4android:4.7.0")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.8.3")

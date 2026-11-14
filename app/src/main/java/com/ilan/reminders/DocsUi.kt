@@ -387,6 +387,18 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         }
     }
     var menuFor by remember { mutableStateOf<String?>(null) }
+    var ocrBusy by remember { mutableStateOf<String?>(null) }
+    var ocrShow by remember { mutableStateOf<File?>(null) }
+    fun ocrRun(f: File) {
+        ocrBusy = "מתחיל…"
+        scope.launch {
+            val ok = runCatching { Ocr.run(ctx, f) { p, n -> ocrBusy = "עמוד $p מתוך $n" } }
+            ocrBusy = null
+            ok.onSuccess { t ->
+                if (t.isBlank()) Toast.makeText(ctx, "לא זוהה טקסט", Toast.LENGTH_LONG).show() else ocrShow = f
+            }.onFailure { Toast.makeText(ctx, "הזיהוי נכשל", Toast.LENGTH_LONG).show() }
+        }
+    }
     var renaming by remember { mutableStateOf<File?>(null) }
     var renameText by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<File?>(null) }
@@ -561,6 +573,8 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                         .putExtra(Intent.EXTRA_TITLE, f.name)
                                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION))
                                 })
+                                if (isPdf) DropdownMenuItem(text = { Text("🔤 זיהוי טקסט (OCR)") }, onClick = { menuFor = null; ocrRun(f) })
+                                if (isPdf && Ocr.text(ctx, f) != null) DropdownMenuItem(text = { Text("📝 הטקסט שזוהה") }, onClick = { menuFor = null; ocrShow = f })
                                 if (isPdf) DropdownMenuItem(text = { Text("ארגן עמודים") }, onClick = { menuFor = null; organizing = f })
                                 DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
                                 DropdownMenuItem(text = { Text("שתף") }, onClick = { menuFor = null; Docs.share(ctx, f) })
@@ -620,6 +634,44 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
 
     saveAsFor?.let { f -> SaveAsDialog(f, { saveAsFor = null }, { tick++ }) }
+
+    ocrBusy?.let { msg ->
+        AlertDialog(
+            onDismissRequest = {}, title = { Text("מזהה טקסט…") }, confirmButton = {},
+            text = { Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(28.dp)); Spacer(Modifier.width(14.dp)); Text(msg) } }
+        )
+    }
+    ocrShow?.let { f ->
+        val t = remember(f) { Ocr.text(ctx, f).orEmpty() }
+        AlertDialog(
+            onDismissRequest = { ocrShow = null }, title = { Text("הטקסט שזוהה") },
+            text = {
+                Column {
+                    Text("הטקסט נשמר, ומעכשיו החיפוש הגלובלי ימצא את המסמך גם לפי התוכן שלו.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(8.dp))
+                    Text(t, Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()))
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    val now = System.currentTimeMillis()
+                    val esc = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                    scope.launch { Notes.save(ctx, Note(now, f.nameWithoutExtension, esc, t, "", false, 0, now, now, 0)) }
+                    Toast.makeText(ctx, "נוצר פתק", Toast.LENGTH_SHORT).show(); ocrShow = null
+                }) { Text("📝 צור פתק") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton({
+                        (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                            .setPrimaryClip(android.content.ClipData.newPlainText("ocr", t))
+                        Toast.makeText(ctx, "הועתק", Toast.LENGTH_SHORT).show()
+                    }) { Text("העתק") }
+                    TextButton({ ocrShow = null }) { Text("סגור") }
+                }
+            }
+        )
+    }
 
     if (scanDlg) AlertDialog(
         onDismissRequest = {}, title = { Text("סריקה ל-PDF") },
