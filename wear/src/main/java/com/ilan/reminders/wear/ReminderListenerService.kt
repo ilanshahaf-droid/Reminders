@@ -27,6 +27,7 @@ class ReminderListenerService : WearableListenerService() {
             if (ev.type == DataEvent.TYPE_CHANGED && ev.dataItem.uri.path == "/tasks") {
                 val json = DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
                 TaskStore.update(this, json)
+                runCatching { androidx.wear.tiles.TileService.getUpdater(this).requestUpdate(ReminderTileService::class.java) }
             }
         }
     }

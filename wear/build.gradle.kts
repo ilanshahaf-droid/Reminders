@@ -41,4 +41,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    implementation("androidx.wear.tiles:tiles:1.4.0")
+    implementation("androidx.wear.protolayout:protolayout:1.2.0")
+    implementation("com.google.guava:guava:33.0.0-android")
 }
