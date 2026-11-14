@@ -59,12 +59,24 @@ import org.json.JSONObject
 @Composable
 fun Home() {
     var screen by rememberSaveable { mutableStateOf("tasks") }
+    val startCtx = LocalContext.current
+    LaunchedEffect(Unit) {
+        if (PendingOpen.task == null && PendingOpen.noteId == null && PendingOpen.file == null && PendingShare.text == null &&
+            startCtx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).getBoolean("startToday", false)) TodayView.open = true
+    }
     if (PendingShare.text != null && screen != "notes") screen = "notes"
     if ((PendingOpen.file != null || PendingOpen.template != null) && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })
         if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" })
+        if (TodayView.open) TodayScreen(
+            onTask = { PendingOpen.task = it; screen = "tasks" },
+            onNote = { PendingOpen.noteId = it.id; screen = "notes" },
+            onDoc = { PendingOpen.file = it; screen = "docs" },
+            onSearch = { GlobalSearch.open = true },
+            onCalendar = { CalendarView.open = true }
+        )
         if (CalendarView.open) CalendarScreen(onTask = { PendingOpen.task = it; screen = "tasks" })
         if (GlobalSearch.open) GlobalSearchScreen(
             onTask = { PendingOpen.task = it; screen = "tasks" },
@@ -112,7 +124,7 @@ fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onD
 fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
+    val dark = appDark()
     val scope = rememberCoroutineScope()
     val db = remember { AppDb.get(ctx) }
     val all by db.notes().all().collectAsState(initial = emptyList())

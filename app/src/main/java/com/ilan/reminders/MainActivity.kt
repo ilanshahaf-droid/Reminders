@@ -374,6 +374,7 @@ fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
                                                     text = { Text((if (healthy) "" else "⚠ ") + "הגדרות") },
                                                     onClick = { menuOpen = false; showSettings = true }
                                                 )
+                                                DropdownMenuItem(text = { Text("☀️ היום שלי") }, onClick = { menuOpen = false; TodayView.open = true })
                                                 DropdownMenuItem(text = { Text("📆 לוח שנה (תזכורות + יומן)") }, onClick = { menuOpen = false; CalendarView.open = true })
                                                 DropdownMenuItem(
                                                     text = { Text("🔎 חיפוש בכל האפליקציה") },
@@ -804,11 +805,39 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v82") },
+        title = { Text("הגדרות · v83") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
                 var snooze by remember { mutableIntStateOf(prefs.getInt("snoozeMin", 10)) }
+                Text("מראה", fontWeight = FontWeight.Bold)
+                val appCtx = LocalContext.current
+                Text("גודל טקסט", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("קטן" to 0.9f, "רגיל" to 1f, "גדול" to 1.15f, "גדול מאוד" to 1.3f).forEach { (l, v) ->
+                        FilterChip(ThemePrefs.scale == v, { ThemePrefs.scale = v; ThemePrefs.save(appCtx) }, label = { Text(l) })
+                    }
+                }
+                Text("צבע ראשי", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ACCENTS.forEach { (k, a) ->
+                        FilterChip(ThemePrefs.accent == k, { ThemePrefs.accent = k; ThemePrefs.save(appCtx) },
+                            label = { Text(a[0] as String) },
+                            leadingIcon = { Box(Modifier.size(12.dp).clip(CircleShape).background(Color(a[1] as Long))) })
+                    }
+                }
+                Text("מצב תצוגה", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("system" to "לפי המכשיר", "light" to "בהיר", "dark" to "כהה").forEach { (k, l) ->
+                        FilterChip(ThemePrefs.mode == k, { ThemePrefs.mode = k; ThemePrefs.save(appCtx) }, label = { Text(l) })
+                    }
+                }
+                var startToday by remember { mutableStateOf(prefs.getBoolean("startToday", false)) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("לפתוח במסך \"היום שלי\"", Modifier.weight(1f))
+                    Switch(startToday, { startToday = it; prefs.edit().putBoolean("startToday", it).apply() })
+                }
+                HorizontalDivider()
                 Text("נודניק (בדקות)")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(5, 10, 15, 30, 60).forEach { m ->

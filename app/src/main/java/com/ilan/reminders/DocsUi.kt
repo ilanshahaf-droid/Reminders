@@ -368,7 +368,7 @@ internal fun cloudCreateIntent(f: File): Intent =
 fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
+    val dark = appDark()
     var tick by remember { mutableStateOf(0) }
     val files = remember(tick) { Docs.list(ctx) }
     var editing by remember { mutableStateOf<File?>(null) }

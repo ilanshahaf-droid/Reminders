@@ -40,12 +40,12 @@ object CalendarView { var open by mutableStateOf(false) }
 
 private data class Entry(val date: LocalDate, val time: LocalTime?, val title: String, val sub: String, val task: Task?)
 
-private val HE_DAYS = listOf("א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳")
-private val HE_MONTHS = listOf("ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר")
-private fun sundayIndex(d: LocalDate) = d.dayOfWeek.value % 7   // Sunday = 0
+internal val HE_DAYS = listOf("א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳")
+internal val HE_MONTHS = listOf("ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר")
+internal fun sundayIndex(d: LocalDate) = d.dayOfWeek.value % 7   // Sunday = 0
 private fun weekStart(d: LocalDate): LocalDate = d.minusDays(sundayIndex(d).toLong())
 
-private fun occursOn(t: Task, day: LocalDate, zone: ZoneId): Boolean {
+internal fun occursOn(t: Task, day: LocalDate, zone: ZoneId): Boolean {
     if (t.done || t.deletedAt != 0L || t.alertMode == "NONE" && t.triggerAt == 0L) return false
     val first = if (t.triggerAt > 0) java.time.Instant.ofEpochMilli(t.triggerAt).atZone(zone).toLocalDate() else null
     return when (t.repeat) {
@@ -61,7 +61,7 @@ private fun occursOn(t: Task, day: LocalDate, zone: ZoneId): Boolean {
     }
 }
 
-private fun timeOf(t: Task, zone: ZoneId): LocalTime? =
+internal fun timeOf(t: Task, zone: ZoneId): LocalTime? =
     if (t.triggerAt > 0) java.time.Instant.ofEpochMilli(t.triggerAt).atZone(zone).toLocalTime().withSecond(0).withNano(0) else null
 
 @Composable
