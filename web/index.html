@@ -316,6 +316,12 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
     var ed = document.createElement('div'); ed.className = 'ne-ed'; ed.contentEditable = 'true';
     ed.setAttribute('data-ph', opts.placeholder || 'כתוב כאן…'); ed.setAttribute('dir', 'rtl'); ed.spellcheck = true;
     body.appendChild(ed);
+    ed.addEventListener('click', function(e){
+      var a = e.target && e.target.closest ? e.target.closest('a[href^="doc://"]') : null;
+      if(!a) return;
+      e.preventDefault();
+      if(window.Android && window.Android.openDoc) window.Android.openDoc(decodeURIComponent(a.getAttribute('href').slice(6)));
+    });
     var bar = document.createElement('div'); bar.className = 'ne-bar';
     var pal = document.createElement('div'); pal.className = 'ne-row ne-pal hide';
     var row = document.createElement('div'); row.className = 'ne-row';

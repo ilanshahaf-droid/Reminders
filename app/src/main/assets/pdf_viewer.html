@@ -47,6 +47,8 @@ button{font:inherit;color:var(--fg)}
 .sw.on,.sz.on{box-shadow:0 0 0 3px var(--acc)}
 .sz{min-width:38px;height:36px;border:0;border-radius:10px;background:var(--chip);padding:0 10px}
 .hide{display:none!important}
+#sbar{display:flex;gap:6px;align-items:center;padding:6px;background:var(--bar);border-bottom:1px solid #0002}#sbar input{flex:1;height:36px;border-radius:10px;border:1px solid #8886;padding:0 10px;font-size:16px;background:transparent;color:var(--fg)}#sbar button{border:0;border-radius:10px;background:var(--chip);height:36px;padding:0 12px}#scnt{font-size:13px;color:var(--sub,#778)}
+.hit{position:absolute;background:#ffd60066;outline:1px solid #ffb300;z-index:3;pointer-events:none}.hit.cur{background:#ff980088;outline:2px solid #ff6d00}
 #sigModal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
 #sigModal .box{background:var(--bar);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center}
 #sigCv{background:repeating-linear-gradient(#fff,#fff 219px,#9aa 219px,#9aa 220px);border-radius:10px;touch-action:none}
@@ -54,6 +56,7 @@ button{font:inherit;color:var(--fg)}
 </style></head><body>
 <div id="app">
   <div id="fbar"><button id="fillGo" class="hide">📝 מילוי השדות</button><button id="dateGo">📅 תאריך</button><button id="myGo">👤 הפרטים שלי</button></div>
+  <div id="sbar" class="hide"><input id="sq" placeholder="חיפוש בקובץ" autocomplete="off"><span id="scnt"></span><button id="sprev">▲</button><button id="snext">▼</button><button id="sx">✕</button></div>
   <div id="scroller"><div id="pages"></div></div>
   <div id="fsheet" class="hide"><div class="top"><span id="fsPos"></span><button id="fsX">✕</button></div><div id="fsLabel"></div><div id="fsBody"></div>
     <div class="nav"><button id="fsPrev">הקודם</button><button id="fsNext">הבא</button></div><div class="more"><button id="fsMove">↔ הזז</button><button id="fsWp">▭+</button><button id="fsWm">▭−</button><button id="fsRen">✏️ שם</button><button id="fsDel" style="margin-inline-start:auto">זה לא שדה – הסרה</button></div></div>

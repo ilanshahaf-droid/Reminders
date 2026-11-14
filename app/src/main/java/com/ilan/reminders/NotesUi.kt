@@ -19,6 +19,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -119,6 +120,7 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
     val notes = remember(all) { all.filter { it.deletedAt == 0L } }
     val trash = remember(all) { all.filter { it.deletedAt > 0L } }
     var editing by remember { mutableStateOf<Note?>(null) }
+    var tplDlg by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var catFilter by remember { mutableStateOf<Long?>(null) }
@@ -342,8 +344,23 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
                             Text("לא נמצאו פתקים", Modifier.padding(24.dp), color = cs.onSurfaceVariant)
                         }
                     }
+                    if (tplDlg) AlertDialog(
+                        onDismissRequest = { tplDlg = false }, title = { Text("פתק חדש") },
+                        text = {
+                            LazyColumn(Modifier.heightIn(max = 380.dp)) {
+                                items(NOTE_TEMPLATES, key = { it.first }) { t ->
+                                    Text(t.first, Modifier.fillMaxWidth().clickable {
+                                        tplDlg = false
+                                        val plainT = android.text.Html.fromHtml(t.third, android.text.Html.FROM_HTML_MODE_COMPACT).toString().trim()
+                                        editing = newNote(ctx).copy(categoryId = catFilter ?: 0L, title = t.second, html = t.third, plain = plainT)
+                                    }.padding(vertical = 14.dp), fontSize = 17.sp)
+                                }
+                            }
+                        },
+                        confirmButton = {}, dismissButton = { TextButton({ tplDlg = false }) { Text("ביטול") } }
+                    )
                     Surface(
-                        onClick = { editing = newNote(ctx).copy(categoryId = catFilter ?: 0L) },
+                        onClick = { tplDlg = true },
                         shape = RoundedCornerShape(32.dp), color = cs.surface, shadowElevation = 10.dp,
                         modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 28.dp, vertical = 16.dp).fillMaxWidth().height(64.dp)
                     ) {
@@ -494,7 +511,8 @@ private fun NoteCard(
 /** What the page inside the WebView can call. */
 internal class EditorBridge(
     val ctx: android.content.Context, val onReady: () -> Unit, val onChanged: (String, String) -> Unit, val onToast: (String) -> Unit = {},
-    val docData: () -> String = { "" }, val onDocOpened: () -> Unit = {}, val onDocSaved: (String) -> Unit = {}
+    val docData: () -> String = { "" }, val onDocOpened: () -> Unit = {}, val onDocSaved: (String) -> Unit = {},
+    val onOpenDoc: (String) -> Unit = {}
 ) {
     private val main = Handler(Looper.getMainLooper())
     @JavascriptInterface fun ready() { main.post { onReady() } }
@@ -503,6 +521,7 @@ internal class EditorBridge(
     @JavascriptInterface fun docData(): String = docData.invoke()
     @JavascriptInterface fun docOpened() { main.post { onDocOpened() } }
     @JavascriptInterface fun docSaved(b64: String) { onDocSaved(b64) }
+    @JavascriptInterface fun openDoc(n: String) { main.post { onOpenDoc(n) } }
     @JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
     @JavascriptInterface fun changed(html: String, text: String) { main.post { onChanged(html, text) } }
 }
@@ -557,6 +576,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
     var reminder by remember { mutableStateOf<Task?>(null) }
     var finding by remember { mutableStateOf(false) }
     var snipDlg by remember { mutableStateOf(false) }
+    var linkDlg by remember { mutableStateOf(false) }
     var findQ by remember { mutableStateOf("") }
     var full by remember { mutableStateOf(false) }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -652,6 +672,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                     )
                     DropdownMenuItem(text = { Text("חיפוש בפתק") }, onClick = { moreMenu = false; finding = true })
                     DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })
+                    DropdownMenuItem(text = { Text("🔗 קישור למסמך") }, onClick = { moreMenu = false; linkDlg = true })
                     DropdownMenuItem(text = { Text("📄 ייצוא ל-PDF") }, onClick = {
                         moreMenu = false
                         web.value?.let { w ->
@@ -704,6 +725,27 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                 }
             }
         }
+        if (linkDlg) {
+            val files = remember { Docs.list(ctx) }
+            AlertDialog(
+                onDismissRequest = { linkDlg = false }, title = { Text("קישור למסמך") },
+                text = {
+                    if (files.isEmpty()) Text("אין מסמכים")
+                    else LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        items(files, key = { it.name }) { f ->
+                            Text("📄 " + f.nameWithoutExtension, Modifier.fillMaxWidth().clickable {
+                                linkDlg = false
+                                val esc = f.name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+                                val href = java.net.URLEncoder.encode(f.name, "UTF-8").replace("+", "%20")
+                                val h = "<a href=\"doc://$href\">📄 ${f.nameWithoutExtension.replace("&", "&amp;").replace("<", "&lt;")}</a>&nbsp;"
+                                web.value?.evaluateJavascript("NE.insertHtml(${JSONObject.quote(h)})", null)
+                            }.padding(vertical = 12.dp))
+                        }
+                    }
+                },
+                confirmButton = {}, dismissButton = { TextButton({ linkDlg = false }) { Text("ביטול") } }
+            )
+        }
         if (snipDlg) SnippetsDialog(onInsert = { t -> web.value?.evaluateJavascript("NE.insert(${JSONObject.quote(t + " ")})", null) }, onDismiss = { snipDlg = false })
         if (finding && !full) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -738,7 +780,21 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                                 evaluateJavascript("NE.load(${JSONObject.quote(html)}, $dark)", null)
                             },
                             onChanged = { h, t -> html = h; plain = t },
-                            onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() }
+                            onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() },
+                            onOpenDoc = { n ->
+                                val f = Docs.list(ctx).firstOrNull { it.name == n }
+                                if (f == null) Toast.makeText(ctx, "המסמך לא נמצא", Toast.LENGTH_SHORT).show()
+                                else {
+                                    web.value?.evaluateJavascript("NE.flush()", null)
+                                    scope.launch {
+                                        delay(200)
+                                        val n2 = current()
+                                        if (dirty() && (!n2.isBlank() || !isNew)) Notes.save(ctx, n2)
+                                        PendingOpen.file = f
+                                        onClose()
+                                    }
+                                }
+                            }
                         ), "Android"
                     )
                     webChromeClient = object : android.webkit.WebChromeClient() {
@@ -760,3 +816,13 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
         )
     }
 }
+
+/** name, default title, html (checklists use the editor's `ul.cl`) */
+val NOTE_TEMPLATES: List<Triple<String, String, String>> = listOf(
+    Triple("📝 פתק ריק", "", ""),
+    Triple("🎓 סיכום הדרכה", "סיכום הדרכה", "<p><b>תאריך ומקום:</b> </p><p><b>משתתפים:</b> </p><p><b>נושאים שעלו:</b></p><ul><li></li></ul><p><b>מסקנות והמלצות:</b></p><ul><li></li></ul><p><b>משימות להמשך:</b></p><ul class=\"cl\"><li></li></ul>"),
+    Triple("👥 סיכום ישיבה", "סיכום ישיבה", "<p><b>תאריך:</b> </p><p><b>משתתפים:</b> </p><p><b>סדר יום:</b></p><ul><li></li></ul><p><b>החלטות:</b></p><ul><li></li></ul><p><b>משימות ואחראים:</b></p><ul class=\"cl\"><li></li></ul>"),
+    Triple("👁 פתק תצפית / אבחון", "תצפית", "<p><b>שם / גורם:</b> </p><p><b>תאריך ושעה:</b> </p><p><b>הקשר:</b> </p><p><b>מה נצפה:</b></p><ul><li></li></ul><p><b>פרשנות / אבחון ראשוני:</b> </p><p><b>המלצות להמשך:</b></p><ul class=\"cl\"><li></li></ul>"),
+    Triple("✅ רשימת משימות", "משימות", "<ul class=\"cl\"><li></li><li></li><li></li></ul>"),
+    Triple("📅 יומן יומי", "יומן יומי", "<p><b>מה תכננתי להיום:</b></p><ul class=\"cl\"><li></li></ul><p><b>מה קרה בפועל:</b> </p><p><b>מה למדתי / שמתי לב:</b> </p><p><b>למחר:</b></p><ul class=\"cl\"><li></li></ul>")
+)

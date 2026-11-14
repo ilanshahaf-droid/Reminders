@@ -27,7 +27,8 @@ window.NE = {
   doc: function(on){ editor.setDoc(on); },
   view: function(mode){ editor.setView(mode); },
   zoom: function(f){ editor.pageZoom(f); },
-  insert: function(t){ editor.focus(); document.execCommand('insertText', false, t); editor.flush(); }
+  insert: function(t){ editor.focus(); document.execCommand('insertText', false, t); editor.flush(); },
+  insertHtml: function(h){ editor.focus(); document.execCommand('insertHTML', false, h); editor.flush(); }
 };
 if(/[?&]doc=1/.test(location.search)) editor.setDoc(true);
 window.DOC = {

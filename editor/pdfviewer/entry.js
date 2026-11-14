@@ -599,15 +599,57 @@ function placeDate(p, u, v) {
   snapshot(); p.anns.push(a); redraw(p); markDirty(true); setTool('move'); setSel(p, a);
 }
 
+/* ---------- search inside the PDF ---------- */
+let sIdx = null, sHits = [], sCur = -1;
+async function pageTexts() {
+  if (sIdx) return sIdx;
+  sIdx = [];
+  for (const p of pages) {
+    try { const tc = await p.page.getTextContent(); sIdx.push({ p, v: p.page.getViewport({ scale: 1 }), items: tc.items.filter(i => i.str && i.transform) }); }
+    catch (_) { sIdx.push({ p, v: null, items: [] }); }
+  }
+  return sIdx;
+}
+function sUpdate() { $('scnt').textContent = sHits.length ? (sCur + 1) + '/' + sHits.length : ($('sq').value.trim() ? 'לא נמצא' : ''); }
+async function runSearch() {
+  document.querySelectorAll('.hit').forEach(e => e.remove()); sHits = []; sCur = -1;
+  const q = $('sq').value.trim().toLowerCase();
+  if (!q) { sUpdate(); return; }
+  const idx = await pageTexts();
+  idx.forEach(({ p, v, items }) => { if (!v) return; items.forEach(it => {
+    if (!it.str.toLowerCase().includes(q)) return;
+    const pt = pdfjsLib.Util.transform(v.transform, it.transform);
+    const d = document.createElement('div'); d.className = 'hit';
+    Object.assign(d.style, { left: pt[4] / v.width * 100 + '%', top: (pt[5] - it.height) / v.height * 100 + '%', width: it.width / v.width * 100 + '%', height: it.height / v.height * 100 + '%' });
+    p.el.appendChild(d); sHits.push(d);
+  }); });
+  if (sHits.length) sGo(0); else sUpdate();
+}
+function sGo(i) {
+  if (!sHits.length) return;
+  sCur = (i + sHits.length) % sHits.length;
+  sHits.forEach((h, k) => h.classList.toggle('cur', k === sCur));
+  sHits[sCur].scrollIntoView({ block: 'center', inline: 'nearest' });
+  sUpdate();
+}
+function bindSearch() {
+  let tm = null;
+  $('sq').oninput = () => { clearTimeout(tm); tm = setTimeout(runSearch, 350); };
+  $('sq').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); sGo(sCur + 1); } };
+  $('snext').onclick = () => sGo(sCur + 1); $('sprev').onclick = () => sGo(sCur - 1);
+  $('sx').onclick = () => { $('sbar').classList.add('hide'); $('sq').value = ''; runSearch(); };
+}
+
 /* ---------- entry points ---------- */
 window.PV = {
+  findOpen() { $('sbar').classList.remove('hide'); $('sq').focus(); },
   async open(dark) {
     document.documentElement.className = dark ? 'dark' : '';
     loadSigs();
     try {
       bytes = b64ToBytes(A().docData());
       doc = await pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
-      await buildPages(); bindBar(); bindFill(); setTool('scroll'); $('zl').textContent = '100%';
+      await buildPages(); bindBar(); bindFill(); bindSearch(); setTool('scroll'); $('zl').textContent = '100%';
       A().opened();
       try {
         const sc = $('scroller'), r = parseFloat(A().getPos ? A().getPos() : '') || 0;

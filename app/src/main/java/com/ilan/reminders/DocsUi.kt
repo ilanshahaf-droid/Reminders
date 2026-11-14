@@ -1259,6 +1259,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text("🔍 חיפוש בקובץ") }, onClick = { moreMenu = false; web.value?.evaluateJavascript("PV.findOpen()", null) })
                     DropdownMenuItem(text = { Text("שמור") }, onClick = { moreMenu = false; save(false, false) })
                     DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = {
                         moreMenu = false
