@@ -3,7 +3,10 @@ pluginManagement {
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
+    repositories {
+        google(); mavenCentral()
+        maven("https://jitpack.io") { content { includeGroup("cz.adaptech.tesseract4android") } }
+    }
 }
 rootProject.name = "Reminders"
 include(":app")
