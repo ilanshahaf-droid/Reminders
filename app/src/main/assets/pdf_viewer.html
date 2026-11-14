@@ -6,6 +6,29 @@
 .dark{--bg:#2a2c36;--bar:#1c1e27;--fg:#e8eaf2;--acc:#9ea0ff;--chip:#2c2f3b}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
 #app{position:fixed;inset:0;display:flex;flex-direction:column}
+#fbar{display:flex;gap:6px;align-items:center;padding:6px;background:var(--bar);border-bottom:1px solid #0002;overflow-x:auto}
+#fbar button{border:0;border-radius:10px;background:var(--chip);height:36px;padding:0 12px;font-size:14px;white-space:nowrap}
+#fbar #fillGo{background:var(--acc);color:#fff;font-weight:700}
+.fld{position:absolute;border:1.5px solid #4f8cff;background:#4f8cff22;border-radius:2px;box-sizing:border-box;z-index:3}
+.fld.done{border-color:#19a35a88;background:transparent}
+.fld.cur{border-color:#ff9800;background:#ff980033}
+#pages.active .fld{pointer-events:none}
+#fsheet{background:var(--bar);border-top:2px solid var(--acc);padding:8px 12px 10px;display:flex;flex-direction:column;gap:6px}
+#fsheet .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;opacity:.75}
+#fsLabel{font-weight:700;font-size:16px}
+#fsBody input[type=text],#fsBody select{width:100%;box-sizing:border-box;font-size:17px;padding:9px;border:1px solid #0004;border-radius:10px;background:var(--bg);color:var(--fg)}
+#fsBody .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+#fsBody .chips button,#fsheet .nav button,#fsheet .more button,#fsX{border:0;border-radius:10px;background:var(--chip);height:36px;padding:0 12px;font-size:14px}
+#fsBody .chk,#fsBody .opts label{display:flex;gap:8px;align-items:center;font-size:16px;padding:4px 0}
+#fsBody .sigprev{height:60px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:8px}
+#fsBody .sigprev img{max-height:56px;max-width:100%}
+#fsheet .nav{display:flex;gap:8px}#fsheet .nav button{flex:1}
+#fsNext{background:var(--acc)!important;color:#fff!important}
+#fsheet .more{display:flex}#fsheet .more button{background:transparent;font-size:12px;opacity:.7;padding:0}
+#mdModal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
+#mdModal .box{background:var(--bar);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;width:min(86vw,360px)}
+#mdModal input{font-size:16px;padding:9px;border:1px solid #0004;border-radius:10px;background:var(--bg);color:var(--fg)}
+#mdModal .row{display:flex;gap:8px;justify-content:flex-end}#mdModal button{border:0;border-radius:10px;background:var(--chip);height:38px;padding:0 16px}#mdOk{background:var(--acc)!important;color:#fff!important}
 #scroller{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
 #pages{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:8px;width:max-content;min-width:100%;box-sizing:border-box}
 .pg{position:relative;background:#fff;box-shadow:0 1px 6px #0004;flex:none}
@@ -30,7 +53,10 @@ button{font:inherit;color:var(--fg)}
 #sigModal .row{display:flex;gap:8px}#sigModal button{border:0;border-radius:10px;background:var(--chip);height:40px;padding:0 16px;font-size:15px}#sigOk{background:var(--acc)!important;color:#fff!important}
 </style></head><body>
 <div id="app">
+  <div id="fbar"><button id="fillGo" class="hide">📝 מילוי השדות</button><button id="dateGo">📅 תאריך</button><button id="myGo">👤 הפרטים שלי</button></div>
   <div id="scroller"><div id="pages"></div></div>
+  <div id="fsheet" class="hide"><div class="top"><span id="fsPos"></span><button id="fsX">✕</button></div><div id="fsLabel"></div><div id="fsBody"></div>
+    <div class="nav"><button id="fsPrev">הקודם</button><button id="fsNext">הבא</button></div><div class="more"><button id="fsDel">זה לא שדה – הסרה</button></div></div>
   <div id="tray" class="hide"></div>
   <div id="bar">
     <button data-t="scroll" class="on" aria-label="גלילה">✋</button>
@@ -44,6 +70,9 @@ button{font:inherit;color:var(--fg)}
     <button id="zout" aria-label="הקטן">➖</button><span class="zl" id="zl">100%</span><button id="zin" aria-label="הגדל">➕</button>
   </div>
 </div>
+<div id="mdModal" class="hide"><div class="box"><div style="font-weight:700">הפרטים שלי (למילוי אוטומטי)</div>
+  <input id="mdName" placeholder="שם מלא" autocomplete="off"><input id="mdTz" placeholder="מספר תעודת זהות" inputmode="numeric" autocomplete="off">
+  <div class="row"><button id="mdCancel">ביטול</button><button id="mdOk">שמירה</button></div></div></div>
 <div id="sigModal" class="hide"><div class="box"><div style="font-weight:700">צייר את החתימה</div><canvas id="sigCv"></canvas>
   <div class="row"><button id="sigClear">נקה</button><button id="sigCancel">ביטול</button><button id="sigOk">אישור</button></div></div></div>
 <script src="pdfviewer.js"></script>

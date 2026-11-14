@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.min.mjs';
 import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs';
 import { PDFDocument, degrees, rgb } from 'pdf-lib';
+import { detectFields, dedupe, autofill, dropFields, fieldOrder, filledF, dmyFull, store } from './forms.js';
 
 globalThis.pdfjsWorker = { WorkerMessageHandler };
 
@@ -23,6 +24,7 @@ function undo() {
   const h = history.pop(); if (!h) return;
   pages.forEach((p, i) => { p.anns = h[i] || []; redraw(p); });
   markDirty(history.length > 0);
+  reconcileFields();
 }
 
 /* ---------- layout / text ---------- */
@@ -126,6 +128,8 @@ function attach(p) {
     } else if (tool === 'text') {
       const i = hitTop(p, u, v);
       if (i >= 0 && p.anns[i].t === 'text') editText(p, p.anns[i], null); else editText(p, null, [u, v]);
+    } else if (tool === 'date') {
+      placeDate(p, u, v);
     } else if (tool === 'sig') {
       placeSig(p, u, v);
     } else if (tool === 'move') {
@@ -198,6 +202,7 @@ function closeEditor(silent) {
   redraw(p);
 }
 
+let sigTarget = null;
 /* signature */
 function placeSig(p, u, v) {
   if (!sigData) { openSig(); return; }
@@ -220,7 +225,7 @@ function openSig() {
   cv.onpointermove = e => { if (!on) return; const q = pt(e); x.beginPath(); x.moveTo(last[0], last[1]); x.lineTo(q[0], q[1]); x.stroke(); last = q; };
   cv.onpointerup = () => { on = false; };
   $('sigClear').onclick = () => { x.clearRect(0, 0, cv.width, cv.height); any = false; };
-  $('sigCancel').onclick = () => { m.classList.add('hide'); if (!sigData) setTool('scroll'); };
+  $('sigCancel').onclick = () => { m.classList.add('hide'); const f = sigTarget; sigTarget = null; if (f) openFill(f.id); else if (!sigData) setTool('scroll'); };
   $('sigOk').onclick = () => {
     if (!any) { A().toast('צייר חתימה'); return; }
     // crop to the ink
@@ -229,7 +234,8 @@ function openSig() {
     const pad = 8; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(cv.width, x1 + pad); y1 = Math.min(cv.height, y1 + pad);
     const c2 = document.createElement('canvas'); c2.width = Math.max(1, x1 - x0); c2.height = Math.max(1, y1 - y0);
     c2.getContext('2d').drawImage(cv, x0, y0, c2.width, c2.height, 0, 0, c2.width, c2.height);
-    sigData = c2.toDataURL('image/png'); A().saveSig(sigData); m.classList.add('hide'); toast2('הקש במקום החתימה על הדף');
+    sigData = c2.toDataURL('image/png'); A().saveSig(sigData); m.classList.add('hide');
+    if (sigTarget) { const f = sigTarget; sigTarget = null; setFieldValue(f, sigData).then(() => openFill(f.id)); } else toast2('הקש במקום החתימה על הדף');
   };
 }
 function toast2(t) { A().toast(t); }
@@ -303,6 +309,7 @@ function setTool(t) {
   if (t !== 'move') setSel(null, null);
   renderTray();
   if (t === 'sig') { if (!sigData) openSig(); else toast2('הקש על הדף במקום החתימה'); }
+  if (t === 'date') toast2('הקש במקום התאריך על הדף');
 }
 function renderTray() {
   const tray = $('tray'); tray.innerHTML = '';
@@ -351,6 +358,8 @@ async function save() {
   closeEditor(false);
   const out = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
   const list = out.getPages();
+  const acro = new Set(fields.filter(f => f.src === 'acro' && filledF(f) && f.value !== f.orig).map(f => f.name));
+  if (acro.size) { try { dropFields(out, acro); } catch (_) {} }
   for (const p of pages) {
     if (!p.anns.length) continue;
     const pg = list[p.i - 1]; if (!pg) continue;
@@ -385,6 +394,152 @@ async function save() {
   return res;
 }
 
+
+/* =====================  form fields (ported from My-Forms)  ===================== */
+let fields = [], curField = null;
+const FINK = '#0b1d4d';
+
+async function detectAll() {
+  const all = [];
+  for (const p of pages) {
+    try { const v1 = p.page.getViewport({ scale: 1 }); all.push(...await detectFields(p.page, v1, p.i - 1)); } catch (_) {}
+  }
+  fields = dedupe(all); autofill(fields);
+  fields.forEach(f => { f.orig = f.src === 'acro' ? f.value : undefined; });
+  for (const f of fields) if (filledF(f) && f.auto) await syncField(f);
+  drawBoxes(); fillBarUpdate();
+  if (fields.length) A().toast(fields.length === 1 ? 'זוהה שדה אחד למילוי' : 'זוהו ' + fields.length + ' שדות למילוי');
+}
+function imgAr(src) { return new Promise(res => { const im = new Image(); im.onload = () => res(im.naturalHeight / im.naturalWidth); im.onerror = () => res(0.3); im.src = src; }); }
+async function placeFieldAnn(f, box, pi, kind, value) {
+  const p = pages[pi]; if (!p) return null;
+  const vw = p.vw, vh = p.vh;
+  if (kind === 'sig') {
+    const ar = await imgAr(value), hBox = Math.max(box.h, f.src === 'line' && !f.cell ? 0.045 : 0);
+    let w = Math.min(box.w * 0.98, (hBox * vh) / (vw * ar)); w = Math.max(w, 0.03);
+    const h = w * ar;
+    return { t: 'img', src: value, fid: f.id, u: box.x + (box.w - w) / 2, v: Math.max(0, box.y + box.h - h * vw / vh), w, h };
+  }
+  const txt = kind === 'check' ? '✓' : value;
+  let a = { t: 'text', c: FINK, s: Math.max(7, Math.min(box.h * vh * (kind === 'check' ? 0.95 : 0.78), 13)) / vw, u: 0, v: 0, text: txt, fid: f.id };
+  let m = measureText(a, vw);
+  const maxW = box.w * vw * 0.96;
+  if (m.w > maxW) { a.s = a.s * maxW / m.w; m = measureText(a, vw); }
+  const wr = m.w / vw, hr = m.h / vh;
+  a.u = kind === 'check' ? box.x + (box.w - wr) / 2 : box.x + box.w - wr - Math.min(box.w * 0.04, 6 / vw);
+  a.v = box.y + (box.h - hr) / 2;
+  return a;
+}
+async function syncField(f) {
+  pages.forEach(p => { const n = p.anns.filter(a => a.fid !== f.id); if (n.length !== p.anns.length) { p.anns = n; redraw(p); } });
+  if (!filledF(f) || (f.src === 'acro' && f.value === f.orig)) return;
+  let a = null, pi = f.page;
+  if (f.kind === 'radio') { const o = f.options.find(z => z.value === f.value); if (o) { a = await placeFieldAnn(f, o, o.page, 'check', ''); pi = o.page; } }
+  else a = await placeFieldAnn(f, f, f.page, f.kind === 'select' ? 'text' : f.kind, f.value);
+  if (a && pages[pi]) { pages[pi].anns.push(a); redraw(pages[pi]); }
+}
+async function setFieldValue(f, v) {
+  snapshot(); f.value = v; f.auto = false; await syncField(f); markDirty(true); drawBoxes(); fillBarUpdate();
+}
+function reconcileFields() {
+  fields.forEach(f => {
+    if (!filledF(f) || (f.src === 'acro' && f.value === f.orig)) return;
+    if (!pages.some(p => p.anns.some(a => a.fid === f.id))) f.value = f.kind === 'check' ? false : '';
+  });
+  drawBoxes(); fillBarUpdate();
+}
+function drawBoxes() {
+  document.querySelectorAll('.fld').forEach(e => e.remove());
+  const mk = (f, pg, x, y, w, h, cls) => {
+    const p = pages[pg]; if (!p) return;
+    const d = document.createElement('div'); d.className = 'fld ' + cls + (curField === f.id ? ' cur' : '');
+    Object.assign(d.style, { left: x * 100 + '%', top: y * 100 + '%', width: w * 100 + '%', height: h * 100 + '%' });
+    d.onclick = ev => { ev.stopPropagation(); openFill(f.id); };
+    p.el.appendChild(d);
+  };
+  fields.forEach(f => {
+    const done = filledF(f) ? 'done' : '';
+    if (f.kind === 'radio') f.options.forEach(o => mk(f, o.page, o.x, o.y, o.w, o.h, done)); else mk(f, f.page, f.x, f.y, f.w, f.h, done);
+  });
+}
+function fillBarUpdate() {
+  const n = fields.length, done = fields.filter(filledF).length;
+  $('fillGo').classList.toggle('hide', !n);
+  $('fillGo').textContent = done === 0 ? '📝 מילוי השדות (' + n + ')' : done < n ? '📝 המשך מילוי (' + done + '/' + n + ')' : '📝 עריכת השדות (' + n + ')';
+}
+
+/* fill sheet */
+function openFill(id) {
+  const list = fieldOrder(fields), i = list.findIndex(f => f.id === id), f = list[i]; if (!f) return;
+  if (curField && curField !== id) commitFill();
+  curField = id; drawBoxes();
+  $('fsheet').classList.remove('hide');
+  $('fsPos').textContent = 'שדה ' + (i + 1) + ' מתוך ' + list.length + (f.auto ? ' · מולא אוטומטית' : '');
+  $('fsLabel').textContent = f.label || (f.kind === 'sig' ? 'חתימה' : f.kind === 'check' ? 'סימון' : 'שדה בלי כותרת');
+  const body = $('fsBody'), e = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const chips = [['השם שלי', store.get('pv_name')], ['ת.ז', store.get('pv_tz')], ['התאריך היום', dmyFull()]].filter(c => c[1])
+    .map(c => '<button type="button" data-chip="' + e(c[1]) + '">' + c[0] + '</button>').join('');
+  if (f.kind === 'text') body.innerHTML = '<input type="text" id="fsIn" value="' + e(f.value) + '" enterkeyhint="next" autocomplete="off" autocorrect="off" spellcheck="false"><div class="chips">' + chips + '</div>';
+  else if (f.kind === 'select') body.innerHTML = '<select id="fsIn"><option value="">—</option>' + f.options.map(o => '<option ' + (o === f.value ? 'selected' : '') + '>' + e(o) + '</option>').join('') + '</select>';
+  else if (f.kind === 'check') body.innerHTML = '<label class="chk"><input type="checkbox" id="fsIn" ' + (f.value ? 'checked' : '') + '> מסומן</label>';
+  else if (f.kind === 'radio') body.innerHTML = '<div class="opts">' + f.options.map((o, k) => '<label><input type="radio" name="fsR" value="' + k + '" ' + (f.value === o.value ? 'checked' : '') + '> ' + e(o.label || o.value) + '</label>').join('') + '</div>';
+  else body.innerHTML = '<div class="sigprev">' + (f.value ? '<img src="' + f.value + '">' : '<span class="muted">עוד לא נחתם</span>') + '</div><div class="chips"><button type="button" data-sig="mine">✍️ החתימה שלי</button><button type="button" data-sig="draw">🖊️ חתימה ביד</button>' + (f.value ? '<button type="button" data-sig="clear">ניקוי</button>' : '') + '</div>';
+  $('fsPrev').disabled = i === 0; $('fsNext').textContent = i === list.length - 1 ? 'סיום' : 'הבא';
+  const inp = $('fsIn'); if (inp && f.kind === 'text') setTimeout(() => inp.focus(), 80);
+  const reveal = () => { const el = document.querySelector('.fld[data-x]') || null; const t = document.querySelector('.fld.cur'); if (t) t.scrollIntoView({ block: 'center', inline: 'nearest' }); };
+  setTimeout(reveal, 120); setTimeout(reveal, 520);
+}
+function commitFill() {
+  const f = fields.find(q => q.id === curField); if (!f) return;
+  const inp = $('fsIn');
+  if ((f.kind === 'text' || f.kind === 'select') && inp) { const v = inp.value.trim(); if (v !== f.value) setFieldValue(f, v); }
+  else if (f.kind === 'check' && inp) { if (inp.checked !== f.value) setFieldValue(f, inp.checked); }
+  else if (f.kind === 'radio') { const r = document.querySelector('input[name="fsR"]:checked'); const v = r ? f.options[+r.value].value : ''; if (v !== f.value) setFieldValue(f, v); }
+}
+function closeFill() {
+  commitFill(); curField = null; $('fsheet').classList.add('hide'); drawBoxes();
+  const empty = fields.filter(f => !filledF(f) && f.kind !== 'check').length;
+  A().toast(empty ? 'נשארו ' + (empty === 1 ? 'שדה אחד ריק' : empty + ' שדות ריקים') + ' (אפשר להשאיר ריקים)' : 'כל השדות מולאו');
+}
+function stepFill(d) {
+  commitFill(); const list = fieldOrder(fields), i = list.findIndex(f => f.id === curField), n = list[i + d];
+  if (n) openFill(n.id); else closeFill();
+}
+function bindFill() {
+  $('fillGo').onclick = () => { const l = fieldOrder(fields), first = l.find(f => !filledF(f)) || l[0]; if (first) openFill(first.id); };
+  $('fsNext').onclick = () => stepFill(1); $('fsPrev').onclick = () => stepFill(-1); $('fsX').onclick = closeFill;
+  $('fsBody').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'fsIn') { e.preventDefault(); stepFill(1); } });
+  $('fsBody').addEventListener('click', e => {
+    const f = fields.find(q => q.id === curField); if (!f) return;
+    const c = e.target.closest('[data-chip]'); if (c) { $('fsIn').value = c.dataset.chip; commitFill(); return; }
+    const s = e.target.closest('[data-sig]'); if (!s) return;
+    if (s.dataset.sig === 'mine') { if (!sigData) { toast2('אין חתימה שמורה – צייר חתימה'); sigTarget = f; openSig(); return; } setFieldValue(f, sigData).then(() => openFill(f.id)); }
+    else if (s.dataset.sig === 'clear') setFieldValue(f, '').then(() => openFill(f.id));
+    else if (s.dataset.sig === 'draw') { sigTarget = f; $('fsheet').classList.add('hide'); openSig(); }
+  });
+  $('fsDel').onclick = () => {
+    const f = fields.find(q => q.id === curField); if (!f) return;
+    const l = fieldOrder(fields), i = l.findIndex(z => z.id === f.id);
+    if (filledF(f)) { snapshot(); f.value = f.kind === 'check' ? false : ''; syncField(f); }
+    fields = fields.filter(z => z !== f); curField = null; drawBoxes(); fillBarUpdate();
+    const n = fieldOrder(fields)[Math.min(i, fields.length - 1)]; if (n) openFill(n.id); else $('fsheet').classList.add('hide');
+  };
+  $('dateGo').onclick = () => setTool('date');
+  $('myGo').onclick = () => { $('mdName').value = store.get('pv_name'); $('mdTz').value = store.get('pv_tz'); $('mdModal').classList.remove('hide'); };
+  $('mdCancel').onclick = () => $('mdModal').classList.add('hide');
+  $('mdOk').onclick = () => {
+    store.set('pv_name', $('mdName').value.trim()); store.set('pv_tz', $('mdTz').value.trim()); $('mdModal').classList.add('hide');
+    const before = fields.filter(filledF).length; autofill(fields);
+    Promise.all(fields.filter(f => f.auto && filledF(f)).map(syncField)).then(() => { drawBoxes(); fillBarUpdate(); if (fields.filter(filledF).length > before) markDirty(true); });
+    toast2('הפרטים נשמרו');
+  };
+}
+function placeDate(p, u, v) {
+  const a = { t: 'text', c: FINK, s: 0.026, u: 0, v: 0, text: dmyFull() };
+  const m = measureText(a, p.vw); a.u = Math.max(0, Math.min(1 - m.w / p.vw, u - m.w / p.vw / 2)); a.v = Math.max(0, v - m.h / p.vh / 2);
+  snapshot(); p.anns.push(a); redraw(p); markDirty(true); setTool('move'); setSel(p, a);
+}
+
 /* ---------- entry points ---------- */
 window.PV = {
   async open(dark) {
@@ -393,8 +548,9 @@ window.PV = {
     try {
       bytes = b64ToBytes(A().docData());
       doc = await pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
-      await buildPages(); bindBar(); setTool('scroll'); $('zl').textContent = '100%';
+      await buildPages(); bindBar(); bindFill(); setTool('scroll'); $('zl').textContent = '100%';
       A().opened();
+      detectAll().catch(() => {});
     } catch (e) {
       A().toast(e && e.name === 'PasswordException' ? 'הקובץ מוגן בסיסמה' : 'פתיחת ה-PDF נכשלה');
     }
