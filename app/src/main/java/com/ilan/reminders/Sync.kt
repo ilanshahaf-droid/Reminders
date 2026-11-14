@@ -224,6 +224,76 @@ object Sync {
         return null
     }
 
+    /** A document deleted or renamed on the phone; the cloud copy is marked deleted on the next sync. */
+    fun markDocGone(c: Context, name: String) {
+        val p = prefs(c)
+        p.edit().putStringSet("docsGone", (p.getStringSet("docsGone", emptySet()) ?: emptySet()) + name).apply()
+        schedulePush(c)
+    }
+
+    private fun q(s: String) = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+
+    /** Two-way document sync (Word / PDF files, up to ~6 MB each, stored as base64 in rem_docs). */
+    private fun syncDocs(c: Context, base: String, h: Map<String, String>): String? {
+        val p = prefs(c)
+        val rr = http("GET", "$base/rest/v1/rem_docs?select=name,size,updated_at,deleted", h, null)
+        if (rr.first == 404 || (rr.first == 400 && rr.second.contains("rem_docs"))) return "טבלת המסמכים חסרה בענן (צריך להריץ את docs.sql)"
+        if (rr.first !in 200..299) return "מסמכים: ${rr.first} ${rr.second.take(100)}"
+        val remote = JSONArray(rr.second)
+        val gone = (p.getStringSet("docsGone", emptySet()) ?: emptySet()).toSet()
+        val local = Docs.list(c).associateBy { it.name }
+        val dir = Docs.dir(c)
+        val remoteMap = HashMap<String, Long>()
+        val remoteDeleted = HashSet<String>()
+        var downloaded = 0
+        for (i in 0 until remote.length()) {
+            val r = remote.getJSONObject(i)
+            val name = r.getString("name"); val ru = r.optLong("updated_at")
+            remoteMap[name] = ru
+            val del = r.optBoolean("deleted", false)
+            if (del) remoteDeleted.add(name)
+            val l = local[name]
+            if (name in gone) continue
+            if (del) {
+                if (l != null && l.lastModified() <= ru + 2000) { l.delete(); Docs.setFav(c, name, false); Docs.unlink(c, name); downloaded++ }
+            } else if (l == null || ru > l.lastModified() + 2000) {
+                val g = http("GET", "$base/rest/v1/rem_docs?select=data&name=eq.${q(name)}", h, null)
+                if (g.first !in 200..299) return "מסמכים: ${g.first} ${g.second.take(100)}"
+                val arr = JSONArray(g.second)
+                if (arr.length() == 0) continue
+                val bytes = android.util.Base64.decode(arr.getJSONObject(0).getString("data"), android.util.Base64.DEFAULT)
+                val f = java.io.File(dir, name)
+                val tmp = java.io.File(dir, "$name.part"); tmp.writeBytes(bytes)
+                if (!tmp.renameTo(f)) { f.writeBytes(bytes); tmp.delete() }
+                f.setLastModified(ru); downloaded++
+            }
+        }
+        var tooBig = 0
+        for ((name, f) in Docs.list(c).associateBy { it.name }) {
+            if (name in gone) continue
+            val ru = remoteMap[name]
+            if (ru != null && f.lastModified() <= ru + 2000) continue
+            if (name in remoteDeleted && ru != null && f.lastModified() <= ru) continue
+            if (f.length() > 6L * 1024 * 1024) { tooBig++; continue }
+            val bytes = f.readBytes(); val mod = f.lastModified()
+            val row = JSONObject().put("name", name).put("size", bytes.size).put("updated_at", mod).put("deleted", false)
+                .put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+            val r = http("POST", "$base/rest/v1/rem_docs?on_conflict=user_id,name", h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), JSONArray().put(row).toString())
+            if (r.first !in 200..299) return "מסמכים: ${r.first} ${r.second.take(100)}"
+        }
+        for (name in gone) {
+            if (name in local.keys && java.io.File(dir, name).exists()) continue   // came back (renamed back / restored)
+            if (name in remoteMap) {
+                val r = http("PATCH", "$base/rest/v1/rem_docs?name=eq.${q(name)}", h + ("Prefer" to "return=minimal"),
+                    JSONObject().put("deleted", true).put("data", "").put("size", 0).put("updated_at", System.currentTimeMillis()).toString())
+                if (r.first !in 200..299) return "מסמכים: ${r.first} ${r.second.take(100)}"
+            }
+        }
+        p.edit().putStringSet("docsGone", emptySet()).apply()
+        if (downloaded > 0) p.edit().putLong("docsChangedAt", System.currentTimeMillis()).apply()
+        return if (tooBig > 0) "$tooBig מסמכים גדולים מ-6MB לא סונכרנו" else null
+    }
+
     suspend fun syncNow(c: Context): String = withContext(Dispatchers.IO) { mutex.withLock {
         val p = prefs(c)
         val status = try {
@@ -323,7 +393,9 @@ object Sync {
             }
             // notes never make the reminders sync fail: a problem is only shown next to the status
             val notesMsg = try { syncNotes(c, base, h) } catch (e: Exception) { "פתקים: " + (e.message ?: e.javaClass.simpleName) }
-            "✅ סונכרן ב-" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")) + (if (notesMsg != null) " · ⚠ $notesMsg" else "")
+            val docsMsg = try { syncDocs(c, base, h) } catch (e: Exception) { "מסמכים: " + (e.message ?: e.javaClass.simpleName) }
+            val warn = listOfNotNull(notesMsg, docsMsg).joinToString(" · ")
+            "✅ סונכרן ב-" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")) + (if (warn.isNotEmpty()) " · ⚠ $warn" else "")
         } catch (e: Exception) {
             "❌ " + (e.message ?: e.javaClass.simpleName)
         }

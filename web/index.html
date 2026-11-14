@@ -164,7 +164,7 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 </div>
 
 <div id="app" class="hide">
-  <div class="tabs"><div class="chip" id="tabRem" onclick="setTab('rem')">תזכורות</div><div class="chip" id="tabNotes" onclick="setTab('notes')">פתקים</div></div>
+  <div class="tabs"><div class="chip" id="tabRem" onclick="setTab('rem')">תזכורות</div><div class="chip" id="tabNotes" onclick="setTab('notes')">פתקים</div><div class="chip" id="tabDocs" onclick="setTab('docs')">מסמכים</div></div>
   <div id="remView">
   <div class="top">
     <div><h1>תזכורות</h1><div class="sub" id="count"></div></div>
@@ -187,6 +187,17 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
     <div id="nmsg" class="err"></div>
     <div id="npinH" class="lbl hide">מוצמדים</div><div id="nlistPin"></div>
     <div id="nothH" class="lbl hide">אחרים</div><div id="nlist"></div>
+  </div>
+  <div id="docsView" class="hide">
+    <div class="top">
+      <div><h1>מסמכים</h1><div class="sub" id="dcount"></div></div>
+      <div class="bar" style="margin:0"><button onclick="$('dfile').click()">+ העלאה</button><button class="ghost" onclick="logout()">התנתק</button></div>
+    </div>
+    <input id="dfile" type="file" accept=".pdf,.docx,application/pdf" class="hide" onchange="uploadDoc(this)">
+    <input id="dq" placeholder="חיפוש במסמכים" oninput="renderDocs()">
+    <div id="dmsg" class="err"></div>
+    <div id="dlist"></div>
+    <div class="sub" style="text-align:center;margin-top:16px;font-size:13px">הקבצים מסונכרנים עם האפליקציה בטלפון. עריכה נעשית באפליקציה.</div>
   </div>
 </div>
 
@@ -653,7 +664,7 @@ async function load(){
     if(!t.ok || !c.ok){ view('login'); return; }
     tasks = (await t.json()).filter(x => !x.deleted); cats = await c.json(); sel = new Set([...sel].filter(id => tasks.some(x => x.id === id)));
     $('upd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
-    render(); loadNotes();
+    render(); loadNotes(); loadDocs();
   }catch(e){ $('upd').textContent = 'שגיאת רשת'; }
 }
 function start(){
@@ -1039,16 +1050,81 @@ async function edDelete(){
 
 // ---------- notes ----------
 let notes = [], notesMissing = false, nCat = null, nd = null, nEd = null;
-let tab = LS.getItem('tab') === 'notes' ? 'notes' : 'rem';
+let tab = ['notes', 'docs'].includes(LS.getItem('tab')) ? LS.getItem('tab') : 'rem';
 const NOTE_COLORS = {red:['#F9D0CC','#5C2B29'], orange:['#FCDDB5','#614A19'], yellow:['#FFF2B3','#635D19'], green:['#D4EFC2','#345128'],
   teal:['#BFEBE4','#16504B'], blue:['#CBE3F8','#2D4F6B'], purple:['#E1D4F5','#4B3A6F'], pink:['#F8D1E6','#5F3150'], gray:['#E3E5EA','#3C3F44']};
 const isDark = () => window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
 const ncolor = k => NOTE_COLORS[k] ? NOTE_COLORS[k][isDark() ? 1 : 0] : '';
 function setTab(t){
   tab = t; LS.setItem('tab', t);
-  $('remView').classList.toggle('hide', t !== 'rem'); $('notesView').classList.toggle('hide', t !== 'notes');
-  $('tabRem').classList.toggle('on', t === 'rem'); $('tabNotes').classList.toggle('on', t === 'notes');
+  $('remView').classList.toggle('hide', t !== 'rem'); $('notesView').classList.toggle('hide', t !== 'notes'); $('docsView').classList.toggle('hide', t !== 'docs');
+  $('tabRem').classList.toggle('on', t === 'rem'); $('tabNotes').classList.toggle('on', t === 'notes'); $('tabDocs').classList.toggle('on', t === 'docs');
   if(t === 'notes') renderNotes();
+  if(t === 'docs') loadDocs();
+}
+
+// ---------- documents ----------
+let docs = [], docsMissing = false;
+async function loadDocs(){
+  try{
+    const r = await api('/rest/v1/rem_docs?select=name,size,updated_at,deleted&deleted=eq.false&order=updated_at.desc');
+    if(r.ok){ docs = await r.json(); docsMissing = false; } else docsMissing = r.status === 404 || r.status === 400;
+  }catch(e){}
+  renderDocs();
+}
+const fmtSize = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+function renderDocs(){
+  $('dmsg').textContent = docsMissing ? 'טבלת המסמכים עוד לא קיימת ב-Supabase. הרץ את הקובץ docs.sql ב-SQL Editor.' : '';
+  $('dcount').textContent = docs.length ? docs.length + ' מסמכים' : 'אין מסמכים עדיין';
+  const q = ($('dq').value || '').trim().toLowerCase(), box = $('dlist'); box.innerHTML = '';
+  docs.filter(d => !q || d.name.toLowerCase().includes(q)).forEach(d => {
+    const pdf = /\.pdf$/i.test(d.name), row = el('div', 'card');
+    row.appendChild(el('div', '', pdf ? '📕' : '📄'));
+    const mid = el('div', ''); mid.style.flex = '1'; mid.style.minWidth = '0';
+    mid.appendChild(el('div', 'nt', d.name.replace(/\.(pdf|docx)$/i, '')));
+    mid.appendChild(el('div', 'sub', fmtSize(d.size || 0) + ' · ' + new Date(d.updated_at).toLocaleDateString('he-IL')));
+    row.appendChild(mid);
+    const open = el('button', 'sec', pdf ? 'פתח' : 'הורד'); open.onclick = e => { e.stopPropagation(); openDoc(d, pdf); };
+    const dl = el('button', 'ghost', '⬇'); dl.onclick = e => { e.stopPropagation(); openDoc(d, false); };
+    const del = el('button', 'ghost', '🗑'); del.onclick = e => { e.stopPropagation(); delDoc(d); };
+    row.appendChild(open); if(pdf) row.appendChild(dl); row.appendChild(del);
+    row.onclick = () => openDoc(d, pdf);
+    box.appendChild(row);
+  });
+}
+async function docBlob(d){
+  const r = await api('/rest/v1/rem_docs?select=data&name=eq.' + encodeURIComponent(d.name));
+  if(!r.ok) throw new Error(r.status);
+  const a = await r.json(); if(!a.length) throw new Error('missing');
+  const bin = atob(a[0].data), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new Blob([u], {type: /\.pdf$/i.test(d.name) ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+async function openDoc(d, view){
+  try{
+    toast('מוריד…'); const b = await docBlob(d), url = URL.createObjectURL(b);
+    if(view) window.open(url, '_blank');
+    else { const a = document.createElement('a'); a.href = url; a.download = d.name; document.body.appendChild(a); a.click(); a.remove(); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }catch(e){ toast('הפתיחה נכשלה'); }
+}
+async function delDoc(d){
+  if(!confirm('למחוק את "' + d.name + '"? הוא יימחק גם מהטלפון בסנכרון הבא.')) return;
+  const r = await api('/rest/v1/rem_docs?name=eq.' + encodeURIComponent(d.name), {method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({deleted:true, data:'', size:0, updated_at:Date.now()})});
+  if(r.ok) toast('נמחק'); else toast('המחיקה נכשלה');
+  loadDocs();
+}
+function uploadDoc(inp){
+  const f = inp.files[0]; inp.value = ''; if(!f) return;
+  if(f.size > 6 * 1024 * 1024){ toast('הקובץ גדול מדי (עד 6MB)'); return; }
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const data = String(rd.result).split(',')[1] || '';
+    const row = {name:f.name, size:f.size, updated_at:Date.now(), deleted:false, data};
+    const r = await api('/rest/v1/rem_docs?on_conflict=user_id,name', {method:'POST', headers:{Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify([row])});
+    if(r.ok) toast('הועלה. יופיע בטלפון בסנכרון הבא'); else toast('ההעלאה נכשלה');
+    loadDocs();
+  };
+  rd.readAsDataURL(f);
 }
 async function loadNotes(){
   try{

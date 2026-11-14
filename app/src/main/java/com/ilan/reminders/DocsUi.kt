@@ -387,6 +387,13 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         }
     }
     var menuFor by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(tick) { if (Sync.configured(ctx)) Sync.schedulePush(ctx) }
+    DisposableEffect(Unit) {
+        val p = Sync.prefs(ctx)
+        val l = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, k -> if (k == "docsChangedAt") tick++ }
+        p.registerOnSharedPreferenceChangeListener(l)
+        onDispose { p.unregisterOnSharedPreferenceChangeListener(l) }
+    }
     var ocrBusy by remember { mutableStateOf<String?>(null) }
     var ocrShow by remember { mutableStateOf<File?>(null) }
     fun ocrRun(f: File) {
@@ -817,7 +824,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     val target = File(Docs.dir(ctx), Docs.clean(renameText) + "." + Docs.ext(f))
                     if (target.name != f.name) {
                         if (target.exists()) Toast.makeText(ctx, "כבר קיים קובץ בשם הזה", Toast.LENGTH_SHORT).show()
-                        else { if (f.renameTo(target)) { Docs.renameFav(ctx, f.name, target.name); Docs.renameLink(ctx, f.name, target.name); Docs.moveSource(ctx, f.name, target.name) }; tick++ }
+                        else { if (f.renameTo(target)) { Sync.markDocGone(ctx, f.name); Docs.renameFav(ctx, f.name, target.name); Docs.renameLink(ctx, f.name, target.name); Docs.moveSource(ctx, f.name, target.name) }; tick++ }
                     }
                     renaming = null
                 }) { Text("שמור") }
@@ -829,7 +836,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         AlertDialog(
             onDismissRequest = { deleting = null }, title = { Text("מחיקת קובץ") },
             text = { Text("למחוק את \"${f.nameWithoutExtension}\" לצמיתות? אי אפשר לשחזר.") },
-            confirmButton = { TextButton({ f.delete(); Docs.setFav(ctx, f.name, false); Docs.unlink(ctx, f.name); Docs.moveSource(ctx, f.name, null); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
+            confirmButton = { TextButton({ f.delete(); Sync.markDocGone(ctx, f.name); Docs.setFav(ctx, f.name, false); Docs.unlink(ctx, f.name); Docs.moveSource(ctx, f.name, null); deleting = null; tick++ }) { Text("מחק", color = cs.error) } },
             dismissButton = { TextButton({ deleting = null }) { Text("ביטול") } }
         )
     }
@@ -884,7 +891,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
         if (f == null) f = Docs.unique(ctx, wanted, "docx")
         else if (wanted != f.nameWithoutExtension) {
             val t = File(Docs.dir(ctx), "$wanted.docx")
-            if (!t.exists() && f.renameTo(t)) { Docs.renameFav(ctx, f.name, t.name); Docs.renameLink(ctx, f.name, t.name); f = t }
+            if (!t.exists() && f.renameTo(t)) { Sync.markDocGone(ctx, f.name); Docs.renameFav(ctx, f.name, t.name); Docs.renameLink(ctx, f.name, t.name); f = t }
         }
         val tmp = File(f.parentFile, f.name + ".tmp")
         tmp.writeBytes(bytes)
