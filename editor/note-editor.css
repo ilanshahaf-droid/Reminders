@@ -30,3 +30,15 @@
 .ne-dtop button.on{border-color:#4f46e5;box-shadow:0 0 0 2px #4f46e5}
 .ne-dtop button.ok{background:#4f46e5;color:#fff;font-weight:700}
 .ne-dcv{background:#fff;touch-action:none;box-shadow:0 0 8px #0003;margin-top:6px}
+
+.ne-cfg{position:fixed;inset:0;z-index:100001;background:#0008;display:flex;align-items:flex-end;justify-content:center}
+.ne-cbox{width:100%;max-width:520px;max-height:85%;display:flex;flex-direction:column;background:var(--ne-sheet,#fff);color:var(--ne-fg,#14161f);border-radius:22px 22px 0 0;padding:14px;box-sizing:border-box;direction:rtl}
+.dark .ne-cbox{--ne-sheet:#1e2029}
+.ne-ch{font-size:18px;font-weight:700}.ne-chint{font-size:13px;color:var(--ne-mute,#8a8fa3);margin:2px 0 8px}
+.ne-cl{overflow-y:auto;flex:1;min-height:0}
+.ne-cr{display:flex;align-items:center;gap:8px;padding:4px 2px;border-bottom:1px solid var(--ne-line,rgba(0,0,0,.1))}
+.ne-cr.off{opacity:.55}.ne-cr input{width:22px;height:22px}
+.ne-cr .ic{width:40px;text-align:center;font-size:19px}.ne-cr .lb{flex:1;font-size:16px}
+.ne-cr button,.ne-cf button{border:0;border-radius:10px;background:var(--ne-chip,rgba(79,70,229,.16));color:inherit;min-width:40px;height:38px;font-size:16px;cursor:pointer}
+.ne-cr button:disabled{opacity:.25}
+.ne-cf{display:flex;gap:10px;justify-content:space-between;padding-top:10px}.ne-cf button{padding:0 18px}.ne-cf .ok{background:var(--ne-accent,#4f46e5);color:#fff;font-weight:700}

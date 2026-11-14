@@ -303,9 +303,13 @@ private fun NoteCard(
 }
 
 /** What the page inside the WebView can call. */
-private class EditorBridge(val onReady: () -> Unit, val onChanged: (String, String) -> Unit, val onToast: (String) -> Unit = {}) {
+private class EditorBridge(
+    val ctx: android.content.Context, val onReady: () -> Unit, val onChanged: (String, String) -> Unit, val onToast: (String) -> Unit = {}
+) {
     private val main = Handler(Looper.getMainLooper())
     @JavascriptInterface fun ready() { main.post { onReady() } }
+    @JavascriptInterface fun getBar(): String = ctx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).getString("noteBar", "") ?: ""
+    @JavascriptInterface fun saveBar(v: String) { ctx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).edit().putString("noteBar", v).apply() }
     @JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
     @JavascriptInterface fun changed(html: String, text: String) { main.post { onChanged(html, text) } }
 }
@@ -479,6 +483,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                     settings.domStorageEnabled = true
                     addJavascriptInterface(
                         EditorBridge(
+                            c,
                             onReady = {
                                 evaluateJavascript("NE.load(${JSONObject.quote(html)}, $dark)", null)
                             },

@@ -223,29 +223,74 @@
       cv.addEventListener('pointerup', stop); cv.addEventListener('pointercancel', stop);
     }
 
-    var items = [
-      ['↶', function(){ cmd('undo'); }, 'ביטול'], ['↷', function(){ cmd('redo'); }, 'שחזור'], null,
-      ['<b>B</b>', function(){ cmd('bold'); }, 'מודגש'], ['<i>I</i>', function(){ cmd('italic'); }, 'נטוי'],
-      ['<u>U</u>', function(){ cmd('underline'); }, 'קו תחתון'], ['<s>S</s>', function(){ cmd('strikeThrough'); }, 'קו חוצה'], null,
-      ['<span style="background:#fff475;padding:0 4px;border-radius:4px">A</span>', function(){ showPal('hi'); }, 'הדגשה בצבע'],
-      ['<span style="color:#d93025;font-weight:700;border-bottom:3px solid #d93025">A</span>', function(){ showPal('fore'); }, 'צבע טקסט'],
-      ['Aa', function(){ showPal('size'); }, 'גודל טקסט'], null,
-      ['•≡', function(){ plainList('UL'); }, 'תבליטים'], ['1.', function(){ plainList('OL'); }, 'רשימה ממוספרת'], ['☑', checklist, 'רשימת סימון'], null,
-      ['🖼', pickImage, 'הוסף תמונה'], ['✏️', draw, 'ציור'], ['🗑️', delImage, 'מחק תמונה נבחרת'], null,
-      ['⇥', function(){ cmd('justifyRight'); }, 'יישור לימין'], ['≡', function(){ cmd('justifyCenter'); }, 'מרכוז'], ['⇤', function(){ cmd('justifyLeft'); }, 'יישור לשמאל'], null,
-      ['⌫A', function(){ cmd('removeFormat'); }, 'נקה עיצוב']
+    var ITEMS = [
+      {id:'undo', h:'↶', f:function(){ cmd('undo'); }, t:'ביטול'}, {id:'redo', h:'↷', f:function(){ cmd('redo'); }, t:'שחזור'},
+      {id:'b', h:'<b>B</b>', f:function(){ cmd('bold'); }, t:'מודגש'}, {id:'i', h:'<i>I</i>', f:function(){ cmd('italic'); }, t:'נטוי'},
+      {id:'u', h:'<u>U</u>', f:function(){ cmd('underline'); }, t:'קו תחתון'}, {id:'s', h:'<s>S</s>', f:function(){ cmd('strikeThrough'); }, t:'קו חוצה'},
+      {id:'hi', h:'<span style="background:#fff475;padding:0 4px;border-radius:4px">A</span>', f:function(){ showPal('hi'); }, t:'הדגשה בצבע'},
+      {id:'fore', h:'<span style="color:#d93025;font-weight:700;border-bottom:3px solid #d93025">A</span>', f:function(){ showPal('fore'); }, t:'צבע טקסט'},
+      {id:'size', h:'Aa', f:function(){ showPal('size'); }, t:'גודל טקסט'},
+      {id:'ul', h:'•≡', f:function(){ plainList('UL'); }, t:'תבליטים'}, {id:'ol', h:'1.', f:function(){ plainList('OL'); }, t:'רשימה ממוספרת'},
+      {id:'cl', h:'☑', f:checklist, t:'רשימת סימון'},
+      {id:'img', h:'🖼', f:pickImage, t:'הוסף תמונה'}, {id:'draw', h:'✏️', f:draw, t:'ציור'}, {id:'delimg', h:'🗑️', f:delImage, t:'מחק תמונה נבחרת'},
+      {id:'jr', h:'⇥', f:function(){ cmd('justifyRight'); }, t:'יישור לימין'}, {id:'jc', h:'≡', f:function(){ cmd('justifyCenter'); }, t:'מרכוז'},
+      {id:'jl', h:'⇤', f:function(){ cmd('justifyLeft'); }, t:'יישור לשמאל'},
+      {id:'clr', h:'⌫A', f:function(){ cmd('removeFormat'); }, t:'נקה עיצוב'}
     ];
-    items.forEach(function(it){
-      if(!it){ var s = document.createElement('div'); s.className = 'ne-sep'; row.appendChild(s); return; }
-      var b = document.createElement('button'); b.type = 'button'; b.innerHTML = it[0]; b.setAttribute('aria-label', it[2]); b.title = it[2];
+    var byId = {}; ITEMS.forEach(function(it){ byId[it.id] = it; });
+    var order = ITEMS.map(function(it){ return it.id; });
+    try {
+      var saved = opts.loadBar && opts.loadBar();
+      if(saved){ var arr = JSON.parse(saved); if(Array.isArray(arr)) order = arr.filter(function(k){ return byId[k]; }); }
+    } catch(e){}
+    function saveOrder(){ try { if(opts.saveBar) opts.saveBar(JSON.stringify(order)); } catch(e){} }
+    function mkBtn(html, label, fn){
+      var b = document.createElement('button'); b.type = 'button'; b.innerHTML = html; b.setAttribute('aria-label', label); b.title = label;
       b.addEventListener('pointerdown', function(e){ e.preventDefault(); });
       b.addEventListener('mousedown', function(e){ e.preventDefault(); });
-      b.addEventListener('click', function(e){ e.preventDefault(); it[1](); });
-      row.appendChild(b);
-    });
+      b.addEventListener('click', function(e){ e.preventDefault(); fn(); });
+      return b;
+    }
+    function renderRow(){
+      row.innerHTML = '';
+      order.forEach(function(k){ var it = byId[k]; row.appendChild(mkBtn(it.h, it.t, it.f)); });
+      row.appendChild(mkBtn('⚙️', 'התאמת הסרגל', configure));
+    }
+    function configure(){
+      var ov = document.createElement('div'); ov.className = 'ne-cfg';
+      var box = document.createElement('div'); box.className = 'ne-cbox'; ov.appendChild(box);
+      function paint(){
+        box.innerHTML = '';
+        var h = document.createElement('div'); h.className = 'ne-ch'; h.textContent = 'התאמת סרגל העריכה'; box.appendChild(h);
+        var hint = document.createElement('div'); hint.className = 'ne-chint'; hint.textContent = 'סמן מה להציג, וסדר עם החצים'; box.appendChild(hint);
+        var list = document.createElement('div'); list.className = 'ne-cl'; box.appendChild(list);
+        var all = order.concat(ITEMS.map(function(i){ return i.id; }).filter(function(k){ return order.indexOf(k) < 0; }));
+        all.forEach(function(k){
+          var it = byId[k], on = order.indexOf(k) >= 0, r = document.createElement('div'); r.className = 'ne-cr' + (on ? '' : ' off');
+          var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = on;
+          cb.onchange = function(){ if(cb.checked) order.push(k); else order.splice(order.indexOf(k), 1); saveOrder(); renderRow(); paint(); };
+          var ic = document.createElement('span'); ic.className = 'ic'; ic.innerHTML = it.h;
+          var lb = document.createElement('span'); lb.className = 'lb'; lb.textContent = it.t;
+          r.appendChild(cb); r.appendChild(ic); r.appendChild(lb);
+          function mv(d){ var i = order.indexOf(k), j = i + d; if(i < 0 || j < 0 || j >= order.length) return; order.splice(i, 1); order.splice(j, 0, k); saveOrder(); renderRow(); paint(); }
+          var up = document.createElement('button'); up.type = 'button'; up.textContent = '▲'; up.disabled = !on; up.onclick = function(){ mv(-1); };
+          var dn = document.createElement('button'); dn.type = 'button'; dn.textContent = '▼'; dn.disabled = !on; dn.onclick = function(){ mv(1); };
+          r.appendChild(up); r.appendChild(dn); list.appendChild(r);
+        });
+        var f = document.createElement('div'); f.className = 'ne-cf';
+        var rs = document.createElement('button'); rs.type = 'button'; rs.textContent = 'איפוס'; rs.onclick = function(){ order = ITEMS.map(function(i){ return i.id; }); saveOrder(); renderRow(); paint(); };
+        var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'ok'; ok.textContent = 'סיום'; ok.onclick = function(){ ov.remove(); };
+        f.appendChild(rs); f.appendChild(ok); box.appendChild(f);
+      }
+      paint(); root.appendChild(ov);
+    }
+    renderRow();
     pal.addEventListener('pointerdown', function(e){ e.preventDefault(); });
     pal.addEventListener('mousedown', function(e){ e.preventDefault(); });
 
+    body.addEventListener('click', function(e){
+      if(e.target === body){ ed.focus(); var r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); var sl = g.getSelection(); sl.removeAllRanges(); sl.addRange(r); }
+    });
     ed.addEventListener('input', changed);
     ed.addEventListener('blur', function(){ saveSel(); flush(); });
     ed.addEventListener('keyup', function(e){
