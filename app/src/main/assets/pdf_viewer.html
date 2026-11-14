@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>
+:root{--bg:#dfe1ea;--bar:#ffffff;--fg:#14161f;--acc:#4f46e5;--chip:#eef0f7}
+.dark{--bg:#2a2c36;--bar:#1c1e27;--fg:#e8eaf2;--acc:#9ea0ff;--chip:#2c2f3b}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#scroller{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+#pages{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:8px;width:max-content;min-width:100%;box-sizing:border-box}
+.pg{position:relative;background:#fff;box-shadow:0 1px 6px #0004;flex:none}
+.pgc,.pgo{position:absolute;left:0;top:0}
+.pgo{touch-action:auto}
+#pages.active .pgo{touch-action:none}
+.pgn{position:absolute;bottom:4px;left:6px;font-size:11px;color:#777;background:#fffc;border-radius:8px;padding:0 6px;pointer-events:none}
+.ptext{position:absolute;margin:0;padding:0;border:2px dashed var(--acc);background:#fff9;outline:none;resize:none;overflow:hidden;font-family:Arial,sans-serif;line-height:1.25;z-index:5}
+#tray{display:flex;gap:8px;align-items:center;justify-content:center;padding:6px;background:var(--bar);border-top:1px solid #0002;flex-wrap:wrap}
+#bar{display:flex;gap:3px;align-items:center;justify-content:space-between;padding:6px 4px;overflow-x:auto;background:var(--bar);border-top:1px solid #0002}
+button{font:inherit;color:var(--fg)}
+#bar button{flex:1 1 0;min-width:25px;max-width:44px;height:40px;border:2px solid transparent;border-radius:11px;background:var(--chip);font-size:16px;padding:0}
+#bar button.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 22%,transparent)}
+#bar .zl{font-size:11px;flex:none;width:34px;text-align:center}
+.sw{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #0004;padding:0}
+.sw.on,.sz.on{box-shadow:0 0 0 3px var(--acc)}
+.sz{min-width:38px;height:36px;border:0;border-radius:10px;background:var(--chip);padding:0 10px}
+.hide{display:none!important}
+#sigModal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}
+#sigModal .box{background:var(--bar);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center}
+#sigCv{background:repeating-linear-gradient(#fff,#fff 219px,#9aa 219px,#9aa 220px);border-radius:10px;touch-action:none}
+#sigModal .row{display:flex;gap:8px}#sigModal button{border:0;border-radius:10px;background:var(--chip);height:40px;padding:0 16px;font-size:15px}#sigOk{background:var(--acc)!important;color:#fff!important}
+</style></head><body>
+<div id="app">
+  <div id="scroller"><div id="pages"></div></div>
+  <div id="tray" class="hide"></div>
+  <div id="bar">
+    <button data-t="scroll" class="on" aria-label="גלילה">✋</button>
+    <button data-t="pen" aria-label="עט">✏️</button>
+    <button data-t="hl" aria-label="מרקר">🖍</button>
+    <button data-t="text" aria-label="טקסט"><b>T</b></button>
+    <button data-t="sig" aria-label="חתימה">✍️</button>
+    <button data-t="move" aria-label="הזזה">↔️</button>
+    <button data-t="erase" aria-label="מחק">🧽</button>
+    <button id="undo" aria-label="בטל">↶</button>
+    <button id="zout" aria-label="הקטן">➖</button><span class="zl" id="zl">100%</span><button id="zin" aria-label="הגדל">➕</button>
+  </div>
+</div>
+<div id="sigModal" class="hide"><div class="box"><div style="font-weight:700">צייר את החתימה</div><canvas id="sigCv"></canvas>
+  <div class="row"><button id="sigClear">נקה</button><button id="sigCancel">ביטול</button><button id="sigOk">אישור</button></div></div></div>
+<script src="pdfviewer.js"></script>
+<script>if(window.Android) Android.ready();</script>
+</body></html>

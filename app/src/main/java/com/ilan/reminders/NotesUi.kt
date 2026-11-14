@@ -59,6 +59,7 @@ import org.json.JSONObject
 fun Home() {
     var screen by rememberSaveable { mutableStateOf("tasks") }
     if (PendingShare.text != null && screen != "notes") screen = "notes"
+    if (PendingOpen.file != null && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })

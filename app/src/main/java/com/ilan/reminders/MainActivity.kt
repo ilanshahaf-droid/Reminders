@@ -68,12 +68,12 @@ import java.time.ZonedDateTime
 class MainActivity : androidx.fragment.app.FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        takeShare(intent)
+        takeShare(this, intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        takeShare(intent)
+        takeShare(this, intent)
         setContent { AppTheme { Home() } }
         // while the app is on screen: pull web changes right away and then every 15 seconds
         lifecycleScope.launch {
@@ -90,8 +90,32 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 /** Text received through the system "Share" menu; shown as a new note. */
 object PendingShare { var text by mutableStateOf<String?>(null) }
 
-private fun takeShare(i: Intent?) {
-    if (i?.action != Intent.ACTION_SEND) return
+/** A Word / PDF file opened from another app ("Open with" or Share). */
+object PendingOpen { var file by mutableStateOf<java.io.File?>(null) }
+
+private fun takeShare(ctx: Context, i: Intent?) {
+    if (i == null) return
+    val fileUri: Uri? = when (i.action) {
+        Intent.ACTION_VIEW -> i.data
+        Intent.ACTION_SEND ->
+            if (i.type?.startsWith("text/") == true) null
+            else if (android.os.Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            else @Suppress("DEPRECATION") i.getParcelableExtra(Intent.EXTRA_STREAM)
+        else -> null
+    }
+    if (fileUri != null) {
+        i.action = Intent.ACTION_MAIN
+        val app = ctx.applicationContext
+        Thread {
+            val f = Docs.import(app, fileUri)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (f != null) PendingOpen.file = f
+                else android.widget.Toast.makeText(app, "אי אפשר לפתוח את הקובץ הזה", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }.start()
+        return
+    }
+    if (i.action != Intent.ACTION_SEND) return
     val t = i.getStringExtra(Intent.EXTRA_TEXT)
     val subj = i.getStringExtra(Intent.EXTRA_SUBJECT)
     val all = listOfNotNull(subj?.takeIf { it.isNotBlank() && t?.contains(it) != true }, t).joinToString("\n")
@@ -760,7 +784,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v54") },
+        title = { Text("הגדרות · v55") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

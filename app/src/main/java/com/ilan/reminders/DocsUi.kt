@@ -70,6 +70,9 @@ object Docs {
             if (c.contentResolver.getType(uri)?.contains("pdf") == true) "pdf" else "docx"
         }
         if (ext !in setOf("docx", "pdf")) return null
+        val same = File(dir(c), clean(name.substringBeforeLast('.')) + "." + ext)
+        val size = runCatching { c.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull() ?: -1L
+        if (same.exists() && size > 0 && same.length() == size) return same.also { it.setLastModified(System.currentTimeMillis()) }
         val out = unique(c, name.substringBeforeLast('.'), ext)
         c.contentResolver.openInputStream(uri)?.use { ins -> out.outputStream().use { ins.copyTo(it) } }
         out
@@ -105,6 +108,14 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     val files = remember(tick) { Docs.list(ctx) }
     var editing by remember { mutableStateOf<File?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var viewing by remember { mutableStateOf<File?>(null) }
+    val pending = PendingOpen.file
+    LaunchedEffect(pending) {
+        if (pending != null) {
+            PendingOpen.file = null; tick++
+            if (Docs.ext(pending) == "pdf") viewing = pending else editing = pending
+        }
+    }
     var menuFor by remember { mutableStateOf<String?>(null) }
     var renaming by remember { mutableStateOf<File?>(null) }
     var renameText by remember { mutableStateOf("") }
@@ -118,10 +129,12 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = editing == null && !creating) { onReminders() }
+    BackHandler(enabled = editing == null && !creating && viewing == null) { onReminders() }
 
     Box(Modifier.fillMaxSize().background(cs.background)) {
-        if (editing != null || creating) {
+        if (viewing != null) {
+            PdfViewerScreen(viewing!!, dark, onClose = { viewing = null; tick++ })
+        } else if (editing != null || creating) {
             DocEditorScreen(editing, dark, onClose = { editing = null; creating = false; tick++ })
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp)) {
@@ -147,7 +160,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                             Surface(
                                 shape = RoundedCornerShape(16.dp), color = cs.surface, shadowElevation = 1.dp,
                                 modifier = Modifier.fillMaxWidth().combinedClickable(
-                                    onClick = { if (isPdf) Docs.openExternal(ctx, f) else editing = f },
+                                    onClick = { if (isPdf) viewing = f else editing = f },
                                     onLongClick = { menuFor = f.name }
                                 )
                             ) {
@@ -166,10 +179,10 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 }
                             }
                             DropdownMenu(expanded = menuFor == f.name, onDismissRequest = { menuFor = null }) {
-                                DropdownMenuItem(text = { Text(if (isPdf) "פתח" else "ערוך") }, onClick = {
-                                    menuFor = null; if (isPdf) Docs.openExternal(ctx, f) else editing = f
+                                DropdownMenuItem(text = { Text(if (isPdf) "פתח וסמן" else "ערוך") }, onClick = {
+                                    menuFor = null; if (isPdf) viewing = f else editing = f
                                 })
-                                if (!isPdf) DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
+                                DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
                                 DropdownMenuItem(text = { Text("שתף") }, onClick = { menuFor = null; Docs.share(ctx, f) })
                                 DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menuFor = null; renameText = f.nameWithoutExtension; renaming = f })
                                 DropdownMenuItem(text = { Text("מחק", color = cs.error) }, onClick = { menuFor = null; deleting = f })
@@ -364,4 +377,126 @@ fun DocEditorScreen(file: File?, dark: Boolean, onClose: () -> Unit) {
             onRelease = { it.destroy() }
         )
     }
+}
+
+/** JS side of the PDF viewer (pdf_viewer.html). */
+internal class PdfBridge(
+    val ctx: Context, val data: () -> String, val onOpened: () -> Unit, val onSaved: (String) -> Unit, val onSaveFailed: () -> Unit,
+    val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit, val onReady: () -> Unit
+) {
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
+    @android.webkit.JavascriptInterface fun docData(): String = data()
+    @android.webkit.JavascriptInterface fun opened() { main.post { onOpened() } }
+    @android.webkit.JavascriptInterface fun docSaved(b64: String) { onSaved(b64) }
+    @android.webkit.JavascriptInterface fun saveFailed() { main.post { onSaveFailed() } }
+    @android.webkit.JavascriptInterface fun dirty(v: Boolean) { main.post { onDirty(v) } }
+    @android.webkit.JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
+    @android.webkit.JavascriptInterface fun getSig(): String =
+        ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("pdfSig", "") ?: ""
+    @android.webkit.JavascriptInterface fun saveSig(s: String) {
+        ctx.getSharedPreferences("app", Context.MODE_PRIVATE).edit().putString("pdfSig", s).apply()
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    var cur by remember { mutableStateOf(file) }
+    var dirty by remember { mutableStateOf(false) }
+    var opened by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var closeAfter by remember { mutableStateOf(false) }
+    var asCopy by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
+    val web = remember { mutableStateOf<WebView?>(null) }
+    val initial = remember { Base64.encodeToString(file.readBytes(), Base64.NO_WRAP) }
+
+    fun save(copy: Boolean, thenClose: Boolean) {
+        if (saving) return
+        saving = true; asCopy = copy; closeAfter = thenClose
+        web.value?.evaluateJavascript("PV.save()", null)
+    }
+    fun finish() { if (dirty) confirm = true else onClose() }
+    BackHandler { finish() }
+
+    Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
+            Column(Modifier.weight(1f)) {
+                Text(cur.nameWithoutExtension, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                Text(
+                    if (saving) "שומר…" else if (!opened) "טוען…" else if (dirty) "יש שינויים שלא נשמרו" else "",
+                    fontSize = 12.sp, color = cs.onSurfaceVariant
+                )
+            }
+            if (dirty) TextButton({ save(false, false) }) { Text("שמור") }
+            Box {
+                IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
+                DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text("שמור") }, onClick = { moreMenu = false; save(false, false) })
+                    DropdownMenuItem(text = { Text("שמור כעותק") }, onClick = { moreMenu = false; save(true, false) })
+                    DropdownMenuItem(text = { Text("שתף") }, onClick = { moreMenu = false; Docs.share(ctx, cur) })
+                    DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { moreMenu = false; Docs.openExternal(ctx, cur) })
+                }
+            }
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            factory = { c ->
+                WebView(c).apply {
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    addJavascriptInterface(
+                        PdfBridge(
+                            c, data = { initial },
+                            onOpened = { opened = true },
+                            onSaved = { b64 ->
+                                val ok = runCatching {
+                                    val bytes = Base64.decode(b64, Base64.DEFAULT)
+                                    val target = if (asCopy) Docs.unique(ctx, cur.nameWithoutExtension + " - מסומן", "pdf") else cur
+                                    val tmp = File(target.parentFile, target.name + ".tmp")
+                                    tmp.writeBytes(bytes)
+                                    if (!tmp.renameTo(target)) { target.writeBytes(bytes); tmp.delete() }
+                                    cur = target
+                                }.isSuccess
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    saving = false
+                                    if (ok) {
+                                        dirty = false
+                                        Toast.makeText(ctx, if (asCopy) "נשמר עותק: ${cur.nameWithoutExtension}" else "נשמר", Toast.LENGTH_SHORT).show()
+                                        if (closeAfter) { closeAfter = false; onClose() }
+                                    } else Toast.makeText(ctx, "השמירה נכשלה", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onSaveFailed = { saving = false; closeAfter = false },
+                            onDirty = { dirty = it },
+                            onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() },
+                            onReady = { evaluateJavascript("PV.open($dark)", null) }
+                        ), "Android"
+                    )
+                    loadUrl("file:///android_asset/pdf_viewer.html")
+                    web.value = this
+                }
+            },
+            onRelease = { it.destroy() }
+        )
+    }
+
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("לשמור את הסימונים?") },
+        text = { Text("הסימונים יישמרו בתוך קובץ ה-PDF. אפשר גם לשמור כעותק ולהשאיר את המקור כמו שהוא.") },
+        confirmButton = { TextButton({ confirm = false; save(false, true) }) { Text("שמור וסגור") } },
+        dismissButton = {
+            Row {
+                TextButton({ confirm = false; onClose() }) { Text("סגור בלי לשמור", color = cs.error) }
+                TextButton({ confirm = false }) { Text("המשך") }
+            }
+        }
+    )
 }
