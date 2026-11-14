@@ -661,7 +661,7 @@ fun PdfJobRunner(spec: PdfJobSpec, onResult: (String) -> Unit, onFail: (String) 
                 CircularProgressIndicator(Modifier.size(28.dp)); Spacer(Modifier.width(14.dp))
                 Text(if (spec.kind == "merge") "מאחד את הקבצים" else "יוצר PDF מהתמונות")
             }
-            AndroidView(Modifier.size(1.dp), factory = { c ->
+            AndroidView(modifier = Modifier.size(1.dp), factory = { c ->
                 WebView(c).apply {
                     settings.javaScriptEnabled = true
                     addJavascriptInterface(
@@ -675,7 +675,7 @@ fun PdfJobRunner(spec: PdfJobSpec, onResult: (String) -> Unit, onFail: (String) 
                     )
                     loadUrl("file:///android_asset/pdf_organizer.html")
                 }
-            }, onRelease = { it.destroy() })
+            }, onRelease = { w: WebView -> w.destroy() })
         },
         confirmButton = {}
     )
