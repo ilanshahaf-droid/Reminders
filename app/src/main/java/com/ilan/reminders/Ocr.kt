@@ -43,7 +43,7 @@ object Ocr {
                             bmp.eraseColor(Color.WHITE)
                             p.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                             api.setImage(bmp)
-                            val t = api.utf8Text.orEmpty().trim()
+                            val t = api.getUTF8Text().orEmpty().trim()
                             if (t.isNotEmpty()) sb.append(t).append("\n\n")
                             bmp.recycle()
                         }
