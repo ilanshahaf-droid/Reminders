@@ -356,8 +356,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var compressOrig by remember { mutableStateOf(0L) }
     val shotFile = remember { File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, "scan.jpg") } }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        if (ok && shotFile.exists() && shotFile.length() > 0) { scanShots = scanShots + shotFile.readBytes(); scanDlg = true }
-        else scanDlg = scanShots.isNotEmpty()
+        if (ok && shotFile.exists() && shotFile.length() > 0) { scanShots = listOf(shotFile.readBytes()); scanDlg = true }
     }
     fun shoot() {
         scanDlg = false
@@ -680,18 +679,10 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         )
     }
 
-    if (scanDlg) AlertDialog(
-        onDismissRequest = {}, title = { Text("סריקה ל-PDF") },
-        text = { Text("צולמו ${scanShots.size} עמודים. הצילום יעובד לדף נקי וחד.") },
-        confirmButton = {
-            TextButton({ scanDlg = false; job = PdfJobSpec("scan", "סריקה " + java.text.SimpleDateFormat("dd-MM-yy HH.mm", java.util.Locale.US).format(java.util.Date()), scanShots.map { it to "image/jpeg" }) }) { Text("סיום ויצירת PDF") }
-        },
-        dismissButton = {
-            Row {
-                TextButton({ shoot() }) { Text("📷 עוד דף") }
-                TextButton({ scanDlg = false; scanShots = emptyList() }) { Text("ביטול") }
-            }
-        }
+    if (scanDlg && scanShots.isNotEmpty()) ScanEditorScreen(
+        scanShots[0], dark,
+        onClose = { scanDlg = false; scanShots = emptyList() },
+        onCreated = { f -> scanDlg = false; scanShots = emptyList(); tick++; saveAsFor = f }
     )
 
     if (compressDlg) AlertDialog(

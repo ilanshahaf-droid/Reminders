@@ -2,6 +2,7 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.min.mjs';
 import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs';
 import { PDFDocument, degrees, rgb } from 'pdf-lib';
 import { detectFields, dedupe, autofill, dropFields, fieldOrder, filledF, dmyFull, store } from './forms.js';
+import './scan.js';
 
 globalThis.pdfjsWorker = { WorkerMessageHandler };
 

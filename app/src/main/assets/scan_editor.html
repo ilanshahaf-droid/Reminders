@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>
+:root{--bg:#14151c;--bar:#1e202a;--fg:#f1f2f7;--acc:#4f46e5;--chip:#2b2e3b;--sub:#a3a7b8}
+html:not(.dark){--bg:#eceef5;--bar:#fff;--fg:#14161f;--chip:#eef0f7;--sub:#667}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
+.hide{display:none!important}
+#edit,#settings{position:fixed;inset:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;justify-content:space-between;padding:8px 10px}
+.top button.ic{border:0;background:transparent;color:var(--fg);font-size:26px;width:44px;height:44px}
+.pri{border:0;border-radius:24px;background:var(--acc);color:#fff;font-size:16px;font-weight:700;padding:0 26px;height:42px}
+#stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0}
+#cv{background:#fff;box-shadow:0 2px 10px #0006}
+#crop{position:absolute}
+#box{position:absolute;border:2px solid #ff3b57;box-sizing:border-box;box-shadow:0 0 0 2000px #0008;touch-action:none}
+#box [data-h]{position:absolute;background:#d9dbe3;border:2px solid #ff3b57;box-sizing:border-box;touch-action:none}
+[data-h=tl],[data-h=tr],[data-h=bl],[data-h=br]{width:30px;height:30px;border-radius:50%}
+[data-h=tl]{left:-15px;top:-15px}[data-h=tr]{right:-15px;top:-15px}[data-h=bl]{left:-15px;bottom:-15px}[data-h=br]{right:-15px;bottom:-15px}
+[data-h=t],[data-h=b]{width:46px;height:14px;border-radius:8px;left:calc(50% - 23px)}[data-h=t]{top:-8px}[data-h=b]{bottom:-8px}
+[data-h=l],[data-h=r]{width:14px;height:46px;border-radius:8px;top:calc(50% - 23px)}[data-h=l]{left:-8px}[data-h=r]{right:-8px}
+#pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:4px 0}
+#pager b{font-size:22px;background:var(--chip);border-radius:20px;padding:4px 18px}
+#pager button{border:0;border-radius:50%;width:38px;height:38px;background:var(--chip);color:var(--fg);font-size:18px}
+#pager button:disabled{opacity:.3}
+#filters{display:flex;gap:8px;padding:6px 10px;overflow-x:auto}
+.ft{flex:0 0 74px;text-align:center;font-size:12px;border-radius:10px;border:3px solid transparent;padding:2px}
+.ft.on{border-color:#ff3b57}
+#acts{display:flex;justify-content:space-around;background:var(--bar);padding:8px 0 12px}
+#acts button{border:0;background:transparent;color:var(--fg);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;flex:1;min-width:0;padding:0 2px}
+#acts button i{font-style:normal;font-size:24px}
+#settings{overflow:auto;display:block;padding-bottom:30px}
+#settings .row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #8883}
+#settings h4{margin:0 0 6px;font-size:17px}
+.opt{border:1px solid #8886;background:transparent;color:var(--fg);border-radius:18px;padding:8px 14px;margin:3px;font-size:14px}
+.opt.on{background:var(--acc);border-color:var(--acc);color:#fff}
+#sName{flex:1;font-size:18px;font-weight:700;background:transparent;color:var(--fg);border:0;border-bottom:1px solid #8886;padding:6px 0}
+#sThumb{width:64px;border-radius:8px;background:#fff}
+#make{position:fixed;left:16px;right:16px;bottom:14px;height:52px;font-size:18px;border-radius:26px}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--acc)}
+</style></head><body>
+<div id="edit">
+  <div class="top"><button class="ic" id="backBtn">→</button><button class="pri" id="doneBtn">הבא</button></div>
+  <div id="stage"><canvas id="cv"></canvas>
+    <div id="crop" class="hide"><div id="box"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i><i data-h="t"></i><i data-h="b"></i><i data-h="l"></i><i data-h="r"></i></div></div>
+  </div>
+  <div id="pager"><button id="next">›</button><b id="count">1/1</b><button id="prev">‹</button></div>
+  <div id="filters" class="filterOnly"></div>
+  <div id="acts">
+    <button id="delBtn"><i>🗑</i>מחיקה</button>
+    <button id="retake"><i>📷</i>צילום מחדש</button>
+    <button id="addBtn" class="filterOnly"><i>➕</i>עוד דף</button>
+    <button id="rotL"><i>↺</i>שמאלה</button>
+    <button id="rotR"><i>↻</i>ימינה</button>
+    <button id="autoCrop" class="cropOnly hide"><i>✨</i>אוטומטי</button>
+    <button id="fullCrop" class="cropOnly hide"><i>⛶</i>ללא חיתוך</button>
+    <button id="modeBtn"><i>✂️</i><span>חיתוך</span></button>
+  </div>
+</div>
+<div id="settings" class="hide">
+  <div class="top"><button class="ic" id="sBack">→</button><b style="font-size:19px;flex:1;padding:0 8px">הגדרות PDF</b></div>
+  <div class="row"><canvas id="sThumb"></canvas><div style="flex:1"><input id="sName" placeholder="שם הקובץ" autocomplete="off"><div id="sCount" style="color:var(--sub);margin-top:6px"></div></div></div>
+  <div class="row"><b style="flex:1">שולי דף</b><input type="checkbox" id="sMargin"></div>
+  <div class="row" style="display:block"><h4>דחיסה</h4><div id="o_comp"></div></div>
+  <div class="row" style="display:block"><h4>גודל דף</h4><div id="o_size"></div></div>
+  <div class="row" style="display:block"><h4>כיוון</h4><div id="o_orient"></div></div>
+  <button class="pri" id="make">שמירה</button>
+</div>
+<script src="pdfviewer.js"></script>
+<script>if(window.Android) Android.ready();</script>
+</body></html>
