@@ -468,6 +468,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             DocEditorScreen(editing, dark, template, onClose = { editing = null; creating = false; template = ""; tick++ })
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp)) {
+                TabSwitch("docs", onReminders = onReminders, onNotes = onNotes, onDocs = {}, hPad = 8.dp)
                 Column(Modifier.padding(top = 12.dp, bottom = 8.dp)) {
                     Text("מסמכים", style = MaterialTheme.typography.headlineLarge)
                     Text(
@@ -475,8 +476,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant
                     )
                 }
-                TabSwitch("docs", onReminders = onReminders, onNotes = onNotes, onDocs = {}, hPad = 0.dp)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (searching) {
                         OutlinedTextField(

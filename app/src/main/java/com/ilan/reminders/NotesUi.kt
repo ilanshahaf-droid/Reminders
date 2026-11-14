@@ -236,6 +236,7 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
                                         }) { Text("🗑", fontSize = 20.sp) }
                                     }
                                 }
+                                TabSwitch("notes", onReminders = onReminders, onNotes = {}, onDocs = onDocs, hPad = 8.dp)
                                 Row(Modifier.padding(start = 0.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text("פתקים", style = MaterialTheme.typography.headlineLarge)
@@ -270,7 +271,6 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
                                         }
                                     }
                                 }
-                                TabSwitch("notes", onReminders = onReminders, onNotes = {}, onDocs = onDocs, hPad = 0.dp)
                                 if (searching) OutlinedTextField(
                                     query, { query = it }, singleLine = true, placeholder = { Text("חיפוש בפתקים") },
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
