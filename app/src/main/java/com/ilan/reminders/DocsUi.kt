@@ -87,7 +87,7 @@ object Docs {
     /** Favorites always first, then newest. */
     fun list(c: Context): List<File> {
         val fv = favs(c)
-        return dir(c).listFiles()?.filter { it.isFile && ext(it) in setOf("docx", "pdf", "xlsx") }
+        return dir(c).listFiles()?.filter { it.isFile && ext(it) in setOf("docx", "pdf", "xlsx", "pptx") }
             ?.sortedWith(compareByDescending<File> { it.name in fv }.thenByDescending { it.lastModified() }) ?: emptyList()
     }
 
@@ -142,9 +142,9 @@ object Docs {
             }
         }
         val ext = name.substringAfterLast('.', "").lowercase().ifBlank {
-            if (c.contentResolver.getType(uri)?.contains("pdf") == true) "pdf" else if (c.contentResolver.getType(uri)?.contains("spreadsheet") == true) "xlsx" else "docx"
+            if (c.contentResolver.getType(uri)?.contains("pdf") == true) "pdf" else if (c.contentResolver.getType(uri)?.contains("spreadsheet") == true) "xlsx" else if (c.contentResolver.getType(uri)?.contains("presentation") == true) "pptx" else "docx"
         }
-        if (ext !in setOf("docx", "pdf", "xlsx")) { lastError = "סוג קובץ לא נתמך ($name)"; return null }
+        if (ext !in setOf("docx", "pdf", "xlsx", "pptx")) { lastError = "סוג קובץ לא נתמך ($name)"; return null }
         val same = File(dir(c), clean(name.substringBeforeLast('.')) + "." + ext)
         val size = runCatching { c.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } }.getOrNull() ?: -1L
         if (same.exists() && size > 0 && same.length() == size) return same.also { it.setLastModified(System.currentTimeMillis()) }
@@ -249,7 +249,7 @@ object Docs {
 
     fun uri(c: Context, f: File): Uri = FileProvider.getUriForFile(c, c.packageName + ".files", f)
     fun mime(f: File) =
-        when (ext(f)) { "pdf" -> "application/pdf"; "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; else -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+        when (ext(f)) { "pdf" -> "application/pdf"; "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"; else -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
 
     fun share(c: Context, f: File) {
         c.startActivity(
@@ -376,7 +376,8 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     var template by remember { mutableStateOf("") }
     var viewing by remember { mutableStateOf<File?>(null) }
     var sheeting by remember { mutableStateOf<File?>(null) }
-    fun openIt(f: File) { when (Docs.ext(f)) { "pdf" -> viewing = f; "xlsx" -> sheeting = f; else -> editing = f } }
+    var sliding by remember { mutableStateOf<File?>(null) }
+    fun openIt(f: File) { when (Docs.ext(f)) { "pdf" -> viewing = f; "xlsx" -> sheeting = f; "pptx" -> sliding = f; else -> editing = f } }
     var organizing by remember { mutableStateOf<File?>(null) }
     var toolsMenu by remember { mutableStateOf(false) }
     var mergeDlg by remember { mutableStateOf(false) }
@@ -504,7 +505,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
     }
     /** Opens the service's own file picker (Drive / OneDrive app UI); falls back to the system picker. */
     fun openIn(pkg: String, name: String) {
-        val mimes = arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        val mimes = arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
         val grant = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
         fun mk(action: String) = Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
             .putExtra(Intent.EXTRA_MIME_TYPES, mimes).addFlags(grant).setPackage(pkg)
@@ -539,11 +540,13 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = editing == null && !creating && viewing == null && organizing == null && sheeting == null) { onReminders() }
+    BackHandler(enabled = editing == null && !creating && viewing == null && organizing == null && sheeting == null && sliding == null) { onReminders() }
 
     Box(Modifier.fillMaxSize().background(cs.background)) {
         if (organizing != null) {
             PdfOrganizerScreen(organizing!!, dark, onClose = { organizing = null; tick++ })
+        } else if (sliding != null) {
+            SlideScreen(sliding!!, dark, onClose = { sliding = null; tick++ })
         } else if (sheeting != null) {
             SheetScreen(sheeting!!, dark, onClose = { sheeting = null; tick++ })
         } else if (viewing != null) {
@@ -572,6 +575,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                         FilterChip(typeFilter == "all", { typeFilter = "all" }, { Text("הכול") })
                         FilterChip(typeFilter == "docx", { typeFilter = "docx" }, { Text("Word") })
                         FilterChip(typeFilter == "xlsx", { typeFilter = "xlsx" }, { Text("Excel") })
+                        FilterChip(typeFilter == "pptx", { typeFilter = "pptx" }, { Text("PowerPoint") })
                         FilterChip(typeFilter == "pdf", { typeFilter = "pdf" }, { Text("PDF") })
                         Spacer(Modifier.weight(1f))
                         IconButton({ searching = true }) { Icon(Icons.Default.Search, "חיפוש") }
@@ -602,12 +606,12 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 )
                             ) {
                                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(when (Docs.ext(f)) { "pdf" -> "📕"; "xlsx" -> "📗"; else -> "📝" }, fontSize = 28.sp)
+                                    Text(when (Docs.ext(f)) { "pdf" -> "📕"; "xlsx" -> "📗"; "pptx" -> "📙"; else -> "📝" }, fontSize = 28.sp)
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text((if (Docs.isFav(ctx, f)) "⭐ " else "") + (if (Docs.isLinked(ctx, f)) "☁️ " else "") + f.nameWithoutExtension, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
-                                            (when (Docs.ext(f)) { "pdf" -> "PDF"; "xlsx" -> "Excel"; else -> "Word" }) + (Docs.sourceOf(ctx, f).let { if (it.isBlank()) "" else " · $it" }) + " · " + SimpleDateFormat("d.M.yyyy HH:mm", Locale("he")).format(Date(f.lastModified())) +
+                                            (when (Docs.ext(f)) { "pdf" -> "PDF"; "xlsx" -> "Excel"; "pptx" -> "PowerPoint"; else -> "Word" }) + (Docs.sourceOf(ctx, f).let { if (it.isBlank()) "" else " · $it" }) + " · " + SimpleDateFormat("d.M.yyyy HH:mm", Locale("he")).format(Date(f.lastModified())) +
                                                 " · " + (if (f.length() > 1_000_000) "%.1f MB".format(f.length() / 1e6) else "${f.length() / 1000 + 1} KB"),
                                             style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant
                                         )
@@ -616,7 +620,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                                 }
                             }
                             DropdownMenu(expanded = menuFor == f.name, onDismissRequest = { menuFor = null }) {
-                                DropdownMenuItem(text = { Text(if (isPdf) "פתח וסמן" else if (Docs.ext(f) == "xlsx") "פתח וערוך" else "ערוך") }, onClick = {
+                                DropdownMenuItem(text = { Text(if (isPdf) "פתח וסמן" else if (Docs.ext(f) == "xlsx" || Docs.ext(f) == "pptx") "פתח וערוך" else "ערוך") }, onClick = {
                                     menuFor = null; openDoc(f)
                                 })
                                 DropdownMenuItem(text = { Text(if (Docs.isFav(ctx, f)) "הסר ממועדפים" else "⭐ הוסף למועדפים") }, onClick = {
@@ -814,6 +818,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton({ newDlg = false; sheeting = Docs.unique(ctx, "גיליון חדש", "xlsx") }, Modifier.fillMaxWidth()) { Text("📗 גיליון Excel חדש") }
+                OutlinedButton({ newDlg = false; sliding = Docs.unique(ctx, "מצגת חדשה", "pptx") }, Modifier.fillMaxWidth()) { Text("📙 מצגת PowerPoint חדשה") }
                 Text("מסמך Word חדש", style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant)
                 DOC_TEMPLATES.forEach { (n, h) ->
                     OutlinedButton({ newDlg = false; template = h; creating = true }, Modifier.fillMaxWidth()) { Text(n) }
@@ -829,7 +834,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton({
                     openDlg = false
-                    picker.launch(arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"))
+                    picker.launch(arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/octet-stream"))
                 }, Modifier.fillMaxWidth()) { Text("📱 מכשיר זה") }
                 OutlinedButton({ openDlg = false; openIn("com.google.android.apps.docs", "Google Drive") }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive") }
                 OutlinedButton({ openDlg = false; openIn("com.microsoft.skydrive", "OneDrive") }, Modifier.fillMaxWidth()) { Text("☁️ OneDrive") }
@@ -837,7 +842,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
                     openDlg = false
                     cloudGet.launch(Intent.createChooser(
                         Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-                            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+                            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation")),
                         "פתח מ…"
                     ))
                 }, Modifier.fillMaxWidth()) { Text("🗂 מקור אחר (כל אפליקציה)") }
@@ -1465,6 +1470,134 @@ fun SheetScreen(file: File, dark: Boolean, onClose: () -> Unit) {
         onDismissRequest = { confirm = false },
         title = { Text("לשמור את השינויים?") },
         text = { Text("השינויים יישמרו בקובץ ה-Excel. אפשר גם לשמור כעותק ולהשאיר את המקור כמו שהוא.") },
+        confirmButton = { TextButton({ confirm = false; save(false, true) }) { Text("שמור וסגור") } },
+        dismissButton = {
+            Row {
+                TextButton({ confirm = false; onClose() }) { Text("סגור בלי לשמור", color = cs.error) }
+                TextButton({ confirm = false }) { Text("המשך") }
+            }
+        }
+    )
+}
+
+@Composable
+fun SlideScreen(file: File, dark: Boolean, onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    var cur by remember { mutableStateOf(file) }
+    var dirty by remember { mutableStateOf(false) }
+    var opened by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var delAsk by remember { mutableStateOf(false) }
+    var closeAfter by remember { mutableStateOf(false) }
+    var asCopy by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
+    val web = remember { mutableStateOf<WebView?>(null) }
+    val initial = remember { if (file.exists()) Base64.encodeToString(file.readBytes(), Base64.NO_WRAP) else "" }
+
+    fun save(copy: Boolean, thenClose: Boolean) {
+        if (saving) return
+        saving = true; asCopy = copy; closeAfter = thenClose
+        web.value?.evaluateJavascript("SL.save()", null)
+    }
+    fun finish() { if (dirty) confirm = true else onClose() }
+    BackHandler { finish() }
+    val scope = rememberCoroutineScope()
+    var showSaveAs by remember { mutableStateOf(false) }
+    var linkTick by remember { mutableStateOf(0) }
+    val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val uri = r.data?.data
+        if (r.resultCode == android.app.Activity.RESULT_OK && uri != null) {
+            scope.launch {
+                val ok = withContext(Dispatchers.IO) { Docs.linkTo(ctx, cur, uri) }
+                Toast.makeText(ctx, if (ok) "נשמר בענן ☁️ – מעכשיו כל שמירה תתעדכן גם שם" else "השמירה בענן נכשלה", Toast.LENGTH_LONG).show()
+                linkTick++
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
+            Column(Modifier.weight(1f)) {
+                Text(cur.nameWithoutExtension, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                Text(
+                    if (saving) "שומר…" else if (!opened) "טוען…" else if (dirty) "יש שינויים שלא נשמרו" else "",
+                    fontSize = 12.sp, color = cs.onSurfaceVariant
+                )
+            }
+            if (dirty) TextButton({ save(false, false) }) { Text("שמור") }
+            Box {
+                IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
+                DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text("💾 שמירה בשם…") }, onClick = {
+                        moreMenu = false
+                        scope.launch { if (dirty || !cur.exists()) { save(false, false); delay(2500) }; if (cur.exists()) showSaveAs = true }
+                    })
+                    key(linkTick) {
+                        if (!Docs.isLinked(ctx, cur)) DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
+                            moreMenu = false; cloudSave.launch(cloudCreateIntent(cur))
+                        }) else DropdownMenuItem(text = { Text("☁️ מקושר לענן – נשמר אוטומטית") }, onClick = { moreMenu = false })
+                    }
+                    DropdownMenuItem(text = { Text("📤 שתף") }, onClick = { moreMenu = false; Docs.share(ctx, cur) })
+                    DropdownMenuItem(text = { Text("↗️ פתח באפליקציה אחרת") }, onClick = { moreMenu = false; Docs.openExternal(ctx, cur) })
+                    HorizontalDivider()
+                    DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true })
+                }
+            }
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            factory = { c ->
+                WebView(c).apply {
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    addJavascriptInterface(
+                        PdfBridge(
+                            c, cur.name, data = { initial },
+                            onOpened = { opened = true },
+                            onSaved = { b64 ->
+                                val ok = runCatching {
+                                    val bytes = Base64.decode(b64, Base64.DEFAULT)
+                                    val target = if (asCopy) Docs.unique(ctx, cur.nameWithoutExtension + " - עותק", "pptx") else cur
+                                    val tmp = File(target.parentFile, target.name + ".tmp")
+                                    tmp.writeBytes(bytes)
+                                    if (!tmp.renameTo(target)) { target.writeBytes(bytes); tmp.delete() }
+                                    cur = target
+                                    Docs.push(ctx, target)
+                                }.isSuccess
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    saving = false
+                                    if (ok) {
+                                        dirty = false
+                                        Toast.makeText(ctx, if (asCopy) "נשמר עותק: ${cur.nameWithoutExtension}" else "נשמר", Toast.LENGTH_SHORT).show()
+                                        if (closeAfter) { closeAfter = false; onClose() }
+                                    } else Toast.makeText(ctx, "השמירה נכשלה", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onSaveFailed = { saving = false; closeAfter = false },
+                            onDirty = { dirty = it },
+                            onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() },
+                            onReady = { evaluateJavascript("SL.open($dark)", null) }
+                        ), "Android"
+                    )
+                    loadUrl("file:///android_asset/slides_editor.html")
+                    web.value = this
+                }
+            },
+            onRelease = { it.destroy() }
+        )
+    }
+
+    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {})
+
+    if (delAsk) DeleteDocDialog(cur, { delAsk = false }, { delAsk = false; onClose() })
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("לשמור את השינויים?") },
+        text = { Text("השינויים יישמרו בקובץ המצגת. אפשר גם לשמור כעותק ולהשאיר את המקור כמו שהוא.") },
         confirmButton = { TextButton({ confirm = false; save(false, true) }) { Text("שמור וסגור") } },
         dismissButton = {
             Row {

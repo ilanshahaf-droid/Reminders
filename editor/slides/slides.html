@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>
+:root{--bg:#e9eaf2;--bar:#f2f3f9;--fg:#14161f;--sub:#6a6f85;--grid:#d9dbe6;--acc:#4f46e5;--chip:#e4e6f2}
+html.dark{--bg:#0e0f14;--bar:#1e202a;--fg:#f1f2f7;--sub:#a3a7b8;--grid:#33364a;--acc:#9ea0ff;--chip:#2b2e3b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#stage{flex:1;overflow:auto;display:flex;padding:8px;background:var(--bg);-webkit-overflow-scrolling:touch}
+#slidewrap{margin:auto;box-shadow:0 2px 14px #0004;flex:none}
+.slide{direction:ltr}
+.sh{direction:ltr}
+.tx{cursor:pointer}
+.tx:active{outline:2px dashed var(--acc);outline-offset:1px}
+#info{display:flex;align-items:center;gap:6px;padding:3px 8px;background:var(--bar);font-size:13px;color:var(--sub);border-top:1px solid var(--grid)}
+#info b{flex:1;font-weight:400}
+#info button{border:0;background:var(--chip);color:var(--fg);border-radius:8px;height:30px;min-width:34px;font-size:16px}
+#strip{display:flex;gap:8px;padding:6px 8px;background:var(--bar);overflow-x:auto;border-top:1px solid var(--grid);direction:rtl}
+.th{position:relative;flex:none;padding:0;border:2px solid var(--grid);border-radius:6px;overflow:hidden;background:#fff}
+.th.on{border-color:var(--acc)}
+.th i{position:absolute;inset-inline-start:2px;bottom:2px;font-style:normal;font-size:10px;background:#000a;color:#fff;border-radius:6px;padding:0 5px}
+#tb{display:flex;gap:4px;padding:5px 6px;background:var(--bar);overflow-x:auto;border-top:1px solid var(--grid);direction:rtl}
+#tb button{flex:none;min-width:40px;height:40px;border:0;border-radius:9px;background:var(--chip);color:var(--fg);font-size:16px;font-family:inherit;padding:0 10px}
+#tb .sep{flex:none;width:1px;background:var(--grid);margin:4px 2px}
+#dlg{position:fixed;inset:0;background:#0007;z-index:30;display:none;align-items:flex-start;justify-content:center;padding-top:5vh}
+#dlg.show{display:flex}
+#dlg .box{background:var(--bar);border-radius:16px;padding:12px;width:min(94vw,440px)}
+#dtxt{width:100%;height:30vh;min-height:110px;font-size:17px;border:1px solid var(--grid);border-radius:10px;padding:8px 10px;background:var(--bg);color:var(--fg);font-family:inherit;resize:none}
+#fmt{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
+#fmt button{border:0;border-radius:8px;height:36px;min-width:36px;background:var(--chip);color:var(--fg);font-size:15px;padding:0 8px}
+#pal{display:flex;gap:6px;align-items:center}
+#pal i{width:26px;height:26px;border-radius:50%;border:1px solid #8886;display:block}
+#dlg .row{display:flex;gap:8px;margin-top:8px}
+#dlg .row button{border:0;border-radius:10px;height:40px;padding:0 16px;font-size:15px;background:var(--chip);color:var(--fg)}
+#dlg .row button.pri{background:var(--acc);color:#fff}
+#dlg .row .sp{flex:1}
+#dlg .row .dng{color:#e5484d}
+#pres{position:fixed;inset:0;background:#000;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column}
+#pres.show{display:flex}
+#pres .pc{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);color:#fff9;font-size:12px}
+#toast{position:fixed;bottom:150px;left:50%;transform:translateX(-50%);background:#222c;color:#fff;border-radius:18px;padding:8px 16px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center}
+</style></head><body>
+<div id="app">
+<div id="stage"></div>
+<div id="info"><button data-a="next">›</button><b id="cnt"></b><button data-a="prev">‹</button><button data-a="zout">－</button><button data-a="zin">＋</button></div>
+<div id="strip"></div>
+<div id="tb">
+  <button data-a="add">＋ שקף</button><button data-a="dup">⧉</button><button data-a="del">🗑</button><span class="sep"></span>
+  <button data-a="right">→</button><button data-a="left">←</button><span class="sep"></span>
+  <button data-a="tbox">＋ תיבת טקסט</button><span class="sep"></span><button data-a="play">▶ הצגה</button>
+</div>
+</div>
+<div id="dlg"><div class="box">
+  <textarea id="dtxt" dir="auto"></textarea>
+  <div id="fmt">
+    <button data-f="b"><b>B</b></button><button data-f="i"><i>I</i></button><button data-f="sz-">A−</button><button data-f="sz+">A+</button>
+    <button data-f="al-l">⇤</button><button data-f="al-c">↔</button><button data-f="al-r">⇥</button><button data-f="rtl">עב</button><button data-f="ltr">En</button>
+  </div>
+  <div id="pal"></div>
+  <div class="row"><button id="ddel" class="dng">🗑 מחק תיבה</button><span class="sp"></span><button id="dno">ביטול</button><button class="pri" id="dok">אישור</button></div>
+</div></div>
+<div id="pres"></div>
+<div id="toast"></div>
+<script src="jszip.min.js"></script>
+<script src="pptxgen.bundle.js"></script>
+<script src="slides.js"></script>
+</body></html>

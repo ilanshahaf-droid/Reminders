@@ -48,7 +48,7 @@ fun GlobalSearchScreen(onTask: (Task) -> Unit, onNote: (Note) -> Unit, onDoc: (j
                 val byName = f.name.contains(term, true)
                 val ocr = if (byName) null else Ocr.text(ctx, f)?.takeIf { it.contains(term, true) }
                 if (byName || ocr != null)
-                    add(Hit(when (Docs.ext(f)) { "pdf" -> "📕"; "xlsx" -> "📗"; else -> "📄" }, f.nameWithoutExtension, if (ocr != null) "🔤 " + snippet(ocr, term) else f.extension.uppercase()) { onDoc(f) })
+                    add(Hit(when (Docs.ext(f)) { "pdf" -> "📕"; "xlsx" -> "📗"; "pptx" -> "📙"; else -> "📄" }, f.nameWithoutExtension, if (ocr != null) "🔤 " + snippet(ocr, term) else f.extension.uppercase()) { onDoc(f) })
             }
         }
     }
