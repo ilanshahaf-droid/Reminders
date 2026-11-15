@@ -502,7 +502,16 @@
     $('nf').addEventListener('change', () => setNumFmt($('nf').value));
     document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#pop') && !e.target.closest('#tb') && !e.target.closest('#tabs')) closePop(); }, true);
     // load more rows on scroll
-    wrap.addEventListener('scroll', () => { if (wrap.scrollTop + wrap.clientHeight > wrap.scrollHeight - 300 && S.R < 20000) { S.rowsShown = S.R + ROW_CHUNK; const st = wrap.scrollTop; renderAll(); wrap.scrollTop = st; } }, { passive: true });
+    // (only a real downward scroll by the user adds rows; re-rendering itself must never trigger more rendering)
+    let lastTop = 0, busy = false;
+    wrap.addEventListener('scroll', () => {
+      if (busy) return;
+      const top = wrap.scrollTop, down = top > lastTop + 4; lastTop = top;
+      if (down && top + wrap.clientHeight > wrap.scrollHeight - 300 && S.R < Math.min(20000, sh().maxR + 400)) {
+        busy = true; S.rowsShown = S.R + ROW_CHUNK; renderAll(); wrap.scrollTop = top; lastTop = wrap.scrollTop;
+        setTimeout(() => { busy = false; }, 250);
+      }
+    }, { passive: true });
     // pinch zoom
     let d0 = 0, z0 = 1;
     const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -541,6 +550,7 @@
     } catch (e) { A().toast('השמירה נכשלה: ' + (e && e.message || e)); A().saveFailed(); }
   }
   window.SE = { open, save, _S: S, _setText: (r, c, t) => { setCellText(r, c, t); changed(); renderAll(); } };
+  window.addEventListener('error', (e) => { try { A().toast('שגיאה: ' + (e.message || e)); } catch (_) {} });
   bind();
   A().ready();
 })();
