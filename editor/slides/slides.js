@@ -49,7 +49,7 @@
   /* ---------------- package loading ---------------- */
   async function loadSlideDeps(sp) {
     await getDoc(sp); await loadRels(sp);
-    for (const r of Object.values(S.rels[sp] || {})) if (r.target && /^diagram(Data|Drawing)$/.test(r.type)) { await getDoc(r.target); }
+    for (const r of Object.values(S.rels[sp] || {})) if (r.target && /^diagram(Data|Drawing)$/.test(r.type)) { await getDoc(r.target); if (r.type === 'diagramDrawing') await loadRels(r.target); }
     const lay = relOfType(sp, 'slideLayout'); if (!lay) return;
     await getDoc(lay.target); await loadRels(lay.target);
     const mas = relOfType(lay.target, 'slideMaster'); if (!mas) return;
@@ -127,6 +127,20 @@
     }
     return alpha < 1 ? `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})` : `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
   }
+  function mixCss(a, b, t) {
+    const p = (c) => (c && (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number)) || null, x = p(a), y = p(b);
+    if (!x) return b; if (!y) return a;
+    return `rgb(${x.map((v, i) => Math.round(v * t + y[i] * (1 - t))).join(',')})`;
+  }
+  function pattCss(pf, ctx) {
+    const fg = clr(kid(pf, 'fgClr'), ctx) || '#000', bg = clr(kid(pf, 'bgClr'), ctx) || '#fff', pr = pf.getAttribute('prst') || '';
+    const m = /^pct(\d+)$/.exec(pr); if (m) return mixCss(fg, bg, m[1] / 100);
+    if (/Diag/.test(pr)) return `repeating-linear-gradient(${/Up/.test(pr) ? '-45deg' : '45deg'},${fg} 0 1px,${bg} 1px 5px)`;
+    if (/Grid|Check|Trellis|Weave|Plaid/.test(pr)) return `linear-gradient(${fg} 1px,transparent 1px) 0 0/6px 6px,linear-gradient(90deg,${fg} 1px,transparent 1px) 0 0/6px 6px,${bg}`;
+    if (/Dot|Sphere|Confetti|Shingle/.test(pr)) return `radial-gradient(${fg} 1px,transparent 1.5px) 0 0/6px 6px,${bg}`;
+    if (/Horz|Vert/.test(pr)) return `repeating-linear-gradient(${/Vert/.test(pr) ? '90deg' : '0deg'},${fg} 0 1px,${bg} 1px 5px)`;
+    return mixCss(fg, bg, 0.5);
+  }
   function gradCss(g, ctx) {
     const stops = kids(kid(g, 'gsLst'), 'gs').map((s) => `${clr(s, ctx) || '#888'} ${num(s.getAttribute('pos'), 0) / 1000}%`);
     if (!stops.length) return null;
@@ -138,10 +152,12 @@
   function paint(spPr, style, ctx) {
     let bg = null, line = null;
     const fills = spPr ? Array.from(spPr.children) : [];
+    const pf = fills.find((c) => c.localName === 'pattFill'), gpf = fills.find((c) => c.localName === 'grpFill');
     const sf = fills.find((c) => c.localName === 'solidFill'), gf = fills.find((c) => c.localName === 'gradFill'), nf = fills.find((c) => c.localName === 'noFill');
-    if (sf) bg = clr(sf, ctx); else if (gf) bg = gradCss(gf, ctx); else if (!nf && style) { const fr = kid(style, 'fillRef'); if (fr && num(fr.getAttribute('idx'), 0) > 0) bg = clr(fr, ctx); }
+    if (sf) bg = clr(sf, ctx); else if (pf) bg = pattCss(pf, ctx); else if (gpf && ctx._gfill) bg = ctx._gfill; else if (gf) bg = gradCss(gf, ctx); else if (!nf && style) { const fr = kid(style, 'fillRef'); if (fr && num(fr.getAttribute('idx'), 0) > 0) bg = clr(fr, ctx); }
     const ln = spPr && kid(spPr, 'ln');
     if (ln && kid(ln, 'noFill')) line = null;
+    else if (ln && kid(ln, 'gradFill') && !kid(ln, 'solidFill')) { const g0 = kids(kid(kid(ln, 'gradFill'), 'gsLst'), 'gs')[0]; line = { w: num(ln.getAttribute('w'), 12700), color: clr(g0, ctx), dash: '' }; }
     else if (ln && kid(ln, 'solidFill')) line = { w: num(ln.getAttribute('w'), 12700), color: clr(kid(ln, 'solidFill'), ctx), dash: path(ln, 'prstDash') ? path(ln, 'prstDash').getAttribute('val') : '' };
     else if (style) { const lr = kid(style, 'lnRef'); if (lr && num(lr.getAttribute('idx'), 0) > 0) line = { w: ln ? num(ln.getAttribute('w'), 12700) : 12700, color: clr(lr, ctx), dash: '' }; }
     return { bg, line };
@@ -217,7 +233,7 @@
       if (ln) { const pc = kid(ln, 'spcPct'), pt = kid(ln, 'spcPts'); if (pc) lh = 1.2 * num(pc.getAttribute('val'), 100000) / 100000; else if (pt) lh = null, d.style.lineHeight = (num(pt.getAttribute('val'), 1200) / 100 * PT) + 'px'; }
       if (lh) d.style.lineHeight = String(lh);
       const sb = firstKid(pl, 'spcBef'), sa = firstKid(pl, 'spcAft');
-      const spc = (e, sz) => { if (!e) return 0; const pc = kid(e, 'spcPct'), pt = kid(e, 'spcPts'); return pc ? num(pc.getAttribute('val'), 0) / 100000 * sz * 1.2 : pt ? num(pt.getAttribute('val'), 0) / 100 * PT : 0; };
+      const spc = (e, sz) => { if (!e) return 0; const pc = kid(e, 'spcPct'), pt = kid(e, 'spcPts'); return pc ? num(pc.getAttribute('val'), 0) / 100000 * sz * 1.2 * PT : pt ? num(pt.getAttribute('val'), 0) / 100 * PT : 0; };
       // runs
       const rl0 = (rPr) => [rPr, ...pl.map((l) => kid(l, 'defRPr'))];
       const mkRun = (rPr, text, isBr) => {
@@ -245,6 +261,7 @@
       }
       if (!any) { const e = kid(p, 'endParaRPr'); const sp2 = mkRun(e, '​', false); d.appendChild(sp2); firstSz = parseFloat(sp2.style.fontSize); }
       sizeForP = (firstSz || 18 * PT) / PT;
+      d.style.fontSize = (sizeForP * PT) + 'px';
       d.style.marginTop = (spc(sb, sizeForP)) + 'px'; d.style.marginBottom = (spc(sa, sizeForP)) + 'px';
       // bullet
       const bn = firstKid(pl, 'buNone'), bc = firstKid(pl, 'buChar'), ba = firstKid(pl, 'buAutoNum');
@@ -283,6 +300,32 @@
     f.async('uint8array').then((u) => { if (!S.urls[p]) S.urls[p] = URL.createObjectURL(new Blob([u], { type: MIME[ext] })); img.src = S.urls[p]; });
   }
 
+  /** custGeom -> CSS clip-path (px) */
+  function custClip(geom, wPx, hPx) {
+    const pl = kid(geom, 'pathLst'); if (!pl) return null; let d = '';
+    for (const p of kids(pl, 'path')) {
+      if (p.getAttribute('fill') === 'none') continue;
+      const pw = num(p.getAttribute('w'), 0) || wPx, ph = num(p.getAttribute('h'), 0) || hPx, sx = wPx / pw, sy = hPx / ph;
+      const pt = (e) => { const q = kid(e, 'pt'); return [num(q.getAttribute('x'), 0) * sx, num(q.getAttribute('y'), 0) * sy]; };
+      let cx = 0, cy = 0;
+      for (const c of Array.from(p.children)) {
+        const n = c.localName;
+        if (n === 'moveTo') { const [x, y] = pt(c); d += `M${x} ${y} `; cx = x; cy = y; }
+        else if (n === 'lnTo') { const [x, y] = pt(c); d += `L${x} ${y} `; cx = x; cy = y; }
+        else if (n === 'cubicBezTo') { const q = kids(c, 'pt').map((e) => [num(e.getAttribute('x'), 0) * sx, num(e.getAttribute('y'), 0) * sy]); if (q.length === 3) { d += `C${q[0][0]} ${q[0][1]} ${q[1][0]} ${q[1][1]} ${q[2][0]} ${q[2][1]} `; cx = q[2][0]; cy = q[2][1]; } }
+        else if (n === 'quadBezTo') { const q = kids(c, 'pt').map((e) => [num(e.getAttribute('x'), 0) * sx, num(e.getAttribute('y'), 0) * sy]); if (q.length === 2) { d += `Q${q[0][0]} ${q[0][1]} ${q[1][0]} ${q[1][1]} `; cx = q[1][0]; cy = q[1][1]; } }
+        else if (n === 'arcTo') {
+          const wR = num(c.getAttribute('wR'), 0) * sx, hR = num(c.getAttribute('hR'), 0) * sy, st = num(c.getAttribute('stAng'), 0) / 60000 * Math.PI / 180, sw = num(c.getAttribute('swAng'), 0) / 60000 * Math.PI / 180;
+          if (wR > 0 && hR > 0) {
+            const ox = cx - wR * Math.cos(st), oy = cy - hR * Math.sin(st), ex = ox + wR * Math.cos(st + sw), ey = oy + hR * Math.sin(st + sw);
+            d += `A${wR} ${hR} 0 ${Math.abs(sw) > Math.PI ? 1 : 0} ${sw > 0 ? 1 : 0} ${ex} ${ey} `; cx = ex; cy = ey;
+          }
+        } else if (n === 'close') d += 'Z ';
+      }
+    }
+    return d ? `path('${d.trim()}')` : null;
+  }
+
   /* ---------------- slide rendering ---------------- */
   function px(v, K) { return (v * K) + 'px'; }
   function renderShapeList(parent, host, ctx, tf, K, editable, layerPath) {
@@ -298,7 +341,8 @@
           const sx = cx / cex, sy = cy / cey;
           t2 = { ox: tf.ox + (ox - chx * sx) * tf.sx, oy: tf.oy + (oy - chy * sy) * tf.sy, sx: tf.sx * sx, sy: tf.sy * sy };
         }
-        renderShapeList(e, host, ctx, t2, K, editable, layerPath); continue;
+        const gpn = paint(kid(e, 'grpSpPr'), null, ctx); const prevG = ctx._gfill; if (gpn.bg) ctx._gfill = gpn.bg;
+        renderShapeList(e, host, ctx, t2, K, editable, layerPath); ctx._gfill = prevG; continue;
       }
       if (n !== 'sp' && n !== 'pic' && n !== 'cxnSp' && n !== 'graphicFrame') continue;
       const hidden = path(e, n === 'graphicFrame' ? 'nvGraphicFramePr' : n === 'pic' ? 'nvPicPr' : n === 'cxnSp' ? 'nvCxnSpPr' : 'nvSpPr', 'cNvPr');
@@ -329,6 +373,9 @@
         }
         if (fh) tr += 'scaleX(-1) '; if (fv) tr += 'scaleY(-1) ';
         const pn = paint(kid(e, 'spPr'), null, ctx); if (pn.line) box.style.border = `${Math.max(1, pn.line.w * K)}px solid ${pn.line.color}`;
+        const pg = path(e, 'spPr', 'prstGeom'), cg = path(e, 'spPr', 'custGeom');
+        if (pg && pg.getAttribute('prst') === 'ellipse') box.style.borderRadius = '50%'; else if (pg && pg.getAttribute('prst') === 'roundRect') box.style.borderRadius = (Math.min(w, h) * K * 0.1667) + 'px';
+        else if (cg) { const cp = custClip(cg, w * K, h * K); if (cp) { box.style.clipPath = cp; box.style.border = 'none'; } }
       } else if (n === 'cxnSp' || (n === 'sp' && path(e, 'spPr', 'prstGeom') && /^(line|straightConnector1)$/.test(path(e, 'spPr', 'prstGeom').getAttribute('prst')) && !kid(e, 'txBody'))) {
         const pn = paint(kid(e, 'spPr'), kid(e, 'style'), ctx);
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); svg.style.overflow = 'visible';
@@ -339,20 +386,22 @@
         svg.appendChild(l); box.appendChild(svg);
       } else if (n === 'graphicFrame') {
         const tbl = e.getElementsByTagNameNS(NSA, 'tbl')[0];
-        let dr = null; const rid = e.getElementsByTagNameNS('*', 'relIds')[0];
+        let dr = null, drPath = null; const rid = e.getElementsByTagNameNS('*', 'relIds')[0];
         if (rid && !tbl) {
           const rl = S.rels[ctx.slide] || {}; const dmr = rl[rid.getAttributeNS(NSR, 'dm')]; const dmd = dmr && S.docs[dmr.target];
           const ext = dmd && dmd.getElementsByTagNameNS('*', 'dataModelExt')[0]; const drr = ext && rl[ext.getAttribute('relId')];
-          dr = drr && S.docs[drr.target];
-          if (!dr) { const any = Object.values(rl).find((r) => r.type === 'diagramDrawing'); dr = any && S.docs[any.target]; }
+          dr = drr && S.docs[drr.target]; drPath = drr && drr.target;
+          if (!dr) { const any = Object.values(rl).find((r) => r.type === 'diagramDrawing'); dr = any && S.docs[any.target]; drPath = any && any.target; }
         }
         if (tbl) renderTable(tbl, box, ctx, K, w, editable);
-        else if (dr && dr.getElementsByTagNameNS('*', 'spTree')[0]) renderShapeList(dr.getElementsByTagNameNS('*', 'spTree')[0], box, ctx, { ox: 0, oy: 0, sx: 1, sy: 1 }, K, false, 'slide');
+        else if (dr && (ctx.owner.dgm = drPath) && dr.getElementsByTagNameNS('*', 'spTree')[0]) renderShapeList(dr.getElementsByTagNameNS('*', 'spTree')[0], box, ctx, { ox: 0, oy: 0, sx: 1, sy: 1 }, K, false, 'dgm');
         else { box.style.border = '1px dashed #8886'; box.style.display = 'flex'; box.style.alignItems = 'center'; box.style.justifyContent = 'center'; box.style.color = '#888'; box.style.fontSize = '13px'; box.textContent = 'רכיב שלא נתמך בתצוגה (תרשים / SmartArt)'; }
       } else { // sp
         const spPr = kid(e, 'spPr'), pn = paint(spPr, kid(e, 'style'), ctx);
         const geom = path(spPr, 'prstGeom'), prst = geom ? geom.getAttribute('prst') : 'rect';
+        if (e.getAttribute('useBgFill') === '1') pn.bg = bgOf(ctx);
         if (pn.bg) box.style.background = pn.bg;
+        const cgm = !kid(e, 'txBody') || !kid(kid(e, 'txBody'), 'p') || kids(kid(e, 'txBody'), 'p').every((q) => !ptext(q)) ? path(spPr, 'custGeom') : null; if (cgm) { const cp = custClip(cgm, w * K, h * K); if (cp) { box.style.clipPath = cp; box.style.border = 'none'; } }
         if (pn.line) box.style.border = `${Math.max(1, pn.line.w * K)}px ${/dash|sysDot/i.test(pn.line.dash) ? 'dashed' : 'solid'} ${pn.line.color}`;
         if (prst === 'ellipse') box.style.borderRadius = '50%';
         else if (prst === 'roundRect') box.style.borderRadius = (Math.min(w, h) * K * 0.1667) + 'px';
@@ -360,6 +409,8 @@
         else if (prst === 'diamond') { box.style.clipPath = 'polygon(50% 0,100% 50%,50% 100%,0 50%)'; box.style.border = 'none'; }
         else if (prst === 'rightArrow') { box.style.clipPath = 'polygon(0 25%,60% 25%,60% 0,100% 50%,60% 100%,60% 75%,0 75%)'; box.style.border = 'none'; }
         else if (prst === 'leftArrow') { box.style.clipPath = 'polygon(100% 25%,40% 25%,40% 0,0 50%,40% 100%,40% 75%,100% 75%)'; box.style.border = 'none'; }
+        const sbl = spPr && path(spPr, 'blipFill', 'blip'); const srel = sbl && S.rels[ctx.owner[layerPath]] && S.rels[ctx.owner[layerPath]][sbl.getAttributeNS(NSR, 'embed')];
+        if (srel && srel.target) { const im = document.createElement('img'); Object.assign(im.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none' }); const am2 = kid(sbl, 'alphaModFix'); if (am2) im.style.opacity = String(num(am2.getAttribute('amt'), 100000) / 100000); setImg(im, srel.target); box.appendChild(im); }
         const tx = kid(e, 'txBody');
         if (tx) {
           const bp = kid(tx, 'bodyPr');
@@ -414,7 +465,7 @@
     for (const doc of [ctx.doc, ctx.layoutDoc, ctx.masterDoc]) {
       const bg = doc && path(doc.documentElement, 'cSld', 'bg'); if (!bg) continue;
       const pr = kid(bg, 'bgPr');
-      if (pr) { const sf = kid(pr, 'solidFill'), gf = kid(pr, 'gradFill'); if (sf) return clr(sf, ctx); if (gf) return gradCss(gf, ctx); }
+      if (pr) { const sf = kid(pr, 'solidFill'), gf = kid(pr, 'gradFill'); if (sf) return clr(sf, ctx); if (gf) return gradCss(gf, ctx); const pt = kid(pr, 'pattFill'); if (pt) return pattCss(pt, ctx); }
       const ref = kid(bg, 'bgRef'); if (ref) { const c = clr(ref, ctx); if (c) return c; }
     }
     return '#fff';
@@ -426,10 +477,10 @@
       const ch = b.clientHeight; if (!ch || !b.children.length) return;
       const cs = getComputedStyle(b), avail = ch - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       const kidsEl = Array.from(b.children); const top = kidsEl[0].getBoundingClientRect().top - (parseFloat(kidsEl[0].style.marginTop) || 0), bot = kidsEl[kidsEl.length - 1].getBoundingClientRect().bottom + (parseFloat(kidsEl[kidsEl.length - 1].style.marginBottom) || 0);
-      const need = bot - top; if (need <= avail * 1.04 || avail <= 0) return;
-      const f = Math.max(0.45, avail / need);
+      const need = bot - top; if (need <= avail * 1.12 || avail <= 0) return;
+      const f = Math.max(0.55, avail / need);
       b.querySelectorAll('span').forEach((x) => { const v = parseFloat(x.style.fontSize); if (v) x.style.fontSize = (v * f) + 'px'; });
-      b.querySelectorAll(':scope > div').forEach((d) => { ['lineHeight', 'marginTop', 'marginBottom'].forEach((k) => { if (/px$/.test(d.style[k])) d.style[k] = (parseFloat(d.style[k]) * f) + 'px'; }); });
+      b.querySelectorAll(':scope > div').forEach((d) => { if (d.style.fontSize) d.style.fontSize = (parseFloat(d.style.fontSize) * f) + 'px'; ['lineHeight', 'marginTop', 'marginBottom'].forEach((k) => { if (/px$/.test(d.style[k])) d.style[k] = (parseFloat(d.style[k]) * f) + 'px'; }); });
     });
   }
   /** Builds the slide DOM at the given pixel width. */
