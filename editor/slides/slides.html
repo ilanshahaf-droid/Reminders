@@ -14,7 +14,9 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:
 .tx{cursor:pointer}
 .tx:active{outline:2px dashed var(--acc);outline-offset:1px}
 #info{display:flex;align-items:center;gap:6px;padding:3px 8px;background:var(--bar);font-size:13px;color:var(--sub);border-top:1px solid var(--grid)}
-#info b{flex:1;font-weight:400}
+#info b{font-weight:600;min-width:64px;text-align:center;font-size:15px;color:var(--fg)}
+#info .sp{flex:1}
+#info button.pg{min-width:52px;height:38px;font-size:18px;background:var(--acc);color:#fff}
 #info button{border:0;background:var(--chip);color:var(--fg);border-radius:8px;height:30px;min-width:34px;font-size:16px}
 #strip{display:flex;gap:8px;padding:6px 8px;background:var(--bar);overflow-x:auto;border-top:1px solid var(--grid);direction:rtl}
 .th{position:relative;flex:none;padding:0;border:2px solid var(--grid);border-radius:6px;overflow:hidden;background:#fff}
@@ -38,12 +40,15 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:
 #dlg .row .dng{color:#e5484d}
 #pres{position:fixed;inset:0;background:#000;z-index:50;display:none;align-items:center;justify-content:center;flex-direction:column}
 #pres.show{display:flex}
+#pres .px{position:absolute;top:10px;right:10px;width:44px;height:44px;border:0;border-radius:50%;background:#fff3;color:#fff;font-size:20px}
+#pres .pa{position:absolute;top:50%;transform:translateY(-50%);color:#fff7;font-size:28px;padding:20px 8px}
+#pres .pl{left:0}#pres .pr{right:0}
 #pres .pc{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);color:#fff9;font-size:12px}
-#toast{position:fixed;bottom:150px;left:50%;transform:translateX(-50%);background:#222c;color:#fff;border-radius:18px;padding:8px 16px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center}
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#222c;color:#fff;border-radius:18px;padding:8px 16px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center}
 </style></head><body>
 <div id="app">
 <div id="stage"></div>
-<div id="info"><button data-a="next">›</button><b id="cnt"></b><button data-a="prev">‹</button><button data-a="zout">－</button><button data-a="zin">＋</button></div>
+<div id="info" dir="ltr"><button data-a="zout">－</button><button data-a="zin">＋</button><span class="sp"></span><button class="pg" data-a="next">◀</button><b id="cnt" dir="ltr"></b><button class="pg" data-a="prev">▶</button><span class="sp"></span><span style="width:76px"></span></div>
 <div id="strip"></div>
 <div id="tb">
   <button data-a="add">＋ שקף</button><button data-a="dup">⧉</button><button data-a="del">🗑</button><span class="sep"></span>
