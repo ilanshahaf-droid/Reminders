@@ -298,6 +298,20 @@ fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
         }
     }
     val healthy = remember(tick) { NotificationManagerCompat.from(ctx).areNotificationsEnabled() && batteryOk(ctx) && fullScreenOk(ctx) }
+    // Android may reset the full-screen permission after an update; ask once per launch and jump straight to the right settings screen
+    var fsPrompt by remember { mutableStateOf(!fullScreenOk(ctx)) }
+    if (fsPrompt) AlertDialog(
+        onDismissRequest = { fsPrompt = false },
+        title = { Text("הרשאת התראה במסך מלא כבויה") },
+        text = { Text("בלעדיה התזכורות לא יקפצו מעל מסך הנעילה. אנדרואיד מאפס לפעמים את ההרשאה אחרי עדכון. אפשר להפעיל אותה בלחיצה אחת.") },
+        confirmButton = {
+            TextButton({
+                fsPrompt = false
+                runCatching { ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).setData(Uri.parse("package:${ctx.packageName}"))) }
+            }) { Text("פתח הגדרות") }
+        },
+        dismissButton = { TextButton({ fsPrompt = false }) { Text("לא עכשיו") } }
+    )
 
     Box(Modifier.fillMaxSize().background(appBackground())) {
         val e = editor
@@ -808,7 +822,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v94") },
+        title = { Text("הגדרות · v95") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
