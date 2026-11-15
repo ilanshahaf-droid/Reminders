@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>
+:root{--bg:#fff;--bar:#f2f3f9;--fg:#14161f;--sub:#6a6f85;--grid:#d9dbe6;--hd:#eceef6;--acc:#4f46e5;--sel:#4f46e522;--chip:#e4e6f2}
+html.dark{--bg:#14151c;--bar:#1e202a;--fg:#f1f2f7;--sub:#a3a7b8;--grid:#33364a;--hd:#232636;--acc:#9ea0ff;--sel:#9ea0ff30;--chip:#2b2e3b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
+body{display:flex;flex-direction:column}
+#fbar{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bar);border-bottom:1px solid var(--grid)}
+#addr{min-width:54px;text-align:center;font-weight:700;font-size:14px;color:var(--acc);direction:ltr}
+#fxin{flex:1;height:34px;border:1px solid var(--grid);border-radius:8px;background:var(--bg);color:var(--fg);font-size:16px;padding:0 8px;}
+#wrap{flex:1;overflow:auto;position:relative;-webkit-overflow-scrolling:touch;background:var(--bg)}
+#grid{position:relative;width:max-content;transform-origin:0 0}
+table{border-collapse:separate;border-spacing:0;table-layout:fixed}
+td,th{scroll-margin-inline-start:44px;scroll-margin-top:32px;scroll-margin-bottom:6px;scroll-margin-inline-end:6px;border-inline-end:1px solid var(--grid);border-bottom:1px solid var(--grid);overflow:hidden;white-space:nowrap;text-overflow:clip;padding:0 4px;font-size:14px;height:28px;line-height:26px;background:var(--bg);user-select:none;-webkit-user-select:none}
+td.wr{white-space:normal;line-height:1.25;vertical-align:top;padding-top:3px}
+th{background:var(--hd);color:var(--sub);font-weight:600;text-align:center;position:sticky;z-index:2;font-size:12px}
+thead th{top:0;height:26px}
+tbody th{inset-inline-start:0;z-index:1;min-width:38px;width:38px}
+thead th.corner{inset-inline-start:0;z-index:3}
+th.hs{background-color:var(--hd);background-image:linear-gradient(var(--sel),var(--sel));color:var(--acc)}
+td.sel{background-image:linear-gradient(var(--sel),var(--sel))}
+td.cur{outline:2px solid var(--acc);outline-offset:-2px}
+#ed{position:absolute;z-index:5;display:none;border:2px solid var(--acc);background:var(--bg);color:var(--fg);font-size:15px;padding:0 4px;margin:0;outline:none;resize:none;overflow:hidden;font-family:inherit;white-space:pre}
+#tb{display:flex;gap:4px;padding:5px 6px;background:var(--bar);overflow-x:auto;border-top:1px solid var(--grid);direction:rtl}
+#tb button,#tb select{flex:none;min-width:38px;height:38px;border:0;border-radius:9px;background:var(--chip);color:var(--fg);font-size:16px;font-family:inherit;padding:0 8px}
+#tb button.on{background:var(--acc);color:#fff}
+#tb .sep{flex:none;width:1px;background:var(--grid);margin:4px 2px}
+#tabs{display:flex;gap:4px;padding:4px 6px;background:var(--bar);overflow-x:auto;border-top:1px solid var(--grid);align-items:center}
+#tabs button{flex:none;border:0;border-radius:9px;background:var(--chip);color:var(--fg);height:34px;padding:0 14px;font-size:14px}
+#tabs button.on{background:var(--acc);color:#fff;font-weight:700}
+.pop{position:fixed;z-index:20;background:var(--bar);border:1px solid var(--grid);border-radius:12px;box-shadow:0 6px 24px #0005;padding:8px;display:none;max-width:92vw}
+.pop.show{display:block}
+.pop .it{display:block;width:100%;text-align:start;border:0;background:transparent;color:var(--fg);font-size:16px;padding:10px 14px;border-radius:8px;font-family:inherit}
+.pop .it:active{background:var(--chip)}
+.pop .it.dng{color:#e5484d}
+.pal{display:grid;grid-template-columns:repeat(8,34px);gap:6px}
+.pal i{width:34px;height:34px;border-radius:8px;border:1px solid #8886;display:block}
+.pal i.none{background:linear-gradient(135deg,#fff 45%,#e5484d 45% 55%,#fff 55%)}
+#dlg{position:fixed;inset:0;background:#0007;z-index:30;display:none;align-items:center;justify-content:center}
+#dlg.show{display:flex}
+#dlg .box{background:var(--bar);border-radius:16px;padding:16px;width:min(88vw,340px)}
+#dlg input{width:100%;height:42px;font-size:17px;border:1px solid var(--grid);border-radius:10px;padding:0 10px;background:var(--bg);color:var(--fg);margin:10px 0}
+#dlg .row{display:flex;gap:8px;justify-content:flex-end}
+#dlg .row button{border:0;border-radius:10px;height:38px;padding:0 16px;font-size:15px;background:var(--chip);color:var(--fg)}
+#dlg .row button.pri{background:var(--acc);color:#fff}
+#toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#222c;color:#fff;border-radius:18px;padding:8px 16px;font-size:14px;z-index:40;display:none}
+</style></head><body>
+<div id="fbar"><span id="addr">A1</span><input id="fxin" dir="auto" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></div>
+<div id="wrap"><div id="grid"><table id="tbl"></table><textarea id="ed" dir="auto" rows="1" spellcheck="false"></textarea></div></div>
+<div id="tb">
+  <button data-a="undo">↶</button><button data-a="redo">↷</button><span class="sep"></span>
+  <button data-a="bold"><b>B</b></button><button data-a="italic"><i>I</i></button><button data-a="under"><u>U</u></button>
+  <button data-a="fc" style="color:#e5484d">A</button><button data-a="bg">🎨</button><button data-a="border">▦</button><span class="sep"></span>
+  <button data-a="al-l">⇤</button><button data-a="al-c">↔</button><button data-a="al-r">⇥</button><button data-a="wrap">↵</button><button data-a="merge">⊞</button><span class="sep"></span>
+  <select id="nf"><option value="General">כללי</option><option value="0">מספר 0</option><option value="0.00">מספר 0.00</option><option value="#,##0">אלפים #,##0</option><option value="#,##0.00">אלפים 0.00</option><option value="0%">אחוז</option><option value="0.00%">אחוז 0.00%</option><option value="&quot;₪&quot;#,##0.00">₪ מטבע</option><option value="dd/mm/yyyy">תאריך</option><option value="hh:mm">שעה</option><option value="@">טקסט</option></select>
+  <span class="sep"></span>
+  <button data-a="sum">Σ</button><button data-a="rows">☰ שורות/עמודות</button><button data-a="sort">⇅ מיון</button><button data-a="clear">🧹</button><button data-a="range">⬚ טווח</button><span class="sep"></span>
+  <button data-a="zin">＋</button><button data-a="zout">－</button>
+</div>
+<div id="tabs"></div>
+<div class="pop" id="pop"></div>
+<div id="dlg"><div class="box"><div id="dtitle" style="font-weight:700"></div><input id="dinp"><div class="row"><button id="dno">ביטול</button><button class="pri" id="dok">אישור</button></div></div></div>
+<div id="toast"></div>
+<script src="exceljs.min.js"></script>
+<script src="fx.js"></script>
+<script src="sheet.js"></script>
+</body></html>

@@ -193,7 +193,7 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
       <div><h1>מסמכים</h1><div class="sub" id="dcount"></div></div>
       <div class="bar" style="margin:0"><button onclick="$('dfile').click()">+ העלאה</button><button class="ghost" onclick="logout()">התנתק</button></div>
     </div>
-    <input id="dfile" type="file" accept=".pdf,.docx,application/pdf" class="hide" onchange="uploadDoc(this)">
+    <input id="dfile" type="file" accept=".pdf,.docx,.xlsx,application/pdf" class="hide" onchange="uploadDoc(this)">
     <input id="dq" placeholder="חיפוש במסמכים" oninput="renderDocs()">
     <div id="dmsg" class="err"></div>
     <div id="dlist"></div>
@@ -1112,9 +1112,9 @@ function renderDocs(){
   const q = ($('dq').value || '').trim().toLowerCase(), box = $('dlist'); box.innerHTML = '';
   docs.filter(d => !q || d.name.toLowerCase().includes(q)).forEach(d => {
     const pdf = /\.pdf$/i.test(d.name), row = el('div', 'card');
-    row.appendChild(el('div', '', pdf ? '📕' : '📄'));
+    row.appendChild(el('div', '', pdf ? '📕' : /\.xlsx$/i.test(d.name) ? '📗' : '📄'));
     const mid = el('div', ''); mid.style.flex = '1'; mid.style.minWidth = '0';
-    mid.appendChild(el('div', 'nt', d.name.replace(/\.(pdf|docx)$/i, '')));
+    mid.appendChild(el('div', 'nt', d.name.replace(/\.(pdf|docx|xlsx)$/i, '')));
     mid.appendChild(el('div', 'sub', fmtSize(d.size || 0) + ' · ' + new Date(d.updated_at).toLocaleDateString('he-IL')));
     row.appendChild(mid);
     const open = el('button', 'sec', pdf ? 'פתח' : 'הורד'); open.onclick = e => { e.stopPropagation(); openDoc(d, pdf); };
@@ -1130,7 +1130,7 @@ async function docBlob(d){
   if(!r.ok) throw new Error(r.status);
   const a = await r.json(); if(!a.length) throw new Error('missing');
   const bin = atob(a[0].data), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-  return new Blob([u], {type: /\.pdf$/i.test(d.name) ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  return new Blob([u], {type: /\.pdf$/i.test(d.name) ? 'application/pdf' : /\.xlsx$/i.test(d.name) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
 }
 async function openDoc(d, view){
   try{
