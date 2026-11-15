@@ -27,8 +27,9 @@ class AlarmReceiver : BroadcastReceiver() {
             if (nag > 0 && Notifier.handledSinceFire(c, id)) return@async
             if (t.alertMode != "NONE") {
                 Notifier.show(c, t)
-                WearBridge.fire(c, t)
-                Scheduler.setNag(c, id, nag + 1)
+                // a button on the watch may have been pressed while the alert was still being put up: its stop came too early, so stop again
+                if (Notifier.handledSinceFire(c, id)) Notifier.dismissReminder(c, id)
+                else { WearBridge.fire(c, t); Scheduler.setNag(c, id, nag + 1) }
             }
             if (nag > 0) return@async
             // re-read: the user may have tapped a button while the alert was being shown, and that must not be overwritten
@@ -101,8 +102,7 @@ class ActionReceiver : BroadcastReceiver() {
             WearBridge.dismiss(c, id, act == "DONE" || act == "CANCEL_SNOOZE")
             WearBridge.pushList(c)
             // belt and braces: stop any vibration that a racing alert may have started in the meantime
-            kotlinx.coroutines.delay(1500)
-            Notifier.dismissReminder(c, id)
+            for (d in longArrayOf(1500, 3000, 6000)) { kotlinx.coroutines.delay(d); Notifier.dismissReminder(c, id) }
         }
     }
 }

@@ -15,14 +15,22 @@ import java.time.LocalTime
 
 /** Talks to the watch app (same applicationId) through the Wearable Data Layer. */
 object WearBridge {
-    private fun send(c: Context, path: String, payload: String) {
+    private fun send(c: Context, path: String, payload: String, attempt: Int = 0) {
+        val app = c.applicationContext
+        // no watch in reach (or a failed send) is retried a few times; nothing is retried once a send went through
+        fun retry() {
+            if (attempt < 3) android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ send(app, path, payload, attempt + 1) }, 2000L * (attempt + 1))
+        }
         runCatching {
-            val app = c.applicationContext
-            Wearable.getNodeClient(app).connectedNodes.addOnSuccessListener { nodes ->
-                for (n in nodes) {
-                    Wearable.getMessageClient(app).sendMessage(n.id, path, payload.toByteArray(Charsets.UTF_8))
+            Wearable.getNodeClient(app).connectedNodes
+                .addOnSuccessListener { nodes ->
+                    // a phone without a paired watch has no nodes at all: do not keep retrying forever
+                    for (n in nodes) {
+                        Wearable.getMessageClient(app).sendMessage(n.id, path, payload.toByteArray(Charsets.UTF_8))
+                            .addOnFailureListener { retry() }
+                    }
                 }
-            }
+                .addOnFailureListener { retry() }
         }
     }
 

@@ -323,6 +323,38 @@ async function render(p) {
 }
 function free(p) { if (p.task) { try { p.task.cancel(); } catch (_) {} } p.cv.width = 0; p.ov.width = 0; p.rendered = 0; }
 
+/* ---------- two-finger pinch zoom ---------- */
+function bindPinch() {
+  const sc = $('scroller'), pg = $('pages');
+  let d0 = 0, z0 = 1, f = 1, cx = 0, cy = 0;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  sc.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      d0 = dist(e.touches); z0 = zoom; f = 1;
+      const r = sc.getBoundingClientRect();
+      cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left; cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      pg.style.transformOrigin = (sc.scrollLeft + cx) + 'px ' + (sc.scrollTop + cy) + 'px';
+    } else d0 = 0;
+  }, { passive: true });
+  sc.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2 || !d0) return;
+    e.preventDefault();
+    f = Math.max(1 / z0, Math.min(4 / z0, dist(e.touches) / d0));
+    pg.style.transform = 'scale(' + f + ')';
+  }, { passive: false });
+  const end = () => {
+    if (!d0) return; d0 = 0;
+    pg.style.transform = ''; pg.style.transformOrigin = '';
+    const nz = Math.max(1, Math.min(4, z0 * f));
+    if (Math.abs(nz - zoom) < 0.02) return;
+    const rx = (sc.scrollLeft + cx) / Math.max(1, sc.scrollWidth), ry = (sc.scrollTop + cy) / Math.max(1, sc.scrollHeight);
+    setZoom(nz);
+    sc.scrollLeft = rx * sc.scrollWidth - cx; sc.scrollTop = ry * sc.scrollHeight - cy;
+  };
+  sc.addEventListener('touchend', e => { if (e.touches.length < 2) end(); }, { passive: true });
+  sc.addEventListener('touchcancel', end, { passive: true });
+}
+
 function setZoom(z) {
   closeEditor(false);
   const sc = $('scroller'), ratio = sc.scrollTop / Math.max(1, sc.scrollHeight);
@@ -649,7 +681,7 @@ window.PV = {
     try {
       bytes = b64ToBytes(A().docData());
       doc = await pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true, isEvalSupported: false }).promise;
-      await buildPages(); bindBar(); bindFill(); bindSearch(); setTool('scroll'); $('zl').textContent = '100%';
+      await buildPages(); bindBar(); bindFill(); bindSearch(); bindPinch(); setTool('scroll'); $('zl').textContent = '100%';
       A().opened();
       try {
         const sc = $('scroller'), r = parseFloat(A().getPos ? A().getPos() : '') || 0;

@@ -70,6 +70,24 @@
     var ed = document.createElement('div'); ed.className = 'ne-ed'; ed.contentEditable = 'true';
     ed.setAttribute('data-ph', opts.placeholder || 'כתוב כאן…'); ed.setAttribute('dir', 'rtl'); ed.spellcheck = true;
     body.appendChild(ed);
+    // two-finger pinch zoom in page view (like Word)
+    (function(){
+      var d0 = 0;
+      function dist(t){ var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx*dx + dy*dy); }
+      body.addEventListener('touchstart', function(e){ d0 = e.touches.length === 2 ? dist(e.touches) : 0; }, {passive:true});
+      body.addEventListener('touchmove', function(e){
+        if(e.touches.length !== 2 || !d0 || !root.classList.contains('page')) return;
+        e.preventDefault();
+        var d = dist(e.touches), f = d / d0; d0 = d;
+        var r = body.getBoundingClientRect();
+        var cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+        var rx = (body.scrollLeft + cx) / Math.max(1, body.scrollWidth), ry = (body.scrollTop + cy) / Math.max(1, body.scrollHeight);
+        var cur = parseFloat(root.style.getPropertyValue('--pz')) || 0.5;
+        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2.5, cur * f))));
+        body.scrollLeft = rx * body.scrollWidth - cx; body.scrollTop = ry * body.scrollHeight - cy;
+      }, {passive:false});
+      body.addEventListener('touchend', function(e){ if(e.touches.length < 2) d0 = 0; }, {passive:true});
+    })();
     ed.addEventListener('click', function(e){
       var a = e.target && e.target.closest ? e.target.closest('a[href^="doc://"]') : null;
       if(!a) return;
@@ -353,7 +371,7 @@
       },
       pageZoom: function(f){
         var cur = parseFloat(root.style.getPropertyValue('--pz')) || 0.5;
-        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2, cur * f))));
+        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2.5, cur * f))));
       }
     };
   }
