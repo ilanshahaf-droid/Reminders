@@ -1050,10 +1050,13 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                         moreMenu = false; pageView = !pageView; Docs.setPageView(ctx, pageView)
                     })
                     if (pageView) {
-                        DropdownMenuItem(text = { Text("🔍 הגדל") }, onClick = { web.value?.evaluateJavascript("NE.zoom(1.25)", null) })
-                        DropdownMenuItem(text = { Text("🔍 הקטן") }, onClick = { web.value?.evaluateJavascript("NE.zoom(0.8)", null) })
+                        DropdownMenuItem(text = { Text("➕ הגדל תצוגה") }, onClick = { web.value?.evaluateJavascript("NE.zoom(1.25)", null) })
+                        DropdownMenuItem(text = { Text("➖ הקטן תצוגה") }, onClick = { web.value?.evaluateJavascript("NE.zoom(0.8)", null) })
                     }
-                    DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = {
+                    DropdownMenuItem(text = { Text("🔍 חיפוש במסמך") }, onClick = { moreMenu = false; finding = true })
+                    DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })
+                    HorizontalDivider()
+                    DropdownMenuItem(text = { Text("💾 שמירה בשם…") }, onClick = {
                         moreMenu = false
                         scope.launch {
                             requestSave(false); delay(1500)
@@ -1071,17 +1074,14 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                             }
                         }) else DropdownMenuItem(text = { Text("☁️ מקושר לענן – נשמר אוטומטית") }, onClick = { moreMenu = false })
                     }
-                    DropdownMenuItem(text = { Text("שתף כקובץ Word") }, onClick = {
+                    DropdownMenuItem(text = { Text("📤 שתף כקובץ Word") }, onClick = {
                         moreMenu = false
                         scope.launch {
                             requestSave(false); delay(1200)
                             cur?.let { Docs.share(ctx, it) }
                         }
                     })
-                    if (cur?.exists() == true) DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true })
-                    DropdownMenuItem(text = { Text("🔍 חיפוש במסמך") }, onClick = { moreMenu = false; finding = true })
-                    DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })
-                    DropdownMenuItem(text = { Text("📄 המר ל-PDF (שמור כקובץ)") }, onClick = {
+                    DropdownMenuItem(text = { Text("📄 שמור כ-PDF (בלשונית מסמכים)") }, onClick = {
                         moreMenu = false
                         web.value?.let { w ->
                             val n = Docs.clean(title.ifBlank { "מסמך" })
@@ -1094,7 +1094,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                             }
                         }
                     })
-                    DropdownMenuItem(text = { Text("הדפס / שמור כ-PDF") }, onClick = {
+                    DropdownMenuItem(text = { Text("🖨 הדפסה") }, onClick = {
                         moreMenu = false
                         web.value?.let {
                             val pm = ctx.getSystemService(Context.PRINT_SERVICE) as android.print.PrintManager
@@ -1102,6 +1102,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                             pm.print(n, it.createPrintDocumentAdapter(n), null)
                         }
                     })
+                    if (cur?.exists() == true) { HorizontalDivider(); DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true }) }
                 }
             }
         }
@@ -1260,19 +1261,18 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                     DropdownMenuItem(text = { Text("🔍 חיפוש בקובץ") }, onClick = { moreMenu = false; web.value?.evaluateJavascript("PV.findOpen()", null) })
-                    DropdownMenuItem(text = { Text("שמור") }, onClick = { moreMenu = false; save(false, false) })
-                    DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = {
+                    DropdownMenuItem(text = { Text("💾 שמירה בשם…") }, onClick = {
                         moreMenu = false
                         scope.launch { if (dirty) { save(false, false); delay(2500) }; showSaveAs = true }
                     })
-                    DropdownMenuItem(text = { Text("שמור כעותק") }, onClick = { moreMenu = false; save(true, false) })
                     key(linkTick) {
                         if (!Docs.isLinked(ctx, cur)) DropdownMenuItem(text = { Text("☁️ שמור ב-Drive / OneDrive") }, onClick = {
                             moreMenu = false; cloudSave.launch(cloudCreateIntent(cur))
                         }) else DropdownMenuItem(text = { Text("☁️ מקושר לענן – נשמר אוטומטית") }, onClick = { moreMenu = false })
                     }
-                    DropdownMenuItem(text = { Text("שתף") }, onClick = { moreMenu = false; Docs.share(ctx, cur) })
-                    DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { moreMenu = false; Docs.openExternal(ctx, cur) })
+                    DropdownMenuItem(text = { Text("📤 שתף") }, onClick = { moreMenu = false; Docs.share(ctx, cur) })
+                    DropdownMenuItem(text = { Text("↗️ פתח באפליקציה אחרת") }, onClick = { moreMenu = false; Docs.openExternal(ctx, cur) })
+                    HorizontalDivider()
                     DropdownMenuItem(text = { Text("🗑 מחק את הקובץ", color = cs.error) }, onClick = { moreMenu = false; delAsk = true })
                 }
             }
