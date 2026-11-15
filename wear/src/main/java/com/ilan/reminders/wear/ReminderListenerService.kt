@@ -27,6 +27,7 @@ class ReminderListenerService : WearableListenerService() {
             if (ev.type == DataEvent.TYPE_CHANGED && ev.dataItem.uri.path == "/tasks") {
                 val json = DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
                 TaskStore.update(this, json)
+                stopStaleAlerts()
                 runCatching { androidx.wear.tiles.TileService.getUpdater(this).requestUpdate(ReminderTileService::class.java) }
             }
         }
@@ -34,6 +35,7 @@ class ReminderListenerService : WearableListenerService() {
 
     private fun fire(j: JSONObject) {
         val id = j.optLong("id")
+        markFiring(this, id, true)
         getSystemService(NotificationManager::class.java).cancel(snoozeNoteId(id))
         val intent = Intent(this, ReminderActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -74,6 +76,7 @@ class ReminderListenerService : WearableListenerService() {
     private fun dismiss(id: Long, done: Boolean) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.cancel(id.toInt())
+        markFiring(this, id, false)
         stopVibration(this)
         if (done) nm.cancel(snoozeNoteId(id))
         ReminderActivity.current?.get()?.let { a ->
@@ -81,7 +84,32 @@ class ReminderListenerService : WearableListenerService() {
         }
     }
 
+    /**
+     * Safety net: the phone's task list always follows a snooze/done tap. If a "dismiss" message was lost, an alert that is still
+     * buzzing for a task that is now snoozed or gone from the list is stopped here.
+     */
+    private fun stopStaleAlerts() {
+        val ids = firing(this)
+        if (ids.isEmpty()) return
+        val now = System.currentTimeMillis()
+        val list = TaskStore.tasks.value
+        for (id in ids) {
+            val t = list.firstOrNull { it.id == id }
+            if (t == null || t.snoozeUntil > now) dismiss(id, false)
+        }
+    }
+
     companion object {
+        private fun firing(c: android.content.Context): Set<Long> =
+            c.getSharedPreferences("watch", android.content.Context.MODE_PRIVATE).getStringSet("firing", emptySet())!!.mapNotNull { it.toLongOrNull() }.toSet()
+
+        fun markFiring(c: android.content.Context, id: Long, on: Boolean) {
+            val p = c.getSharedPreferences("watch", android.content.Context.MODE_PRIVATE)
+            val set = p.getStringSet("firing", emptySet())!!.toMutableSet()
+            if (on) set.add(id.toString()) else set.remove(id.toString())
+            p.edit().putStringSet("firing", set).apply()
+        }
+
         /** Repeats the buzz (alarm usage, so it also works in Do Not Disturb) for up to 10 minutes or until stopped. */
         @Suppress("DEPRECATION")
         fun startVibration(c: android.content.Context) {

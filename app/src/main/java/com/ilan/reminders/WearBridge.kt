@@ -60,8 +60,18 @@ object WearBridge {
         }
     }
 
-    fun dismiss(c: Context, id: Long, done: Boolean = false) =
-        send(c, "/reminder/dismiss", JSONObject().put("id", id).put("done", done).toString())
+    /** A message is fire-and-forget, so repeat it: a watch that is briefly out of reach (locked phone, Doze) would otherwise keep buzzing. */
+    fun dismiss(c: Context, id: Long, done: Boolean = false) {
+        val body = JSONObject().put("id", id).put("done", done).toString()
+        send(c, "/reminder/dismiss", body)
+        val app = c.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            for (d in longArrayOf(2_000, 4_000, 8_000)) {
+                kotlinx.coroutines.delay(d)
+                send(app, "/reminder/dismiss", body)
+            }
+        }
+    }
 }
 
 /** Receives "done" / "snooze" taps made on the watch and reuses the notification action logic. */
