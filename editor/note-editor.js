@@ -76,9 +76,17 @@
       function dist(t){ var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx*dx + dy*dy); }
       body.addEventListener('touchstart', function(e){ d0 = e.touches.length === 2 ? dist(e.touches) : 0; }, {passive:true});
       body.addEventListener('touchmove', function(e){
-        if(e.touches.length !== 2 || !d0 || !root.classList.contains('page')) return;
+        if(e.touches.length !== 2 || !d0) return;
+        var isPage = root.classList.contains('page');
+        if(!isPage && !root.classList.contains('doc')) return;
         e.preventDefault();
         var d = dist(e.touches), f = d / d0; d0 = d;
+        if(!isPage){   // phone view of a document: pinch changes the text size (text re-wraps to the screen)
+          var fs = Math.max(11, Math.min(44, (parseFloat(ed.style.fontSize) || 18) * f));
+          ed.style.fontSize = fs + 'px';
+          try{ localStorage.setItem('neDocFs', String(fs)); }catch(_){}
+          return;
+        }
         var r = body.getBoundingClientRect();
         var cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
         var rx = (body.scrollLeft + cx) / Math.max(1, body.scrollWidth), ry = (body.scrollTop + cy) / Math.max(1, body.scrollHeight);
@@ -362,10 +370,11 @@
       focus: function(){ ed.focus(); },
       flush: flush,
       setTheme: function(t){ root.setAttribute('data-theme', t); },
-      setDoc: function(on){ root.classList.toggle('doc', !!on); },
+      setDoc: function(on){ root.classList.toggle('doc', !!on); if(on){ try{ var v = parseFloat(localStorage.getItem('neDocFs')); if(v) ed.style.fontSize = v + 'px'; }catch(_){} } },
       setView: function(mode){
         var page = mode === 'page';
         root.classList.toggle('page', page);
+        if(page) ed.style.fontSize = ''; else { try{ var v = parseFloat(localStorage.getItem('neDocFs')); if(v && root.classList.contains('doc')) ed.style.fontSize = v + 'px'; }catch(_){} }
         if(page){ var w = Math.max(200, body.clientWidth - 16); root.style.setProperty('--pz', String(Math.min(1.2, w / 794))); }
         else root.style.removeProperty('--pz');
       },
