@@ -67,28 +67,36 @@ object CalRepo {
     }.getOrDefault(emptyList())
 
     /** events (instances of recurring events included) touching [fromMs, toMs) in the given calendars */
-    fun events(c: Context, fromMs: Long, toMs: Long, calIds: Set<Long>): List<Ev> = runCatching {
+    fun events(c: Context, fromMs: Long, toMs: Long, calIds: Set<Long>): List<Ev> {
         if (calIds.isEmpty()) return emptyList()
+        // an edited occurrence of a series is a separate "exception" event; it still counts as repeating (ORIGINAL_ID / ORIGINAL_SYNC_ID are set)
+        return runCatching { queryEvents(c, fromMs, toMs, calIds, true) }.getOrNull() ?: runCatching { queryEvents(c, fromMs, toMs, calIds, false) }.getOrDefault(emptyList())
+    }
+
+    private fun queryEvents(c: Context, fromMs: Long, toMs: Long, calIds: Set<Long>, withOrig: Boolean): List<Ev> {
         val b = CalendarContract.Instances.CONTENT_URI.buildUpon()
         ContentUris.appendId(b, fromMs); ContentUris.appendId(b, toMs)
         val out = ArrayList<Ev>()
+        val cols = arrayListOf(
+            CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.CALENDAR_ID, CalendarContract.Instances.TITLE,
+            CalendarContract.Instances.BEGIN, CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY,
+            CalendarContract.Instances.DISPLAY_COLOR, CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.RRULE,
+            CalendarContract.Instances.HAS_ALARM
+        )
+        if (withOrig) { cols.add(CalendarContract.Events.ORIGINAL_ID); cols.add(CalendarContract.Events.ORIGINAL_SYNC_ID); cols.add(CalendarContract.Events.RDATE) }
         c.contentResolver.query(
-            b.build(),
-            arrayOf(
-                CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.CALENDAR_ID, CalendarContract.Instances.TITLE,
-                CalendarContract.Instances.BEGIN, CalendarContract.Instances.END, CalendarContract.Instances.ALL_DAY,
-                CalendarContract.Instances.DISPLAY_COLOR, CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.RRULE,
-                CalendarContract.Instances.HAS_ALARM
-            ),
+            b.build(), cols.toTypedArray(),
             "${CalendarContract.Instances.CALENDAR_ID} IN (${calIds.joinToString(",")})", null, CalendarContract.Instances.BEGIN + " ASC"
         )?.use { q ->
-            while (q.moveToNext()) out.add(
-                Ev(q.getLong(0), q.getLong(1), q.getString(2).orEmpty().ifBlank { "(ללא כותרת)" }, q.getLong(3), q.getLong(4), q.getInt(5) == 1,
-                    q.getInt(6), q.getString(7).orEmpty(), !q.getString(8).isNullOrBlank(), q.getInt(9) == 1)
-            )
+            while (q.moveToNext()) {
+                var rep = !q.getString(8).isNullOrBlank()
+                if (withOrig && !rep) rep = (!q.isNull(10) && q.getLong(10) > 0) || !q.getString(11).isNullOrBlank() || !q.getString(12).isNullOrBlank()
+                out.add(Ev(q.getLong(0), q.getLong(1), q.getString(2).orEmpty().ifBlank { "(ללא כותרת)" }, q.getLong(3), q.getLong(4), q.getInt(5) == 1,
+                    q.getInt(6), q.getString(7).orEmpty(), rep, q.getInt(9) == 1))
+            }
         }
-        out
-    }.getOrDefault(emptyList())
+        return out
+    }
 
     fun load(c: Context, id: Long): EvFull? = runCatching {
         var r: EvFull? = null

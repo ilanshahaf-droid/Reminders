@@ -566,15 +566,29 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
 
 // ============================ WEEK ============================
 
+/** how many of [evs] fit in [avail] when a long title wraps onto a second line (estimated from text length) */
+private fun packEvs(evs: List<Ev>, avail: androidx.compose.ui.unit.Dp, width: androidx.compose.ui.unit.Dp, sizeSp: Float, lineDp: Float, showTime: Boolean): List<Ev> {
+    val cpl = ((width.value - 8f) / (sizeSp * 0.56f)).toInt().coerceAtLeast(4)
+    var used = 0f
+    val out = ArrayList<Ev>()
+    for (e in evs) {
+        val len = e.title.length + (if (showTime && !e.allDay) 6 else 0) + (if (e.repeat) 2 else 0) + (if (e.att) 3 else 0)
+        val h = (if (len > cpl) 2 else 1) * lineDp
+        if (used + h > avail.value + 1f) break
+        used += h; out.add(e)
+    }
+    return out
+}
+
 @Composable
 private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, onClick: () -> Unit) {
     val col = evColor(e)
     if (e.allDay) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp).clip(RoundedCornerShape(3.dp)).background(col.copy(alpha = 0.30f)).clickable(onClick = onClick).padding(horizontal = 4.dp)) {
-            Text((if (e.att) "📎 " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
+            Text((if (e.att) "📎 " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 2, overflow = TextOverflow.Ellipsis, color = INK)
         }
     } else {
-        Text((if (e.att) "📎 " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
+        Text((if (e.att) "📎 " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 2, overflow = TextOverflow.Ellipsis, color = col,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 4.dp))
     }
 }
@@ -584,8 +598,7 @@ private fun WeekDayCell(d: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
     val idx = dayIdx(d); val isToday = d == today
     val evs = remember(all, d) { dayEvs(all, d, z) }
     BoxWithConstraints(modifier.background(if (idx >= 5) WEEKEND_BG else Color.White)) {
-        val cap = ((maxHeight - 30.dp) / 18.dp).toInt().coerceAtLeast(0)
-        val shown = if (evs.size <= cap) evs else evs.take((cap - 1).coerceAtLeast(0))
+        val shown = packEvs(evs, maxHeight - 30.dp, maxWidth, 13f, 18f, true)
         val hidden = evs.size - shown.size
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -678,8 +691,7 @@ private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, 
     val idx = dayIdx(d); val isToday = d == today
     val evs = remember(all, d) { dayEvs(all, d, z) }
     BoxWithConstraints(modifier.background(if (inMonth) Color.White else Color(0xFFE4E4E4)).border(0.5.dp, GRID).clickable { onDay(d) }) {
-        val cap = ((maxHeight - 24.dp) / 15.dp).toInt().coerceAtLeast(0)
-        val shown = if (evs.size <= cap) evs else evs.take((cap - 1).coerceAtLeast(0))
+        val shown = packEvs(evs, maxHeight - 24.dp, maxWidth, 12f, 15f, false)
         val hidden = evs.size - shown.size
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
