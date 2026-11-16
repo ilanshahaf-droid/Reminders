@@ -714,9 +714,11 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                             }
                         }
                     ) {
+                      CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Box(Modifier.fillMaxSize()) {
                         for (h in 0..23) {
                             Box(Modifier.absoluteOffset(y = hourH * h).fillMaxWidth().height(1.dp).background(GRID))
-                            Text("%02d".format(h), fontSize = 13.sp, color = Color(0xFF777777), modifier = Modifier.align(Alignment.TopEnd).absoluteOffset(y = hourH * h - 9.dp).padding(end = 8.dp))
+                            Text("%02d".format(h), fontSize = 13.sp, color = Color(0xFF777777), modifier = Modifier.align(Alignment.TopStart).absoluteOffset(y = hourH * h - 9.dp).padding(start = 8.dp))
                         }
                         val slots = remember(evs) { evs.filter { !it.allDay }.map { val (a, b) = spanOn(it, date, z); DSlot(it, a, b) }.also { placeSlots(it) } }
                         slots.forEach { s ->
@@ -724,17 +726,21 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                             val h = maxOf(22.dp, hourH * ((s.b - s.a) / 60f))
                             val col = evColor(s.e)
                             Box(
-                                Modifier.absoluteOffset(x = 4.dp + w * s.col, y = hourH * (s.a / 60f)).size(w - 2.dp, h - 1.dp)
+                                Modifier.absoluteOffset(x = labelW + 2.dp + w * s.col, y = hourH * (s.a / 60f)).size(w - 2.dp, h - 1.dp)
                                     .clip(RoundedCornerShape(5.dp)).background(col.copy(alpha = 0.92f)).border(1.dp, Color.Black.copy(alpha = 0.25f), RoundedCornerShape(5.dp))
                                     .clickable { onEvent(s.e) }.padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
-                                Text("${hm(s.e.startTime(z))}–${hm(s.e.endTime(z))} ${s.e.title}" + if (s.e.repeat) " ⇄" else "", fontSize = 16.sp, color = Color.White, maxLines = if (h > 44.dp) 4 else 1, overflow = TextOverflow.Ellipsis)
+                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                    Text("${hm(s.e.startTime(z))}–${hm(s.e.endTime(z))} ${s.e.title}" + if (s.e.repeat) " ⇄" else "", fontSize = 16.sp, color = Color.White, maxLines = if (h > 44.dp) 4 else 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                         if (date == today) {
                             val now = LocalTime.now(); val y = hourH * ((now.hour * 60 + now.minute) / 60f)
                             Box(Modifier.absoluteOffset(y = y).fillMaxWidth().height(2.dp).background(RED))
                         }
+                        }
+                      }
                     }
                 }
             }
