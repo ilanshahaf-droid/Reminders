@@ -69,7 +69,7 @@ object EventNotify {
         )?.use { q ->
             while (q.moveToNext()) {
                 if (q.getInt(2) == CalendarContract.Reminders.METHOD_EMAIL) continue
-                mins.getOrPut(q.getLong(0)) { ArrayList() }.add(q.getInt(1).let { if (it < 0) 10 else it })
+                mins.getOrPut(q.getLong(0)) { ArrayList() }.add(q.getInt(1).let { if (it == -1) 10 else it })
             }
         }
         val out = ArrayList<Al>()

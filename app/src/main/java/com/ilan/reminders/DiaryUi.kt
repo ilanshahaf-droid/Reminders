@@ -981,7 +981,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                 Text("🔔 תזכורות", fontWeight = FontWeight.Bold, color = INK)
                 rems.toList().forEachIndexed { i, m ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { Choice("התראה", remLabel(m) + (if (m > 0) " לפני" else ""), listOf("מותאם אישית…") + REM_OPTS.map { remLabel(it) }) { if (it == 0) remCustom = i else rems[i] = REM_OPTS[it - 1] } }
+                        Box(Modifier.weight(1f)) { Choice("התראה", if (allDay && (m < 0 || m % 1440 != 0)) remAbs(m) else remLabel(m) + (if (m > 0) " לפני" else ""), listOf("מותאם אישית…") + REM_OPTS.map { remLabel(it) }) { if (it == 0) remCustom = i else rems[i] = REM_OPTS[it - 1] } }
                         TextButton({ rems.removeAt(i) }) { Text("✕", color = RED) }
                     }
                 }
@@ -992,7 +992,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         }
     }
     remCustom?.let { idx ->
-        CustomReminderDialog(rems.getOrNull(idx) ?: 10, { remCustom = null }) { m -> if (idx in rems.indices) rems[idx] = m; remCustom = null }
+        CustomReminderDialog(rems.getOrNull(idx) ?: 10, allDay, if (allDay) 0 else stT.hour * 60 + stT.minute, { remCustom = null }) { m -> if (idx in rems.indices) rems[idx] = m; remCustom = null }
     }
     if (repDlg) RepeatDialog(rep, sd, allDay, { repDlg = false }, { r -> rep = r; repDlg = false }) { cur, set -> pickDate(cur, set) }
     if (askScope) AlertDialog(
@@ -1172,28 +1172,61 @@ private fun RepeatDialog(cur: String, start: LocalDate, allDay: Boolean, onClose
     }
 }
 
+private fun remAbs(m: Int): String {
+    val d = if (m > 0) (m + 1439) / 1440 else 0
+    val t = d * 1440 - m
+    return (if (d == 0) "באותו יום" else if (d == 1) "יום לפני" else "$d ימים לפני") + " ב-%02d:%02d".format(t / 60, t % 60)
+}
+
 @Composable
-private fun CustomReminderDialog(initial: Int, onClose: () -> Unit, onOk: (Int) -> Unit) {
+private fun CustomReminderDialog(initial: Int, allDay: Boolean, startMin: Int, onClose: () -> Unit, onOk: (Int) -> Unit) {
+    val ctx = LocalContext.current
     val units = listOf(1 to "דקות", 60 to "שעות", 1440 to "ימים", 10080 to "שבועות")
     val u0 = units.lastOrNull { initial > 0 && initial % it.first == 0 } ?: units[0]
+    var mode by remember { mutableStateOf(if (allDay || initial < 0) 1 else 0) }
     var unit by remember { mutableStateOf(u0.first) }
-    var num by remember { mutableStateOf((initial / u0.first).toString()) }
+    var num by remember { mutableStateOf((maxOf(initial, 0) / u0.first).toString()) }
+    val d0 = if (initial > 0) (initial + 1439) / 1440 else 0
+    var days by remember { mutableStateOf(if (allDay || initial < 0) d0.toString() else "1") }
+    var tmin by remember { mutableStateOf(if (allDay || initial < 0) d0 * 1440 - initial else 9 * 60) }
+    fun chip(sel: Boolean) = Modifier.clip(RoundedCornerShape(18.dp)).background(if (sel) Color(0xFFE91E63) else Color(0xFFE6E6E6))
     AlertDialog(
         onDismissRequest = onClose, title = { Text("התראה מותאמת אישית") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(num, { v -> num = v.filter { it.isDigit() }.take(4) }, Modifier.width(110.dp), singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    units.forEach { (f, l) ->
-                        Text(l, Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(if (unit == f) Color(0xFFE91E63) else Color(0xFFE6E6E6)).clickable { unit = f }.padding(vertical = 8.dp),
-                            color = if (unit == f) Color.White else INK, textAlign = TextAlign.Center, fontSize = 14.sp)
+                    listOf(0 to "זמן לפני האירוע", 1 to "ימים לפני + שעה").forEach { (v, l) ->
+                        Text(l, chip(mode == v).weight(1f).clickable { mode = v }.padding(vertical = 8.dp), color = if (mode == v) Color.White else INK, textAlign = TextAlign.Center, fontSize = 14.sp)
                     }
                 }
-                Text("לפני תחילת האירוע", fontSize = 14.sp, color = Color.Gray)
+                if (mode == 0) {
+                    OutlinedTextField(num, { v -> num = v.filter { it.isDigit() }.take(4) }, Modifier.width(110.dp), singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        units.forEach { (f, l) ->
+                            Text(l, chip(unit == f).weight(1f).clickable { unit = f }.padding(vertical = 8.dp), color = if (unit == f) Color.White else INK, textAlign = TextAlign.Center, fontSize = 14.sp)
+                        }
+                    }
+                    Text("לפני תחילת האירוע", fontSize = 14.sp, color = Color.Gray)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(days, { v -> days = v.filter { it.isDigit() }.take(3) }, Modifier.width(90.dp), singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                        Text("ימים לפני (0 = באותו יום)", fontSize = 14.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("בשעה", fontSize = 16.sp)
+                        OutlinedButton({ android.app.TimePickerDialog(ctx, { _, h, m -> tmin = h * 60 + m }, tmin / 60, tmin % 60, true).show() }) { Text("%02d:%02d".format(tmin / 60, tmin % 60)) }
+                    }
+                }
             }
         },
-        confirmButton = { TextButton({ onOk(((num.toIntOrNull() ?: 0) * unit).coerceIn(0, 40320)) }) { Text("אישור") } },
+        confirmButton = {
+            TextButton({
+                val r = if (mode == 0) (num.toIntOrNull() ?: 0) * unit else (days.toIntOrNull() ?: 0) * 1440 + startMin - tmin
+                onOk(if (allDay) r.coerceIn(-1439, 40320) else r.coerceIn(0, 40320))
+            }) { Text("אישור") }
+        },
         dismissButton = { TextButton(onClose) { Text("ביטול") } }
     )
 }
