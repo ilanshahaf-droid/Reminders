@@ -938,28 +938,16 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                         }
                     }
                 }
-                OutlinedButton({ repDlg = true }, Modifier.fillMaxWidth()) { Text("🔁 " + repText(rep, sd), Modifier.fillMaxWidth(), textAlign = TextAlign.Start) }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) { Choice("📌", AVAIL.first { it.first == avail }.second, AVAIL.map { it.second }) { avail = AVAIL[it].first } }
-                    Box(Modifier.weight(1f)) { Choice("👁", ACCESS.firstOrNull { it.first == access }?.second ?: "ברירת מחדל", ACCESS.map { it.second }) { access = ACCESS[it].first } }
-                }
-                OutlinedTextField(loc, { loc = it }, Modifier.fillMaxWidth(), label = { Text("מיקום") }, singleLine = true)
-                OutlinedTextField(desc, { desc = it }, Modifier.fillMaxWidth(), label = { Text("תיאור") }, minLines = 2)
-                Text("👥 אורחים", fontWeight = FontWeight.Bold, color = INK)
-                guests.toList().forEach { g ->
+                Text("🔔 תזכורות", fontWeight = FontWeight.Bold, color = INK)
+                rems.toList().forEachIndexed { i, m ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(g, Modifier.weight(1f), fontSize = 15.sp)
-                        TextButton({ guests.remove(g) }) { Text("✕", color = RED) }
+                        Box(Modifier.weight(1f)) { Choice("התראה", if (allDay && (m < 0 || m % 1440 != 0)) remAbs(m) else remLabel(m) + (if (m > 0) " לפני" else ""), listOf("מותאם אישית…") + REM_OPTS.map { remLabel(it) }) { if (it == 0) remCustom = i else rems[i] = REM_OPTS[it - 1] } }
+                        TextButton({ rems.removeAt(i) }) { Text("✕", color = RED) }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(guestIn, { guestIn = it }, Modifier.weight(1f), label = { Text("כתובת מייל של אורח") }, singleLine = true)
-                    TextButton({
-                        val g = guestIn.trim()
-                        if (g.contains("@") && guests.none { it.equals(g, true) }) { guests.add(g); guestIn = "" }
-                        else android.widget.Toast.makeText(ctx, "כתובת מייל לא תקינה", android.widget.Toast.LENGTH_SHORT).show()
-                    }) { Text("הוסף") }
-                }
+                TextButton({ rems.add(REM_OPTS.firstOrNull { it !in rems } ?: 10) }) { Text("＋ הוסף תזכורת", color = Color(0xFFE91E63)) }
+                OutlinedButton({ repDlg = true }, Modifier.fillMaxWidth()) { Text("🔁 " + repText(rep, sd), Modifier.fillMaxWidth(), textAlign = TextAlign.Start) }
+                if (full != null && full!!.rrule.isNotEmpty()) Text("שינוי בפגישה חוזרת חל על כל הסדרה.", fontSize = 12.sp, color = Color.Gray)
                 Text("📎 קבצים מצורפים (תמונות)", fontWeight = FontWeight.Bold, color = INK)
                 atts.toList().forEachIndexed { i, a ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -978,15 +966,27 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                 }
                 TextButton({ picker.launch("image/*") }) { Text("＋ הוסף תמונה", color = Color(0xFFE91E63)) }
                 if (atts.isNotEmpty()) Text("התמונות נשמרות באפליקציה בלבד (לא ביומן גוגל). \"מחק אחרי האירוע\" מוחק את התמונה אוטומטית בתום האירוע.", fontSize = 12.sp, color = Color.Gray)
-                Text("🔔 תזכורות", fontWeight = FontWeight.Bold, color = INK)
-                rems.toList().forEachIndexed { i, m ->
+                Text("👥 אורחים", fontWeight = FontWeight.Bold, color = INK)
+                guests.toList().forEach { g ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { Choice("התראה", if (allDay && (m < 0 || m % 1440 != 0)) remAbs(m) else remLabel(m) + (if (m > 0) " לפני" else ""), listOf("מותאם אישית…") + REM_OPTS.map { remLabel(it) }) { if (it == 0) remCustom = i else rems[i] = REM_OPTS[it - 1] } }
-                        TextButton({ rems.removeAt(i) }) { Text("✕", color = RED) }
+                        Text(g, Modifier.weight(1f), fontSize = 15.sp)
+                        TextButton({ guests.remove(g) }) { Text("✕", color = RED) }
                     }
                 }
-                TextButton({ rems.add(REM_OPTS.firstOrNull { it !in rems } ?: 10) }) { Text("＋ הוסף תזכורת", color = Color(0xFFE91E63)) }
-                if (full != null && full!!.rrule.isNotEmpty()) Text("שינוי בפגישה חוזרת חל על כל הסדרה.", fontSize = 12.sp, color = Color.Gray)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(guestIn, { guestIn = it }, Modifier.weight(1f), label = { Text("כתובת מייל של אורח") }, singleLine = true)
+                    TextButton({
+                        val g = guestIn.trim()
+                        if (g.contains("@") && guests.none { it.equals(g, true) }) { guests.add(g); guestIn = "" }
+                        else android.widget.Toast.makeText(ctx, "כתובת מייל לא תקינה", android.widget.Toast.LENGTH_SHORT).show()
+                    }) { Text("הוסף") }
+                }
+                OutlinedTextField(loc, { loc = it }, Modifier.fillMaxWidth(), label = { Text("מיקום") }, singleLine = true)
+                OutlinedTextField(desc, { desc = it }, Modifier.fillMaxWidth(), label = { Text("תיאור") }, minLines = 2)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { Choice("📌", AVAIL.first { it.first == avail }.second, AVAIL.map { it.second }) { avail = AVAIL[it].first } }
+                    Box(Modifier.weight(1f)) { Choice("👁", ACCESS.firstOrNull { it.first == access }?.second ?: "ברירת מחדל", ACCESS.map { it.second }) { access = ACCESS[it].first } }
+                }
                 Spacer(Modifier.navigationBarsPadding().height(24.dp))
             }
         }
