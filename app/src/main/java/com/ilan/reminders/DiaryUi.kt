@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -390,11 +391,11 @@ private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, 
 
 // ============================ DAY ============================
 
-private class Slot(val e: Ev, val a: Int, val b: Int) { var col = 0; var n = 1 }
+private class DSlot(val e: Ev, val a: Int, val b: Int) { var col = 0; var n = 1 }
 
-private fun placeSlots(slots: List<Slot>) {
+private fun placeSlots(slots: List<DSlot>) {
     val sorted = slots.sortedBy { it.a }
-    var cluster = ArrayList<Slot>(); var clusterEnd = -1
+    var cluster = ArrayList<DSlot>(); var clusterEnd = -1
     fun flush() { val n = (cluster.maxOfOrNull { it.col } ?: -1) + 1; cluster.forEach { it.n = maxOf(n, 1) }; cluster = ArrayList() }
     for (s in sorted) {
         if (cluster.isNotEmpty() && s.a >= clusterEnd) { flush(); clusterEnd = -1 }
@@ -434,7 +435,7 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                             Box(Modifier.absoluteOffset(y = hourH * h).fillMaxWidth().height(1.dp).background(GRID))
                             Text("%02d".format(h), fontSize = 13.sp, color = Color(0xFF777777), modifier = Modifier.align(Alignment.TopEnd).absoluteOffset(y = hourH * h - 9.dp).padding(end = 8.dp))
                         }
-                        val slots = remember(evs) { evs.filter { !it.allDay }.map { val (a, b) = spanOn(it, date, z); Slot(it, a, b) }.also { placeSlots(it) } }
+                        val slots = remember(evs) { evs.filter { !it.allDay }.map { val (a, b) = spanOn(it, date, z); DSlot(it, a, b) }.also { placeSlots(it) } }
                         slots.forEach { s ->
                             val w = areaW / s.n
                             val h = maxOf(22.dp, hourH * ((s.b - s.a) / 60f))
