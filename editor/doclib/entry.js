@@ -60,6 +60,7 @@ async function htmlToDocxB64(html, title) {
       runs = []; text = '';
     }
     async function inline(node, st) {
+      if (node.nodeType === 1 && node.classList && node.classList.contains('wc')) return;
       if (node.nodeType === 3) {
         const t = node.nodeValue.replace(/\s+/g, ' ');
         if (!t) return;
@@ -72,6 +73,7 @@ async function htmlToDocxB64(html, title) {
       }
       if (node.nodeType !== 1) return;
       const tag = node.tagName;
+      if (tag === 'SUP' && node.querySelector('a[id^="comment-ref"]')) return;
       if (tag === 'BR') { runs.push(new TextRun({ break: 1 })); return; }
       if (tag === 'IMG') {
         const src = node.getAttribute('src') || '';
@@ -103,6 +105,7 @@ async function htmlToDocxB64(html, title) {
     }
 
     async function walk(node, st) {
+      if (node.nodeType === 1 && node.classList && node.classList.contains('wc')) return;
       if (node.nodeType === 1 && BLOCK.has(node.tagName)) {
         await flush();
         const tag = node.tagName;
@@ -198,12 +201,69 @@ async function htmlToDocxB64(html, title) {
   return await Packer.toBase64String(doc);
 }
 
-async function docxToHtml(b64) {
-  const ab = b64ToBytes(b64).buffer;
-  const r = await mammoth.convertToHtml({ arrayBuffer: ab }, {
-    styleMap: ['u => u', 'strike => s', "p[style-name='Title'] => h1:fresh", "p[style-name='Heading 1'] => h1:fresh", "p[style-name='Heading 2'] => h2:fresh", "p[style-name='Heading 3'] => h3:fresh"]
+const HL = { yellow: 'FFFF00', green: '00FF00', cyan: '00FFFF', magenta: 'FF00FF', blue: '0000FF', red: 'FF0000', darkBlue: '000080', darkCyan: '008080', darkGreen: '008000', darkMagenta: '800080', darkRed: '800000', darkYellow: '808000', darkGray: '808080', lightGray: 'C0C0C0', black: '000000', white: 'FFFFFF' };
+
+/** mammoth drops font colour, highlight and size: tag such runs with generated character styles, then turn those into inline styles. */
+async function tagRuns(b64) {
+  const zip = await JSZip.loadAsync(b64ToBytes(b64));
+  const df = zip.file('word/document.xml'), sf = zip.file('word/styles.xml');
+  if (!df || !sf) return { ab: b64ToBytes(b64).buffer, map: [] };
+  const xml = new DOMParser().parseFromString(await df.async('string'), 'application/xml');
+  const names = new Set();
+  const runs = xml.getElementsByTagNameNS(WNS, 'r');
+  for (const r of Array.from(runs)) {
+    const pr = Array.from(r.children).find(c => c.localName === 'rPr'); if (!pr) continue;
+    if (Array.from(pr.children).some(c => c.localName === 'rStyle')) continue;
+    const g = n => Array.from(pr.children).find(c => c.localName === n);
+    let col = wattr(g('color'), 'val'); if (!col || !/^[0-9a-f]{6}$/i.test(col) || /^000000$/i.test(col)) col = null;
+    let hl = wattr(g('highlight'), 'val'); if (!hl || hl === 'none' || !HL[hl]) hl = null;
+    const shd = g('shd'); let sh = shd && wattr(shd, 'fill'); if (!sh || !/^[0-9a-f]{6}$/i.test(sh)) sh = null;
+    let sz = wattr(g('sz'), 'val'); if (!sz || !/^\d+$/.test(sz)) sz = null;
+    if (!col && !hl && !sh && !sz) continue;
+    const name = 'dc_' + [col ? col.toUpperCase() : 'x', hl || 'x', sh ? sh.toUpperCase() : 'x', sz || 'x'].join('_');
+    names.add(name);
+    const rs = xml.createElementNS(WNS, 'w:rStyle'); rs.setAttributeNS(WNS, 'w:val', name);
+    pr.insertBefore(rs, pr.firstChild);
+  }
+  if (!names.size) return { ab: b64ToBytes(b64).buffer, map: [] };
+  let st = await sf.async('string');
+  const add = Array.from(names).map(n => '<w:style w:type="character" w:customStyle="1" w:styleId="' + n + '"><w:name w:val="' + n + '"/></w:style>').join('');
+  st = st.replace('</w:styles>', add + '</w:styles>');
+  zip.file('word/styles.xml', st);
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(xml));
+  return { ab: await zip.generateAsync({ type: 'arraybuffer' }), map: Array.from(names) };
+}
+
+function applyRunStyles(html) {
+  if (html.indexOf('dc_') < 0 && html.indexOf('<dl>') < 0) return html;
+  const doc = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html');
+  doc.querySelectorAll('span[class^="dc_"]').forEach(sp => {
+    const [, col, hl, sh, sz] = sp.className.split('_');
+    let css = '';
+    if (col !== 'x') css += 'color:#' + col + ';';
+    if (hl !== 'x') css += 'background-color:#' + HL[hl] + ';';
+    else if (sh !== 'x') css += 'background-color:#' + sh + ';';
+    if (sz !== 'x') css += 'font-size:' + (parseInt(sz, 10) / 1.5).toFixed(1) + 'px;';
+    sp.removeAttribute('class'); sp.setAttribute('style', css);
   });
-  try { return await tableLayout(b64, r.value); } catch (e) { return r.value; }
+  doc.querySelectorAll('dl').forEach(dl => {
+    const w = doc.createElement('div'); w.className = 'wc';
+    w.setAttribute('style', 'border:1px solid #f5c542;background:#fff8e1;padding:6px 12px;border-radius:8px;margin-top:18px;font-size:14px');
+    const h = doc.createElement('div'); h.setAttribute('style', 'font-weight:700;margin-bottom:4px'); h.textContent = '💬 הערות במסמך';
+    dl.parentNode.insertBefore(w, dl); w.appendChild(h); w.appendChild(dl);
+    dl.querySelectorAll('dt').forEach(dt => { dt.textContent = dt.textContent.replace(/^Comment/, 'הערה'); dt.setAttribute('style', 'font-weight:600;margin-top:6px'); });
+  });
+  return doc.body.innerHTML;
+}
+
+async function docxToHtml(b64) {
+  let src = { ab: b64ToBytes(b64).buffer, map: [] };
+  try { src = await tagRuns(b64); } catch (e) { src = { ab: b64ToBytes(b64).buffer, map: [] }; }
+  const styleMap = ['u => u', 'strike => s', "p[style-name='Title'] => h1:fresh", "p[style-name='Heading 1'] => h1:fresh", "p[style-name='Heading 2'] => h2:fresh", "p[style-name='Heading 3'] => h3:fresh", 'comment-reference => sup']
+    .concat(src.map.map(n => "r[style-name='" + n + "'] => span." + n));
+  const r = await mammoth.convertToHtml({ arrayBuffer: src.ab }, { styleMap });
+  let html = applyRunStyles(r.value);
+  try { return await tableLayout(b64, html); } catch (e) { return html; }
 }
 
 const WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
