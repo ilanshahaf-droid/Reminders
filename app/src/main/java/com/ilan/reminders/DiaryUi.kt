@@ -122,7 +122,7 @@ private fun taskOcc(t: Task, from: Long, to: Long): List<Long> {
     return out
 }
 
-class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?)
+class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?, val copyOf: Ev? = null)
 
 @Composable
 fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, onTask: (Task) -> Unit = {}) {
@@ -225,7 +225,9 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             val rem = taskList.filter { it.id in ids && it.deletedAt == 0L && !it.done && it.alertMode != "NONE" }.flatMap { t ->
                 taskOcc(t, from, to).map { Ev(-t.id, 0, "⏰ " + t.title, it, it + 30 * 60_000L, false, 0xFFFB8C00.toInt(), "", false, false) }
             }
-            (CalRepo.events(ctx, from, to, visible) + rem).sortedBy { it.begin }
+            (CalRepo.events(ctx, from, to, visible) + rem)
+                .distinctBy { Triple(it.title.removePrefix("⏰ ").trim(), it.begin, it.allDay) }
+                .sortedBy { it.begin }
         }
     }
     DisposableEffect(Unit) {
@@ -304,6 +306,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 d, dayEvs(events, d, zone), cals, zone, dayEvSel,
                 onClose = { dayDlg = null },
                 onEdit = { e -> dayDlg = null; onEvent(e) },
+                onCopy = { e -> dayDlg = null; editing = EditTarget(null, e.days(zone).first, null, copyOf = e) },
                 onNew = { dayDlg = null; onNew(d, null) },
                 onOpenDay = { dayDlg = null; dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(2) } },
                 onChanged = { tick++ }
@@ -336,7 +339,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
 @Composable
 private fun DayDialog(
     date: LocalDate, evs: List<Ev>, cals: List<Cal>, zone: ZoneId, initial: Pair<Long, Long>?,
-    onClose: () -> Unit, onEdit: (Ev) -> Unit, onNew: () -> Unit, onOpenDay: () -> Unit, onChanged: () -> Unit
+    onClose: () -> Unit, onEdit: (Ev) -> Unit, onCopy: (Ev) -> Unit, onNew: () -> Unit, onOpenDay: () -> Unit, onChanged: () -> Unit
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -356,19 +359,6 @@ private fun DayDialog(
             if (d.isNotBlank()) append("\n\n").append(d)
         }
         ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, txt), "שיתוף אירוע").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
-    fun copy(e: Ev) {
-        scope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                val f = CalRepo.load(ctx, e.id) ?: return@withContext false
-                val (a, b) = e.days(zone)
-                val s = EdState(f.title, f.calId, a, if (e.allDay) LocalTime.MIDNIGHT else e.startTime(zone), b, if (e.allDay) LocalTime.MIDNIGHT else e.endTime(zone),
-                    e.allDay, f.location, f.desc, f.reminders, "", f.availability, f.access, emptyList())
-                CalRepo.save(ctx, null, 0L, s) > 0
-            }
-            android.widget.Toast.makeText(ctx, if (ok) "האירוע הועתק" else "ההעתקה נכשלה", android.widget.Toast.LENGTH_SHORT).show()
-            if (ok) onChanged()
-        }
     }
     androidx.compose.ui.window.Dialog(onClose, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.8f), shape = RoundedCornerShape(6.dp), color = Color.White) {
@@ -403,7 +393,7 @@ private fun DayDialog(
                                     Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                                         if (!isRem) {
                                             TextButton({ delAsk = e }) { Text("🗑", fontSize = 24.sp) }
-                                            TextButton({ copy(e) }) { Text("📋", fontSize = 24.sp) }
+                                            TextButton({ onCopy(e) }) { Text("📋", fontSize = 24.sp) }
                                             TextButton({ share(e) }) { Text("📤", fontSize = 24.sp) }
                                         }
                                         TextButton({ onEdit(e) }) { Text(if (isRem) "פתח בתזכורות" else "✏️", fontSize = if (isRem) 16.sp else 24.sp) }
@@ -675,7 +665,9 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
     val scroll = rememberScrollState()
     val dens = LocalDensity.current
     LaunchedEffect(date) {
-        val h = if (date == today) maxOf(0, LocalTime.now().hour - 1) else 6
+        val firstH = evs.filter { !it.allDay }.minOfOrNull { spanOn(it, date, z).first / 60 }
+        var h = if (date == today) maxOf(0, LocalTime.now().hour - 1) else 6
+        if (firstH != null && firstH < h) h = firstH
         scroll.scrollTo((hourH.value * dens.density * h).toInt())
     }
     val curShift by rememberUpdatedState(onShift)
@@ -772,7 +764,8 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     val writable = cals.filter { it.writable }
     val ev = target.ev
     var full by remember { mutableStateOf<EvFull?>(null) }
-    var loaded by remember { mutableStateOf(ev == null) }
+    val src = ev ?: target.copyOf
+    var loaded by remember { mutableStateOf(src == null) }
     val firstCal = writable.firstOrNull { it.id == defaultCal } ?: writable.firstOrNull { it.account.contains("@") } ?: writable.firstOrNull()
     var title by remember { mutableStateOf("") }
     var calId by remember { mutableStateOf(firstCal?.id ?: -1L) }
@@ -794,21 +787,21 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     var confirmDel by remember { mutableStateOf(false) }
     var pickCal by remember { mutableStateOf(false) }
 
-    LaunchedEffect(ev?.id) {
-        if (ev != null) {
-            val f = withContext(Dispatchers.IO) { CalRepo.load(ctx, ev.id) }
-            full = f
-            title = f?.title ?: ev.title
-            calId = f?.calId ?: ev.calId
-            allDay = ev.allDay
-            val (a, b) = ev.days(zone)
+    LaunchedEffect(src?.id) {
+        if (src != null) {
+            val f = withContext(Dispatchers.IO) { CalRepo.load(ctx, src.id) }
+            full = if (ev != null) f else null          // a copy is saved as a new event
+            title = f?.title ?: src.title
+            calId = f?.calId ?: src.calId
+            allDay = src.allDay
+            val (a, b) = src.days(zone)
             sd = a; ed = b
-            if (!ev.allDay) { stT = ev.startTime(zone); enT = ev.endTime(zone) }
-            loc = f?.location ?: ev.location; desc = f?.desc.orEmpty()
+            if (!src.allDay) { stT = src.startTime(zone); enT = src.endTime(zone) }
+            loc = f?.location ?: src.location; desc = f?.desc.orEmpty()
             rems.clear(); rems.addAll(f?.reminders.orEmpty())
             avail = f?.availability ?: 0; access = f?.access ?: 0
             guests.clear(); guests.addAll(f?.guests.orEmpty())
-            rep = if (f != null && f.rrule.isNotEmpty()) (REPEATS.map { it.first }.firstOrNull { it.isNotEmpty() && f.rrule == "FREQ=$it" } ?: "CUSTOM") else ""
+            rep = if (ev == null) "" else if (f != null && f.rrule.isNotEmpty()) (REPEATS.map { it.first }.firstOrNull { it.isNotEmpty() && f.rrule == "FREQ=$it" } ?: "CUSTOM") else ""
             loaded = true
         }
     }
@@ -841,7 +834,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().background(Color(0xFFE91E63)).statusBarsPadding().height(60.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClose) { Text("✕", color = Color.White, fontSize = 20.sp) }
-                Text(if (ev == null) "פגישה חדשה" else "עריכת פגישה", Modifier.weight(1f), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(if (ev == null) (if (target.copyOf != null) "העתקת אירוע" else "פגישה חדשה") else "עריכת פגישה", Modifier.weight(1f), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 if (ev != null) TextButton({ confirmDel = true }) { Text("🗑", fontSize = 20.sp) }
                 TextButton({ save() }, enabled = loaded && canWrite) { Text("שמירה", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp) }
             }
