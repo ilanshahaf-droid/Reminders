@@ -120,6 +120,36 @@ private fun Modifier.vSwipe(onShift: (Int) -> Unit): Modifier {
     )
 }
 
+/** vertical, animated paging between periods (days / weeks / months); [key] identifies the period a date belongs to */
+@Composable
+private fun <K> VPager(date: LocalDate, key: (LocalDate) -> K, step: (LocalDate, Int) -> LocalDate, onSettled: (LocalDate) -> Unit, content: @Composable (LocalDate) -> Unit) {
+    val center = 5000
+    var anchor by remember { mutableStateOf(date) }
+    val st = androidx.compose.foundation.pager.rememberPagerState(initialPage = center, pageCount = { 2 * center })
+    fun pd(page: Int) = step(anchor, page - center)
+    val cur by rememberUpdatedState(date)
+    val settle by rememberUpdatedState(onSettled)
+    LaunchedEffect(date) {
+        val here = pd(st.currentPage)
+        if (key(here) != key(date)) {
+            when {
+                key(pd(st.currentPage + 1)) == key(date) -> st.animateScrollToPage(st.currentPage + 1)
+                key(pd(st.currentPage - 1)) == key(date) -> st.animateScrollToPage(st.currentPage - 1)
+                else -> { anchor = date; st.scrollToPage(center) }
+            }
+        }
+    }
+    LaunchedEffect(st) {
+        snapshotFlow { st.settledPage }.collect { p ->
+            val d = pd(p)
+            if (key(d) != key(cur)) settle(d)
+        }
+    }
+    androidx.compose.foundation.pager.VerticalPager(st, Modifier.fillMaxSize(), key = { it }) { p ->
+        content(pd(p))
+    }
+}
+
 @Composable
 private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit) {
     val ctx = LocalContext.current
@@ -139,10 +169,11 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var defCal by remember { mutableStateOf(prefs.getLong("diaryDef", -1L)) }
     val visible: Set<Long> = remember(cals, visPref) { val all = cals.map { it.id }.toSet(); if (visPref == null) all else visPref!!.intersect(all) }
     var events by remember { mutableStateOf<List<Ev>>(emptyList()) }
-    val gridStart = wkStart(date.withDayOfMonth(1))
-    LaunchedEffect(gridStart, tick, visible) {
-        val from = gridStart.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val to = gridStart.plusDays(44).atStartOfDay(zone).toInstant().toEpochMilli()
+    val monthKey = date.year * 12 + date.monthValue
+    LaunchedEffect(monthKey, tick, visible) {
+        val first = date.withDayOfMonth(1)
+        val from = wkStart(first.minusMonths(2)).atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = first.plusMonths(3).plusDays(7).atStartOfDay(zone).toInstant().toEpochMilli()
         events = withContext(Dispatchers.IO) { CalRepo.events(ctx, from, to, visible) }
     }
     DisposableEffect(Unit) {
@@ -206,9 +237,9 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                         when (page) {
-                            2 -> DayView(date, events, zone, today, onNew, onEvent, onDay, ::shift)
-                            1 -> WeekView(date, events, zone, today, onDay, onEvent, onNew, ::shift)
-                            else -> MonthView(date, events, zone, today, onDay, onEvent, ::shift)
+                            2 -> VPager(date, { it }, { d, n -> d.plusDays(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> DayView(d, events, zone, today, onNew, onEvent, onDay, {}) }
+                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onEvent, onNew, {}) }
+                            else -> VPager(date, { it.year * 12 + it.monthValue }, { d, n -> d.plusMonths(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> MonthView(d, events, zone, today, onDay, onEvent, {}) }
                         }
                     }
                 }
@@ -334,7 +365,7 @@ private fun MiniWeek(start: LocalDate, all: List<Ev>, z: ZoneId, selected: Local
 @Composable
 private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, onShift: (Int) -> Unit) {
     val start = wkStart(date)
-    Row(Modifier.fillMaxSize().vSwipe(onShift).background(Color.White)) {
+    Row(Modifier.fillMaxSize().background(Color.White)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             for (i in 0..3) WeekDayCell(start.plusDays(i.toLong()), all, z, today, Modifier.weight(1f).fillMaxWidth(), onDay, onEvent, onNew)
         }
@@ -352,7 +383,7 @@ private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
 private fun MonthView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev) -> Unit, onShift: (Int) -> Unit) {
     val first = date.withDayOfMonth(1)
     val gridStart = wkStart(first)
-    Column(Modifier.fillMaxSize().vSwipe(onShift).background(Color.White)) {
+    Column(Modifier.fillMaxSize().background(Color.White)) {
         Row(Modifier.fillMaxWidth().background(BAR).padding(vertical = 6.dp)) {
             for (i in 0..6) Text("יום ${HE_DAYS[i]}", Modifier.weight(1f), color = Color.White, fontSize = 14.sp, textAlign = TextAlign.Center, maxLines = 1)
         }
@@ -432,7 +463,7 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
             }
         }
     }
-    Row(Modifier.fillMaxSize().nestedScroll(edge)) {
+    Row(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             evs.filter { it.allDay }.forEach { e -> EvLine(e, z, 16.sp) { onEvent(e) } }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
@@ -472,7 +503,7 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                 }
             }
         }
-        Column(Modifier.width(64.dp).fillMaxHeight().vSwipe(onShift).background(Color(0xFFEFF3F7)).padding(horizontal = 4.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(64.dp).fillMaxHeight().background(Color(0xFFEFF3F7)).padding(horizontal = 4.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(HE_MONTHS[date.monthValue - 1], fontSize = 12.sp, color = BAR, maxLines = 1)
             Text("${date.dayOfMonth}", fontSize = 34.sp, color = BAR, fontWeight = FontWeight.Medium)
             Text(DAY_FULL[dayIdx(date)].removePrefix("יום "), fontSize = 12.sp, color = BAR, maxLines = 1)
