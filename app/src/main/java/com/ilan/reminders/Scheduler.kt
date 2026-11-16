@@ -127,6 +127,7 @@ object Reminders {
         if ((t.repeat == "MONTHLY" || t.repeat == "DAILY") && t.triggerAt <= now) t = advance(t, now)
         if (t.repeat == "LIST") t = settleList(t, now)
         val id = dao.upsert(t.touch())
+        DiaryTasks.pending?.let { DiaryTasks.set(c, id, it); DiaryTasks.pending = null }
         val saved = t.copy(id = id)
         Scheduler.cancel(c, id, true)
         if (needsAlarm(saved)) scheduleMain(c, saved) else Scheduler.cancel(c, id, false)

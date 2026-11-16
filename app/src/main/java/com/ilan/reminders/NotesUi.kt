@@ -70,7 +70,7 @@ fun Home() {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" }, onOpenDiary = { screen = "diary" })
         if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" }, onDiary = { screen = "diary" })
         if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" }, onDiary = { screen = "diary" })
-        if (screen == "diary") DiaryHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" }, onDocs = { screen = "docs" })
+        if (screen == "diary") DiaryHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" }, onDocs = { screen = "docs" }, onTask = { PendingOpen.task = it; screen = "tasks" })
         if (TodayView.open) TodayScreen(
             onTask = { PendingOpen.task = it; screen = "tasks" },
             onNote = { PendingOpen.noteId = it.id; screen = "notes" },

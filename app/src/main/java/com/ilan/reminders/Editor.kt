@@ -157,6 +157,8 @@ fun Editor(
     var vibration by remember { mutableStateOf(initial.vibration) }
     var alertMode by remember { mutableStateOf(initial.alertMode) }
     var important by remember { mutableStateOf(initial.important) }
+    val diaryCtx = LocalContext.current
+    var inDiary by remember { mutableStateOf(initial.id != 0L && DiaryTasks.has(diaryCtx, initial.id)) }
     var listName by remember { mutableStateOf(initial.listName) }
     var newListDlg by remember { mutableStateOf(false) }
     val extraLists = remember { mutableStateListOf<String>() }   // lists created while editing: keep their chips when another list is picked
@@ -202,6 +204,7 @@ fun Editor(
                 Button(enabled = valid, onClick = {
                     val noAlert = alertMode == "NONE"
                     val sched = repeat == "SCHEDULE" && !noAlert
+                    DiaryTasks.pending = inDiary && !noAlert
                     onSave(
                         initial.copy(
                             title = title.trim(), notes = notes.trim(), categoryId = categoryId,
@@ -256,6 +259,10 @@ fun Editor(
                     FilterChip(alertMode == k, { alertMode = k }, label = { Text(l) })
                 }
                 FilterChip(important, { important = !important }, label = { Text("⭐ חשוב") })
+            }
+            if (alertMode != "NONE") Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("📅 להציג ביומן?", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Switch(inDiary, { inDiary = it })
             }
             if (alertMode == "NONE") Section("רשימה") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

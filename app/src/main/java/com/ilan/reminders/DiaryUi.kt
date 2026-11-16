@@ -82,10 +82,47 @@ private fun spanOn(e: Ev, d: LocalDate, z: ZoneId): Pair<Int, Int> {
     return a to minOf(1440, maxOf(b, a + 25))
 }
 
+/** reminders the user chose to show in the diary (stored on the phone) */
+object DiaryTasks {
+    var pending: Boolean? = null
+    private fun p(c: Context) = c.getSharedPreferences("app", Context.MODE_PRIVATE)
+    fun ids(c: Context): Set<Long> = (p(c).getStringSet("diaryTasks", emptySet()) ?: emptySet()).mapNotNull { it.toLongOrNull() }.toSet()
+    fun has(c: Context, id: Long) = id in ids(c)
+    fun set(c: Context, id: Long, on: Boolean) {
+        val n = if (on) ids(c) + id else ids(c) - id
+        p(c).edit().putStringSet("diaryTasks", n.map { it.toString() }.toSet()).apply()
+    }
+}
+
+/** the moments a reminder fires inside [from, to) */
+private fun taskOcc(t: Task, from: Long, to: Long): List<Long> {
+    val out = ArrayList<Long>()
+    val z = ZoneId.systemDefault()
+    when (t.repeat) {
+        "SCHEDULE" -> {
+            var a = from - 1; var n = 0
+            while (n++ < 400) { val x = Reminders.nextOccurrence(t, a) ?: break; if (x >= to) break; out.add(x); a = x }
+        }
+        "DAILY", "MONTHLY" -> {
+            val daily = t.repeat == "DAILY"; val k = t.every.coerceAtLeast(1).toLong()
+            var d = Instant.ofEpochMilli(t.triggerAt).atZone(z); var n = 0
+            while (d.toInstant().toEpochMilli() > from && n++ < 400) d = if (daily) d.minusDays(k) else d.minusMonths(k)
+            n = 0
+            while (d.toInstant().toEpochMilli() < to && n++ < 800) {
+                val m = d.toInstant().toEpochMilli(); if (m >= from) out.add(m)
+                d = if (daily) d.plusDays(k) else d.plusMonths(k)
+            }
+        }
+        "LIST" -> out.addAll(t.dateList().filter { it in from until to })
+        else -> if (t.triggerAt in from until to) out.add(t.triggerAt)
+    }
+    return out
+}
+
 class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?)
 
 @Composable
-fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit) {
+fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, onTask: (Task) -> Unit = {}) {
     val ctx = LocalContext.current
     var granted by remember { mutableStateOf(CalRepo.hasRead(ctx) && CalRepo.hasWrite(ctx)) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -104,7 +141,7 @@ fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit) 
                 Button({ launcher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) }) { Text("אישור גישה ליומן") }
                 TextButton(onReminders) { Text("חזרה") }
             }
-        } else DiaryMain(onReminders, onNotes, onDocs)
+        } else DiaryMain(onReminders, onNotes, onDocs, onTask)
     }
 }
 
@@ -151,7 +188,7 @@ private fun <K> VPager(date: LocalDate, key: (LocalDate) -> K, step: (LocalDate,
 }
 
 @Composable
-private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit) {
+private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, onTask: (Task) -> Unit) {
     val ctx = LocalContext.current
     val zone = remember { ZoneId.systemDefault() }
     val scope = rememberCoroutineScope()
@@ -170,11 +207,19 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     val visible: Set<Long> = remember(cals, visPref) { val all = cals.map { it.id }.toSet(); if (visPref == null) all else visPref!!.intersect(all) }
     var events by remember { mutableStateOf<List<Ev>>(emptyList()) }
     val monthKey = date.year * 12 + date.monthValue
-    LaunchedEffect(monthKey, tick, visible) {
+    val taskList by remember { AppDb.get(ctx).dao().all() }.collectAsState(emptyList())
+    var remTask by remember { mutableStateOf<Task?>(null) }
+    LaunchedEffect(monthKey, tick, visible, taskList) {
         val first = date.withDayOfMonth(1)
         val from = wkStart(first.minusMonths(2)).atStartOfDay(zone).toInstant().toEpochMilli()
         val to = first.plusMonths(3).plusDays(7).atStartOfDay(zone).toInstant().toEpochMilli()
-        events = withContext(Dispatchers.IO) { CalRepo.events(ctx, from, to, visible) }
+        events = withContext(Dispatchers.IO) {
+            val ids = DiaryTasks.ids(ctx)
+            val rem = taskList.filter { it.id in ids && it.deletedAt == 0L && !it.done && it.alertMode != "NONE" }.flatMap { t ->
+                taskOcc(t, from, to).map { Ev(-t.id, 0, "⏰ " + t.title, it, it + 30 * 60_000L, false, 0xFFFB8C00.toInt(), "", false, false) }
+            }
+            (CalRepo.events(ctx, from, to, visible) + rem).sortedBy { it.begin }
+        }
     }
     DisposableEffect(Unit) {
         val o = object : ContentObserver(Handler(Looper.getMainLooper())) { override fun onChange(selfChange: Boolean) { tick++ } }
@@ -189,7 +234,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         dayNum = n.toEpochDay()
     }
     val onDay: (LocalDate) -> Unit = { d -> dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(2) } }
-    val onEvent: (Ev) -> Unit = { e -> editing = EditTarget(e, e.days(zone).first, null) }
+    val onEvent: (Ev) -> Unit = { e -> if (e.id < 0) remTask = taskList.firstOrNull { it.id == -e.id } else editing = EditTarget(e, e.days(zone).first, null) }
     val onNew: (LocalDate, LocalTime?) -> Unit = { d, t -> editing = EditTarget(null, d, t) }
 
     Box(Modifier.fillMaxSize()) {
@@ -244,6 +289,14 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     }
                 }
             }
+        }
+        remTask?.let { rt ->
+            AlertDialog(
+                onDismissRequest = { remTask = null }, title = { Text("⏰ " + rt.title) },
+                text = { Text(if (rt.notes.isBlank()) "תזכורת מהאפליקציה" else rt.notes) },
+                confirmButton = { TextButton({ remTask = null; onTask(rt) }) { Text("פתח בתזכורות") } },
+                dismissButton = { TextButton({ remTask = null }) { Text("סגירה") } }
+            )
         }
         val t = editing
         if (t != null) EventEditor(
