@@ -3,6 +3,8 @@ package com.ilan.reminders
 import android.app.DatePickerDialog
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -199,6 +202,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var tick by remember { mutableStateOf(0) }
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var showSettings by remember { mutableStateOf(false) }
+    var showNotif by remember { mutableStateOf(false) }
+    LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) } } }
     var menuNav by remember { mutableStateOf(false) }
     var menuMore by remember { mutableStateOf(false) }
     val cals = remember(tick) { CalRepo.calendars(ctx) }
@@ -250,6 +255,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                             DropdownMenuItem({ Text("📄 מסמכים") }, { menuNav = false; onDocs() })
                             HorizontalDivider()
                             DropdownMenuItem({ Text("🗓 הגדרות יומנים") }, { menuNav = false; showSettings = true })
+                            DropdownMenuItem({ Text("🔔 התראות אירועים") }, { menuNav = false; showNotif = true })
                         }
                     }
                     val page = pager.currentPage
@@ -305,12 +311,63 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             onDefault = { defCal = it; prefs.edit().putLong("diaryDef", it).apply() },
             onChanged = { editing = null; tick++ }
         )
+        if (showNotif) NotifSettings(onDismiss = { showNotif = false; tick++ })
         if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false }) { vis, def ->
             visPref = vis; defCal = def
             prefs.edit().putStringSet("diaryVis", vis.map { it.toString() }.toSet()).putLong("diaryDef", def).apply()
             showSettings = false
         }
     }
+}
+
+@Composable
+private fun NotifSettings(onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
+    var on by remember { mutableStateOf(EventNotify.enabled(ctx)) }
+    var snd by remember { mutableStateOf(EventNotify.sound(ctx)) }
+    var vib by remember { mutableStateOf(EventNotify.vib(ctx)) }
+    var led by remember { mutableStateOf(EventNotify.led(ctx)) }
+    var snz by remember { mutableStateOf(EventNotify.snooze(ctx)) }
+    var ren by remember { mutableStateOf(EventNotify.renotify(ctx)) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val u: Uri? = r.data?.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        if (r.resultCode == android.app.Activity.RESULT_OK) { snd = if (u == null) "silent" else u.toString(); prefs.edit().putString("evSound", snd).apply() }
+    }
+    fun sndName(): String = when (snd) {
+        "" -> "ברירת מחדל"; "silent" -> "שקט"
+        else -> runCatching { android.media.RingtoneManager.getRingtone(ctx, Uri.parse(snd)).getTitle(ctx) }.getOrDefault("מותאם אישית")
+    }
+    val vibs = listOf("ANDROID" to "Android", "STRONG" to "חזק", "SHORT" to "קצר", "PULSE" to "פעימות", "NONE" to "ללא")
+    val snzs = listOf(5, 10, 15, 30, 60)
+    val rens = listOf(0, 5, 10, 15, 30)
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text("התראות אירועים") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) { Text("התראה", fontSize = 17.sp); Text(if (on) "מופעל" else "כבוי", fontSize = 13.sp, color = Color.Gray) }
+                    Switch(on, { on = it; prefs.edit().putBoolean("evOn", it).apply() })
+                }
+                Text("ההתראות נשלחות לפי התזכורות שהוגדרו בכל אירוע. אם אפליקציית יומן אחרת מציגה התראות לאותם אירועים, כדאי לכבות אותן שם כדי שלא יוכפלו.", fontSize = 12.sp, color = Color.Gray)
+                Column(Modifier.fillMaxWidth().clickable {
+                    picker.launch(Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_NOTIFICATION)
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, when (snd) { "" -> android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION); "silent" -> null; else -> Uri.parse(snd) })
+                    })
+                }.padding(vertical = 6.dp)) { Text("צליל התראה", fontSize = 17.sp); Text(sndName(), fontSize = 13.sp, color = Color.Gray) }
+                Row(Modifier.fillMaxWidth().clickable { led = !led; prefs.edit().putBoolean("evLed", led).apply() }, verticalAlignment = Alignment.CenterVertically) {
+                    Text("נורית", Modifier.weight(1f), fontSize = 17.sp); Checkbox(led, { led = it; prefs.edit().putBoolean("evLed", it).apply() })
+                }
+                Choice("רטט", vibs.first { it.first == vib }.second, vibs.map { it.second }) { vib = vibs[it].first; prefs.edit().putString("evVib", vib).apply() }
+                Choice("נודניק", "$snz דקות", snzs.map { "$it דקות" }) { snz = snzs[it]; prefs.edit().putInt("evSnooze", snz).apply() }
+                Choice("Re-Notify", if (ren == 0) "כבוי" else "כל $ren דקות", rens.map { if (it == 0) "כבוי" else "כל $it דקות" }) { ren = rens[it]; prefs.edit().putInt("evRenotify", ren).apply() }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("סגירה") } }
+    )
 }
 
 @Composable
@@ -567,7 +624,25 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
 
 // ============================ EDITOR ============================
 
-private val REMINDERS = listOf(-1 to "ללא", 0 to "בזמן האירוע", 5 to "5 דקות לפני", 10 to "10 דקות לפני", 30 to "30 דקות לפני", 60 to "שעה לפני", 1440 to "יום לפני")
+private val REM_OPTS = listOf(0, 5, 10, 15, 30, 45, 60, 120, 1440, 2880, 10080)
+private fun remLabel(m: Int) = when {
+    m == 0 -> "בזמן האירוע"
+    m < 60 -> "$m דקות"
+    m == 60 -> "שעה"
+    m < 1440 -> "${m / 60} שעות"
+    m == 1440 -> "יום"
+    m % 10080 == 0 -> if (m == 10080) "שבוע" else "${m / 10080} שבועות"
+    else -> "${m / 1440} ימים"
+}
+private val AVAIL = listOf(0 to "עסוק", 1 to "פנוי")
+private val ACCESS = listOf(0 to "ברירת מחדל", 3 to "ציבורי", 2 to "פרטי", 1 to "חסוי")
+private fun durText(mins: Long): String = when {
+    mins <= 0 -> "0 דקות"
+    mins < 60 -> "$mins דקות"
+    mins % 1440 == 0L -> if (mins == 1440L) "יום" else "${mins / 1440} ימים"
+    mins % 60 == 0L -> if (mins == 60L) "שעה" else "${mins / 60} שעות"
+    else -> "${mins / 60}:%02d שעות".format(mins % 60)
+}
 private val REPEATS = listOf("" to "ללא חזרה", "DAILY" to "כל יום", "WEEKLY" to "כל שבוע", "MONTHLY" to "כל חודש", "YEARLY" to "כל שנה")
 
 @Composable
@@ -590,7 +665,11 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     var allDay by remember { mutableStateOf(false) }
     var loc by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    var rem by remember { mutableStateOf(10) }
+    val rems = remember { mutableStateListOf(10) }
+    var avail by remember { mutableStateOf(0) }
+    var access by remember { mutableStateOf(0) }
+    val guests = remember { mutableStateListOf<String>() }
+    var guestIn by remember { mutableStateOf("") }
     var rep by remember { mutableStateOf("") }
     var confirmDel by remember { mutableStateOf(false) }
     var pickCal by remember { mutableStateOf(false) }
@@ -606,7 +685,9 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             sd = a; ed = b
             if (!ev.allDay) { stT = ev.startTime(zone); enT = ev.endTime(zone) }
             loc = f?.location ?: ev.location; desc = f?.desc.orEmpty()
-            rem = f?.reminder ?: -1
+            rems.clear(); rems.addAll(f?.reminders.orEmpty())
+            avail = f?.availability ?: 0; access = f?.access ?: 0
+            guests.clear(); guests.addAll(f?.guests.orEmpty())
             rep = if (f != null && f.rrule.isNotEmpty()) (REPEATS.map { it.first }.firstOrNull { it.isNotEmpty() && f.rrule == "FREQ=$it" } ?: "CUSTOM") else ""
             loaded = true
         }
@@ -615,11 +696,21 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     val canWrite = cals.firstOrNull { it.id == calId }?.writable != false
     fun save() {
         if (calId < 0) { android.widget.Toast.makeText(ctx, "אין יומן לכתיבה", android.widget.Toast.LENGTH_SHORT).show(); return }
-        val s = EdState(title.trim(), calId, sd, stT, if (ed.isBefore(sd)) sd else ed, enT, allDay, loc, desc, rem, rep)
+        val s = EdState(title.trim(), calId, sd, stT, if (ed.isBefore(sd)) sd else ed, enT, allDay, loc, desc, rems.toList(), rep, avail, access, guests.toList())
         scope.launch {
             val id = withContext(Dispatchers.IO) { CalRepo.save(ctx, full, ev?.begin ?: 0L, s) }
             if (id < 0) android.widget.Toast.makeText(ctx, "השמירה נכשלה", android.widget.Toast.LENGTH_SHORT).show() else onChanged()
         }
+    }
+    fun startMoved(oldD: LocalDate, oldT: LocalTime, newD: LocalDate, newT: LocalTime) {
+        // keep the duration when the start moves
+        val delta = java.time.Duration.between(oldD.atTime(oldT), newD.atTime(newT))
+        val e = ed.atTime(enT).plus(delta)
+        ed = e.toLocalDate(); enT = e.toLocalTime()
+    }
+    fun shiftEnd(mins: Long) {
+        val e = ed.atTime(enT).plusMinutes(mins)
+        if (e.isAfter(sd.atTime(stT))) { ed = e.toLocalDate(); enT = e.toLocalTime() }
     }
     fun pickDate(cur: LocalDate, set: (LocalDate) -> Unit) =
         DatePickerDialog(ctx, { _, y, m, d -> set(LocalDate.of(y, m + 1, d)) }, cur.year, cur.monthValue - 1, cur.dayOfMonth).show()
@@ -647,16 +738,51 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                     Text("כל היום", Modifier.weight(1f), fontSize = 16.sp); Switch(allDay, { allDay = it })
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton({ pickDate(sd) { sd = it; if (ed.isBefore(it)) ed = it } }, Modifier.weight(1f)) { Text("${sd.dayOfMonth}/${sd.monthValue}/${sd.year}") }
-                    if (!allDay) OutlinedButton({ pickTime(stT) { stT = it } }, Modifier.weight(0.7f)) { Text(hm(stT)) }
+                    OutlinedButton({ pickDate(sd) { n -> if (allDay) { sd = n; if (ed.isBefore(n)) ed = n } else { val od = sd; sd = n; startMoved(od, stT, n, stT) } } }, Modifier.weight(1f)) { Text("${sd.dayOfMonth}/${sd.monthValue}/${sd.year}") }
+                    if (!allDay) OutlinedButton({ pickTime(stT) { n -> val ot = stT; stT = n; startMoved(sd, ot, sd, n) } }, Modifier.weight(0.7f)) { Text(hm(stT)) }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton({ pickDate(ed) { ed = it } }, Modifier.weight(1f)) { Text("${ed.dayOfMonth}/${ed.monthValue}/${ed.year}") }
                     if (!allDay) OutlinedButton({ pickTime(enT) { enT = it } }, Modifier.weight(0.7f)) { Text(hm(enT)) }
                 }
+                if (!allDay) {
+                    val mins = java.time.Duration.between(sd.atTime(stT), ed.atTime(enT)).toMinutes()
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("⏱ " + durText(mins), fontSize = 16.sp, modifier = Modifier.padding(end = 6.dp))
+                        listOf("−1h" to -60L, "−15" to -15L, "+15" to 15L, "+1h" to 60L).forEach { (l, d) ->
+                            Text(l, Modifier.clip(RoundedCornerShape(18.dp)).background(Color(0xFFE6E6E6)).clickable { shiftEnd(d) }.padding(horizontal = 14.dp, vertical = 8.dp), fontSize = 15.sp)
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { Choice("📌", AVAIL.first { it.first == avail }.second, AVAIL.map { it.second }) { avail = AVAIL[it].first } }
+                    Box(Modifier.weight(1f)) { Choice("👁", ACCESS.firstOrNull { it.first == access }?.second ?: "ברירת מחדל", ACCESS.map { it.second }) { access = ACCESS[it].first } }
+                }
                 OutlinedTextField(loc, { loc = it }, Modifier.fillMaxWidth(), label = { Text("מיקום") }, singleLine = true)
                 OutlinedTextField(desc, { desc = it }, Modifier.fillMaxWidth(), label = { Text("תיאור") }, minLines = 2)
-                Choice("תזכורת", REMINDERS.firstOrNull { it.first == rem }?.second ?: "$rem דקות לפני", REMINDERS.map { it.second }) { rem = REMINDERS[it].first }
+                Text("👥 אורחים", fontWeight = FontWeight.Bold, color = INK)
+                guests.toList().forEach { g ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(g, Modifier.weight(1f), fontSize = 15.sp)
+                        TextButton({ guests.remove(g) }) { Text("✕", color = RED) }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(guestIn, { guestIn = it }, Modifier.weight(1f), label = { Text("כתובת מייל של אורח") }, singleLine = true)
+                    TextButton({
+                        val g = guestIn.trim()
+                        if (g.contains("@") && guests.none { it.equals(g, true) }) { guests.add(g); guestIn = "" }
+                        else android.widget.Toast.makeText(ctx, "כתובת מייל לא תקינה", android.widget.Toast.LENGTH_SHORT).show()
+                    }) { Text("הוסף") }
+                }
+                Text("🔔 תזכורות", fontWeight = FontWeight.Bold, color = INK)
+                rems.toList().forEachIndexed { i, m ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { Choice("התראה", remLabel(m) + (if (m > 0) " לפני" else ""), REM_OPTS.map { remLabel(it) }) { rems[i] = REM_OPTS[it] } }
+                        TextButton({ rems.removeAt(i) }) { Text("✕", color = RED) }
+                    }
+                }
+                TextButton({ rems.add(REM_OPTS.firstOrNull { it !in rems } ?: 10) }) { Text("＋ הוסף תזכורת", color = Color(0xFFE91E63)) }
                 val repLabel = if (rep == "CUSTOM") "חזרה מותאמת (נשמרת)" else REPEATS.firstOrNull { it.first == rep }?.second ?: ""
                 Choice("חזרה", repLabel, REPEATS.map { it.second }) { rep = REPEATS[it].first }
                 if (full != null && full!!.rrule.isNotEmpty()) Text("שינוי בפגישה חוזרת חל על כל הסדרה.", fontSize = 12.sp, color = Color.Gray)

@@ -109,6 +109,6 @@ class ActionReceiver : BroadcastReceiver() {
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
-        async(c) { Reminders.rescheduleAll(c) }
+        async(c) { Reminders.rescheduleAll(c); runCatching { EventNotify.run(c) } }
     }
 }

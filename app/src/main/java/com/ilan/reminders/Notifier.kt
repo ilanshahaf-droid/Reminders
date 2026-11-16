@@ -27,6 +27,7 @@ class App : Application() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).deleteNotificationChannel("reminders_v1")
         runCatching { Sync.ensurePeriodic(this) }
+        Thread { runCatching { EventNotify.run(this) } }.start()
     }
 }
 

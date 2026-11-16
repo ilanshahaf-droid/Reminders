@@ -36,12 +36,14 @@ data class Ev(
 /** the full row of an event, needed for editing */
 data class EvFull(
     val id: Long, val calId: Long, val title: String, val dtstart: Long, val dtend: Long, val duration: String,
-    val rrule: String, val allDay: Boolean, val location: String, val desc: String, val tz: String, val reminder: Int
+    val rrule: String, val allDay: Boolean, val location: String, val desc: String, val tz: String, val reminders: List<Int>,
+    val availability: Int, val access: Int, val guests: List<String>, val organizer: String
 )
 
 data class EdState(
     val title: String, val calId: Long, val startDate: LocalDate, val startTime: LocalTime, val endDate: LocalDate, val endTime: LocalTime,
-    val allDay: Boolean, val location: String, val desc: String, val reminder: Int, val repeat: String
+    val allDay: Boolean, val location: String, val desc: String, val reminders: List<Int>, val repeat: String,
+    val availability: Int = 0, val access: Int = 0, val guests: List<String> = emptyList()
 )
 
 object CalRepo {
@@ -93,26 +95,45 @@ object CalRepo {
             arrayOf(
                 CalendarContract.Events.CALENDAR_ID, CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART, CalendarContract.Events.DTEND,
                 CalendarContract.Events.DURATION, CalendarContract.Events.RRULE, CalendarContract.Events.ALL_DAY,
-                CalendarContract.Events.EVENT_LOCATION, CalendarContract.Events.DESCRIPTION, CalendarContract.Events.EVENT_TIMEZONE
+                CalendarContract.Events.EVENT_LOCATION, CalendarContract.Events.DESCRIPTION, CalendarContract.Events.EVENT_TIMEZONE,
+                CalendarContract.Events.AVAILABILITY, CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ORGANIZER
             ), null, null, null
         )?.use { q ->
             if (q.moveToFirst()) r = EvFull(
                 id, q.getLong(0), q.getString(1).orEmpty(), q.getLong(2), q.getLong(3), q.getString(4).orEmpty(), q.getString(5).orEmpty(),
-                q.getInt(6) == 1, q.getString(7).orEmpty(), q.getString(8).orEmpty(), q.getString(9).orEmpty(), firstReminder(c, id)
+                q.getInt(6) == 1, q.getString(7).orEmpty(), q.getString(8).orEmpty(), q.getString(9).orEmpty(), reminderList(c, id),
+                q.getInt(10), q.getInt(11), guestList(c, id, q.getString(12).orEmpty()), q.getString(12).orEmpty()
             )
         }
         r
     }.getOrNull()
 
-    private fun firstReminder(c: Context, id: Long): Int {
-        var m = -1
+    private fun reminderList(c: Context, id: Long): List<Int> {
+        val out = ArrayList<Int>()
         runCatching {
             c.contentResolver.query(
                 CalendarContract.Reminders.CONTENT_URI, arrayOf(CalendarContract.Reminders.MINUTES),
                 "${CalendarContract.Reminders.EVENT_ID}=?", arrayOf(id.toString()), null
-            )?.use { q -> if (q.moveToFirst()) m = q.getInt(0) }
+            )?.use { q -> while (q.moveToNext()) out.add(q.getInt(0).let { if (it < 0) 10 else it }) }
         }
-        return m
+        return out
+    }
+
+    /** guest e-mails (the organizer / the owner's own row is left out) */
+    private fun guestList(c: Context, id: Long, organizer: String): List<String> {
+        val out = ArrayList<String>()
+        runCatching {
+            c.contentResolver.query(
+                CalendarContract.Attendees.CONTENT_URI, arrayOf(CalendarContract.Attendees.ATTENDEE_EMAIL, CalendarContract.Attendees.ATTENDEE_RELATIONSHIP),
+                "${CalendarContract.Attendees.EVENT_ID}=?", arrayOf(id.toString()), null
+            )?.use { q ->
+                while (q.moveToNext()) {
+                    val m = q.getString(0).orEmpty()
+                    if (m.isNotBlank() && !m.equals(organizer, true) && q.getInt(1) != CalendarContract.Attendees.RELATIONSHIP_ORGANIZER) out.add(m)
+                }
+            }
+        }
+        return out
     }
 
     private fun ms(d: LocalDate, t: LocalTime, z: ZoneId) = d.atTime(t).atZone(z).toInstant().toEpochMilli()
@@ -142,7 +163,11 @@ object CalRepo {
         v.put(CalendarContract.Events.DESCRIPTION, s.desc)
         v.put(CalendarContract.Events.ALL_DAY, if (s.allDay) 1 else 0)
         v.put(CalendarContract.Events.EVENT_TIMEZONE, if (s.allDay) "UTC" else TimeZone.getDefault().id)
-        v.put(CalendarContract.Events.HAS_ALARM, if (s.reminder >= 0) 1 else 0)
+        v.put(CalendarContract.Events.HAS_ALARM, if (s.reminders.isNotEmpty()) 1 else 0)
+        v.put(CalendarContract.Events.AVAILABILITY, s.availability)
+        v.put(CalendarContract.Events.ACCESS_LEVEL, s.access)
+        if (s.guests.isNotEmpty()) v.put(CalendarContract.Events.HAS_ATTENDEE_DATA, 1)
+        if (existing == null && s.guests.isNotEmpty()) v.put(CalendarContract.Events.ORGANIZER, calendars(c).firstOrNull { it.id == s.calId }?.account.orEmpty())
         // an existing series keeps its own first occurrence: shift it by however much the opened occurrence moved
         val series = existing != null && existing.rrule.isNotEmpty() && rule.isNotEmpty()
         val start = if (series) existing!!.dtstart + (newBegin - instanceBegin) else newBegin
@@ -166,15 +191,31 @@ object CalRepo {
             id = existing.id
         }
         c.contentResolver.delete(CalendarContract.Reminders.CONTENT_URI, "${CalendarContract.Reminders.EVENT_ID}=?", arrayOf(id.toString()))
-        if (s.reminder >= 0) {
+        s.reminders.distinct().forEach { m ->
             val r = ContentValues()
             r.put(CalendarContract.Reminders.EVENT_ID, id)
-            r.put(CalendarContract.Reminders.MINUTES, s.reminder)
+            r.put(CalendarContract.Reminders.MINUTES, m)
             r.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
             c.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, r)
         }
+        runCatching { saveGuests(c, id, existing, s.guests) }
         id
     }.getOrDefault(-1L)
+
+    private fun saveGuests(c: Context, id: Long, existing: EvFull?, guests: List<String>) {
+        val old = existing?.guests.orEmpty()
+        val A = CalendarContract.Attendees
+        old.filter { o -> guests.none { it.equals(o, true) } }.forEach {
+            c.contentResolver.delete(A.CONTENT_URI, "${A.EVENT_ID}=? AND ${A.ATTENDEE_EMAIL}=?", arrayOf(id.toString(), it))
+        }
+        guests.filter { g -> old.none { it.equals(g, true) } }.forEach { g ->
+            val v = ContentValues()
+            v.put(A.EVENT_ID, id); v.put(A.ATTENDEE_NAME, g); v.put(A.ATTENDEE_EMAIL, g)
+            v.put(A.ATTENDEE_RELATIONSHIP, A.RELATIONSHIP_ATTENDEE); v.put(A.ATTENDEE_TYPE, A.TYPE_REQUIRED)
+            v.put(A.ATTENDEE_STATUS, A.ATTENDEE_STATUS_INVITED)
+            c.contentResolver.insert(A.CONTENT_URI, v)
+        }
+    }
 
     fun delete(c: Context, id: Long): Boolean = runCatching {
         c.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id), null, null) > 0
