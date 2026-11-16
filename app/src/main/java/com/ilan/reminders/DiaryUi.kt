@@ -531,10 +531,10 @@ private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, o
     val col = evColor(e)
     if (e.allDay) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp).clip(RoundedCornerShape(3.dp)).background(col.copy(alpha = 0.30f)).clickable(onClick = onClick).padding(horizontal = 4.dp)) {
-            Text(e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
+            Text((if (e.repeat) "⇄ " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
         }
     } else {
-        Text((if (showTime) "${hm(e.startTime(z))} " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
+        Text((if (e.repeat) "⇄ " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 4.dp))
     }
 }
