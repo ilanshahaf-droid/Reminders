@@ -321,6 +321,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             }
         }
         dayDlg?.let { d ->
+          androidx.compose.runtime.key(d, dayEvSel) {
             DayDialog(
                 d, dayEvs(events, d, zone), cals, zone, dayEvSel,
                 onClose = { dayDlg = null },
@@ -330,6 +331,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 onOpenDay = { dayDlg = null; dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(2) } },
                 onChanged = { tick++ }
             )
+          }
         }
         remTask?.let { rt ->
             AlertDialog(
@@ -375,6 +377,10 @@ private fun DayDialog(
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var sel by remember { mutableStateOf(if (initial == null) 0 else evs.indexOfFirst { it.id == initial.first && it.begin == initial.second }.coerceAtLeast(0)) }
+    var initDone by remember { mutableStateOf(false) }
+    LaunchedEffect(initial, evs.size) {
+        if (initial != null && !initDone) { val i = evs.indexOfFirst { it.id == initial.first && it.begin == initial.second }; if (i >= 0) { sel = i; initDone = true } }
+    }
     var delAsk by remember { mutableStateOf<Ev?>(null) }
     var viewAtt by remember { mutableStateOf<String?>(null) }
     fun timeOf(e: Ev) = if (e.allDay) "כל היום" else "${hm(e.startTime(zone))}–${hm(e.endTime(zone))}"
