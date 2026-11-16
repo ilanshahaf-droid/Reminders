@@ -451,7 +451,7 @@ private fun DayDialog(
                                     Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(col))
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text((if (e.repeat) "⇄ " else "") + e.title, fontSize = 18.sp, color = INK)
+                                        Text(e.title + (if (e.repeat) " ⇄" else ""), fontSize = 18.sp, color = INK)
                                         Text(timeOf(e), fontSize = 16.sp, color = Color.Gray)
                                     }
                                     if (e.alarm || isRem) Text("🔔", fontSize = 20.sp)
@@ -571,10 +571,10 @@ private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, o
     val col = evColor(e)
     if (e.allDay) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp).clip(RoundedCornerShape(3.dp)).background(col.copy(alpha = 0.30f)).clickable(onClick = onClick).padding(horizontal = 4.dp)) {
-            Text((if (e.repeat) "⇄ " else "") + (if (e.att) "📎 " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
+            Text((if (e.att) "📎 " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
         }
     } else {
-        Text((if (e.repeat) "⇄ " else "") + (if (e.att) "📎 " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
+        Text((if (e.att) "📎 " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 4.dp))
     }
 }
