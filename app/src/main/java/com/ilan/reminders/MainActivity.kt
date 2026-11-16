@@ -190,7 +190,7 @@ private fun batteryOk(c: Context) =
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
+fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}, onOpenDiary: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
@@ -344,7 +344,7 @@ fun Root(onOpenNotes: () -> Unit = {}, onOpenDocs: () -> Unit = {}) {
             Scaffold(containerColor = Color.Transparent) { pad ->
                 Box(Modifier.padding(pad).fillMaxSize()) {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 130.dp)) {
-                        if (selected.isEmpty()) item(key = "tabs") { TabSwitch("tasks", onReminders = {}, onNotes = onOpenNotes, onDocs = onOpenDocs) }
+                        if (selected.isEmpty()) item(key = "tabs") { TabSwitch("tasks", onReminders = {}, onNotes = onOpenNotes, onDocs = onOpenDocs, onDiary = onOpenDiary) }
                         if (selected.isNotEmpty()) item {
                             SelectionBar(
                                 selected.size, onClose = { selected = emptySet() },
@@ -822,7 +822,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v95") },
+        title = { Text("הגדרות · v96") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

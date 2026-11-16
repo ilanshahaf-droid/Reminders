@@ -67,9 +67,10 @@ fun Home() {
     if ((PendingShare.text != null || PendingOpen.newNote) && screen != "notes") screen = "notes"
     if ((PendingOpen.file != null || PendingOpen.template != null) && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
-        Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" })
-        if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" })
-        if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" })
+        Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" }, onOpenDiary = { screen = "diary" })
+        if (screen == "notes") NotesHost(onReminders = { screen = "tasks" }, onDocs = { screen = "docs" }, onDiary = { screen = "diary" })
+        if (screen == "docs") DocsHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" }, onDiary = { screen = "diary" })
+        if (screen == "diary") DiaryHost(onReminders = { screen = "tasks" }, onNotes = { screen = "notes" }, onDocs = { screen = "docs" })
         if (TodayView.open) TodayScreen(
             onTask = { PendingOpen.task = it; screen = "tasks" },
             onNote = { PendingOpen.noteId = it.id; screen = "notes" },
@@ -87,7 +88,7 @@ fun Home() {
 }
 
 @Composable
-fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 24.dp) {
+fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 24.dp, onDiary: () -> Unit = {}) {
     val cs = MaterialTheme.colorScheme
     // segmented control: one rounded track, the selected tab is a filled, raised pill
     Surface(
@@ -95,10 +96,10 @@ fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onD
         shape = RoundedCornerShape(26.dp), color = cs.primary.copy(alpha = 0.10f), shadowElevation = 0.dp
     ) {
         Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf(Triple("tasks", "⏰", "תזכורות"), Triple("notes", "📝", "פתקים"), Triple("docs", "📄", "מסמכים")).forEach { (key, icon, label) ->
+            listOf(Triple("tasks", "⏰", "תזכורות"), Triple("notes", "📝", "פתקים"), Triple("docs", "📄", "מסמכים"), Triple("diary", "📅", "יומן")).forEach { (key, icon, label) ->
                 val sel = current == key
                 Surface(
-                    onClick = { if (!sel) when (key) { "notes" -> onNotes(); "docs" -> onDocs(); else -> onReminders() } },
+                    onClick = { if (!sel) when (key) { "notes" -> onNotes(); "docs" -> onDocs(); "diary" -> onDiary(); else -> onReminders() } },
                     modifier = Modifier.weight(1f).height(42.dp),
                     shape = RoundedCornerShape(22.dp),
                     color = if (sel) cs.primary else Color.Transparent,
@@ -121,7 +122,7 @@ fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onD
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
+fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}, onDiary: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val dark = appDark()
@@ -283,7 +284,7 @@ fun NotesHost(onReminders: () -> Unit, onDocs: () -> Unit = {}) {
                                         }) { Text("🗑", fontSize = 20.sp) }
                                     }
                                 }
-                                TabSwitch("notes", onReminders = onReminders, onNotes = {}, onDocs = onDocs, hPad = 8.dp)
+                                TabSwitch("notes", onReminders = onReminders, onNotes = {}, onDocs = onDocs, hPad = 8.dp, onDiary = onDiary)
                                 Row(Modifier.padding(start = 0.dp, end = 8.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text("פתקים", style = MaterialTheme.typography.headlineLarge)

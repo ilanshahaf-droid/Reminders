@@ -365,7 +365,7 @@ internal fun cloudCreateIntent(f: File): Intent =
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
+fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val dark = appDark()
@@ -555,7 +555,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit) {
             DocEditorScreen(editing, dark, template, onClose = { editing = null; creating = false; template = ""; tick++ })
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp)) {
-                TabSwitch("docs", onReminders = onReminders, onNotes = onNotes, onDocs = {}, hPad = 8.dp)
+                TabSwitch("docs", onReminders = onReminders, onNotes = onNotes, onDocs = {}, hPad = 8.dp, onDiary = onDiary)
                 Column(Modifier.padding(top = 12.dp, bottom = 8.dp)) {
                     Text("מסמכים", style = MaterialTheme.typography.headlineLarge)
                     Text(
