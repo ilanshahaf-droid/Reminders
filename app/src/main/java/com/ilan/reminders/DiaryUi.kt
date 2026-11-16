@@ -204,6 +204,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var showSettings by remember { mutableStateOf(false) }
     var showNotif by remember { mutableStateOf(false) }
     var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
+    var dayEvSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) } } }
     var menuNav by remember { mutableStateOf(false) }
     var menuMore by remember { mutableStateOf(false) }
@@ -239,7 +240,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         val n = when (pager.currentPage) { 2 -> date.plusDays(dir.toLong()); 1 -> date.plusWeeks(dir.toLong()); else -> date.plusMonths(dir.toLong()) }
         dayNum = n.toEpochDay()
     }
-    val onDay: (LocalDate) -> Unit = { d -> dayDlg = d }
+    val onDay: (LocalDate) -> Unit = { d -> dayEvSel = null; dayDlg = d }
+    val onCellEv: (Ev, LocalDate) -> Unit = { e, d -> dayEvSel = e.id to e.begin; dayDlg = d }
     val onEvent: (Ev) -> Unit = { e -> if (e.id < 0) remTask = taskList.firstOrNull { it.id == -e.id } else editing = EditTarget(e, e.days(zone).first, null) }
     val onNew: (LocalDate, LocalTime?) -> Unit = { d, t -> editing = EditTarget(null, d, t) }
 
@@ -290,8 +292,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                         when (page) {
                             2 -> VPager(date, { it }, { d, n -> d.plusDays(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> DayView(d, events, zone, today, onNew, onEvent, onDay, {}) }
-                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onEvent, onNew, {}) }
-                            else -> VPager(date, { it.year * 12 + it.monthValue }, { d, n -> d.plusMonths(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> MonthView(d, events, zone, today, onDay, onEvent, {}) }
+                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onCellEv, onNew, {}) }
+                            else -> VPager(date, { it.year * 12 + it.monthValue }, { d, n -> d.plusMonths(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> MonthView(d, events, zone, today, onDay, onCellEv, {}) }
                         }
                     }
                 }
@@ -299,7 +301,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         }
         dayDlg?.let { d ->
             DayDialog(
-                d, dayEvs(events, d, zone), cals, zone,
+                d, dayEvs(events, d, zone), cals, zone, dayEvSel,
                 onClose = { dayDlg = null },
                 onEdit = { e -> dayDlg = null; onEvent(e) },
                 onNew = { dayDlg = null; onNew(d, null) },
@@ -333,12 +335,12 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
 
 @Composable
 private fun DayDialog(
-    date: LocalDate, evs: List<Ev>, cals: List<Cal>, zone: ZoneId,
+    date: LocalDate, evs: List<Ev>, cals: List<Cal>, zone: ZoneId, initial: Pair<Long, Long>?,
     onClose: () -> Unit, onEdit: (Ev) -> Unit, onNew: () -> Unit, onOpenDay: () -> Unit, onChanged: () -> Unit
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    var sel by remember { mutableStateOf(0) }
+    var sel by remember { mutableStateOf(if (initial == null) 0 else evs.indexOfFirst { it.id == initial.first && it.begin == initial.second }.coerceAtLeast(0)) }
     var delAsk by remember { mutableStateOf<Ev?>(null) }
     fun timeOf(e: Ev) = if (e.allDay) "כל היום" else "${hm(e.startTime(zone))}–${hm(e.endTime(zone))}"
     fun dateOf(e: Ev): String {
@@ -533,7 +535,7 @@ private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, o
 }
 
 @Composable
-private fun WeekDayCell(d: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, modifier: Modifier, onDay: (LocalDate) -> Unit, onEvent: (Ev) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit) {
+private fun WeekDayCell(d: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, modifier: Modifier, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit) {
     val idx = dayIdx(d); val isToday = d == today
     val evs = remember(all, d) { dayEvs(all, d, z) }
     BoxWithConstraints(modifier.background(if (idx >= 5) WEEKEND_BG else Color.White)) {
@@ -553,7 +555,7 @@ private fun WeekDayCell(d: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
                 if (hidden > 0) Text("+$hidden", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isToday) Color.White else ORANGE)
             }
             Column(Modifier.weight(1f).fillMaxWidth().pointerInput(d) { detectTapGestures(onTap = { onDay(d) }, onLongPress = { onNew(d, null) }) }) {
-                shown.forEach { e -> EvLine(e, z, 13.sp) { onEvent(e) } }
+                shown.forEach { e -> EvLine(e, z, 13.sp) { onEvent(e, d) } }
             }
         }
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(GRID))
@@ -591,7 +593,7 @@ private fun MiniWeek(start: LocalDate, all: List<Ev>, z: ZoneId, selected: Local
 }
 
 @Composable
-private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, onShift: (Int) -> Unit) {
+private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, onShift: (Int) -> Unit) {
     val start = wkStart(date)
     Row(Modifier.fillMaxSize().background(Color.White)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -608,7 +610,7 @@ private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
 // ============================ MONTH ============================
 
 @Composable
-private fun MonthView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev) -> Unit, onShift: (Int) -> Unit) {
+private fun MonthView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onShift: (Int) -> Unit) {
     val first = date.withDayOfMonth(1)
     val gridStart = wkStart(first)
     Column(Modifier.fillMaxSize().background(Color.White)) {
@@ -627,7 +629,7 @@ private fun MonthView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDat
 }
 
 @Composable
-private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, today: LocalDate, modifier: Modifier, onDay: (LocalDate) -> Unit, onEvent: (Ev) -> Unit) {
+private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, today: LocalDate, modifier: Modifier, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit) {
     val idx = dayIdx(d); val isToday = d == today
     val evs = remember(all, d) { dayEvs(all, d, z) }
     BoxWithConstraints(modifier.background(if (inMonth) Color.White else Color(0xFFE4E4E4)).border(0.5.dp, GRID).clickable { onDay(d) }) {
@@ -644,7 +646,7 @@ private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, 
                     Text("${wkNo(d)}", fontSize = 11.sp, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(BAR.copy(alpha = 0.65f)).padding(horizontal = 3.dp))
                 }
             }
-            shown.forEach { e -> EvLine(e, z, 12.sp, false) { onEvent(e) } }
+            shown.forEach { e -> EvLine(e, z, 12.sp, false) { onEvent(e, d) } }
         }
     }
 }
