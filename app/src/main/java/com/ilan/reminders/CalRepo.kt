@@ -21,7 +21,7 @@ data class Cal(val id: Long, val name: String, val account: String, val color: I
 
 data class Ev(
     val id: Long, val calId: Long, val title: String, val begin: Long, val end: Long, val allDay: Boolean,
-    val color: Int, val location: String, val repeat: Boolean, val alarm: Boolean
+    val color: Int, val location: String, val repeat: Boolean, val alarm: Boolean, val att: Boolean = false
 ) {
     /** first and last day (inclusive) in local dates; all-day events are stored in UTC */
     fun days(zone: ZoneId): Pair<LocalDate, LocalDate> {

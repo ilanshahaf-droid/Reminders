@@ -136,6 +136,7 @@ object EventNotify {
     fun run(c: Context) {
         val am = c.getSystemService(AlarmManager::class.java)
         if (!enabled(c) || !CalRepo.hasRead(c)) { am.cancel(pi(c, 1, "RUN")); am.cancel(pi(c, 2, "RUN")); return }
+        runCatching { EventAtt.purge(c) }
         val now = System.currentTimeMillis()
         val shown = (p(c).getStringSet("evShown", emptySet()) ?: emptySet()).toMutableSet()
         shown.removeAll { k -> (k.split(":").getOrNull(1)?.toLongOrNull() ?: 0L) < now - 3 * 86400_000L }

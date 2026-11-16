@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -206,7 +207,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var showDiag by remember { mutableStateOf(false) }
     var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
     var dayEvSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }
-    LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) } } }
+    LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) }; runCatching { EventAtt.purge(ctx) } } }
     var menuNav by remember { mutableStateOf(false) }
     var menuMore by remember { mutableStateOf(false) }
     val cals = remember(tick) { CalRepo.calendars(ctx) }
@@ -228,6 +229,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             }
             (CalRepo.events(ctx, from, to, visible) + rem)
                 .distinctBy { Triple(it.title.removePrefix("⏰ ").trim(), it.begin, it.allDay) }
+                .let { l -> val ai = EventAtt.ids(ctx); if (ai.isEmpty()) l else l.map { if (it.id in ai) it.copy(att = true) else it } }
                 .sortedBy { it.begin }
         }
     }
@@ -360,6 +362,7 @@ private fun DayDialog(
     val scope = rememberCoroutineScope()
     var sel by remember { mutableStateOf(if (initial == null) 0 else evs.indexOfFirst { it.id == initial.first && it.begin == initial.second }.coerceAtLeast(0)) }
     var delAsk by remember { mutableStateOf<Ev?>(null) }
+    var viewAtt by remember { mutableStateOf<String?>(null) }
     fun timeOf(e: Ev) = if (e.allDay) "כל היום" else "${hm(e.startTime(zone))}–${hm(e.endTime(zone))}"
     fun dateOf(e: Ev): String {
         val (a, b) = e.days(zone)
@@ -405,6 +408,15 @@ private fun DayDialog(
                                     if (e.location.isNotBlank()) Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
                                         Text("📍", fontSize = 20.sp); Spacer(Modifier.width(12.dp)); Text(e.location, fontSize = 16.sp, color = INK)
                                     }
+                                    if (!isRem && e.att) {
+                                        val al = remember(e.id) { EventAtt.list(ctx, e.id) }
+                                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            al.forEach { a ->
+                                                val bm = remember(a.file) { EventAtt.thumb(ctx, a.file, null, 240) }
+                                                if (bm != null) androidx.compose.foundation.Image(bm.asImageBitmap(), null, Modifier.size(84.dp).clip(RoundedCornerShape(6.dp)).clickable { viewAtt = a.file }, contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                                            }
+                                        }
+                                    }
                                     Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                                         if (!isRem) {
                                             TextButton({ delAsk = e }) { Text("🗑", fontSize = 24.sp) }
@@ -435,11 +447,19 @@ private fun DayDialog(
             }
         }
     }
+    viewAtt?.let { f ->
+        androidx.compose.ui.window.Dialog({ viewAtt = null }, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            val bm = remember(f) { EventAtt.thumb(ctx, f, null, 2000) }
+            Box(Modifier.fillMaxSize().background(Color.Black).clickable { viewAtt = null }) {
+                if (bm != null) androidx.compose.foundation.Image(bm.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+            }
+        }
+    }
     delAsk?.let { e ->
         AlertDialog(
             onDismissRequest = { delAsk = null }, title = { Text("למחוק את האירוע?") },
             text = { Text(if (e.repeat) "כל הסדרה החוזרת תימחק גם מיומן גוגל." else "האירוע יימחק גם מיומן גוגל.") },
-            confirmButton = { TextButton({ delAsk = null; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, e.id) }; sel = 0; onChanged() } }) { Text("מחיקה", color = RED) } },
+            confirmButton = { TextButton({ delAsk = null; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, e.id); EventAtt.removeAll(ctx, e.id) }; sel = 0; onChanged() } }) { Text("מחיקה", color = RED) } },
             dismissButton = { TextButton({ delAsk = null }) { Text("ביטול") } }
         )
     }
@@ -531,10 +551,10 @@ private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, o
     val col = evColor(e)
     if (e.allDay) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp).clip(RoundedCornerShape(3.dp)).background(col.copy(alpha = 0.30f)).clickable(onClick = onClick).padding(horizontal = 4.dp)) {
-            Text((if (e.repeat) "⇄ " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
+            Text((if (e.repeat) "⇄ " else "") + (if (e.att) "📎 " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
         }
     } else {
-        Text((if (e.repeat) "⇄ " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
+        Text((if (e.repeat) "⇄ " else "") + (if (e.att) "📎 " else "") + (if (showTime) "${hm(e.startTime(z))} " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 4.dp))
     }
 }
@@ -807,6 +827,10 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     var rep by remember { mutableStateOf("") }
     var confirmDel by remember { mutableStateOf(false) }
     var scope0 by remember { mutableStateOf(1) }
+    val atts = remember { mutableStateListOf<EventAtt.Item>() }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
+        us.forEach { u -> atts.add(EventAtt.Item(null, u, EventAtt.nameOf(ctx, u), false)) }
+    }
     var askScope by remember { mutableStateOf(ev?.repeat == true) }
     var pickCal by remember { mutableStateOf(false) }
 
@@ -822,6 +846,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             if (!src.allDay) { stT = src.startTime(zone); enT = src.endTime(zone) }
             loc = f?.location ?: src.location; desc = f?.desc.orEmpty()
             rems.clear(); rems.addAll(f?.reminders.orEmpty())
+            atts.clear(); EventAtt.list(ctx, src.id).forEach { atts.add(EventAtt.Item(it.file, null, it.name, it.del)) }
             avail = f?.availability ?: 0; access = f?.access ?: 0
             guests.clear(); guests.addAll(f?.guests.orEmpty())
             rep = if (ev == null) "" else if (f != null && f.rrule.isNotEmpty()) (REPEATS.map { it.first }.firstOrNull { it.isNotEmpty() && f.rrule == "FREQ=$it" } ?: "CUSTOM") else ""
@@ -835,6 +860,10 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         val s = EdState(title.trim(), calId, sd, stT, if (ed.isBefore(sd)) sd else ed, enT, allDay, loc, desc, rems.toList(), rep, avail, access, guests.toList())
         scope.launch {
             val id = withContext(Dispatchers.IO) { CalRepo.save(ctx, full, ev?.begin ?: 0L, s, scope0) }
+            if (id >= 0) withContext(Dispatchers.IO) {
+                val endZ = if (allDay) ed.plusDays(1).atStartOfDay(zone) else ed.atTime(enT).atZone(zone)
+                runCatching { EventAtt.commit(ctx, id, atts.toList(), endZ.toInstant().toEpochMilli()) }
+            }
             if (id < 0) android.widget.Toast.makeText(ctx, "השמירה נכשלה: " + CalRepo.lastError.take(160), android.widget.Toast.LENGTH_LONG).show() else onChanged()
         }
     }
@@ -911,6 +940,24 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                         else android.widget.Toast.makeText(ctx, "כתובת מייל לא תקינה", android.widget.Toast.LENGTH_SHORT).show()
                     }) { Text("הוסף") }
                 }
+                Text("📎 קבצים מצורפים (תמונות)", fontWeight = FontWeight.Bold, color = INK)
+                atts.toList().forEachIndexed { i, a ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val bmp = remember(a.file, a.uri) { EventAtt.thumb(ctx, a.file, a.uri, 160) }
+                        if (bmp != null) androidx.compose.foundation.Image(bmp.asImageBitmap(), null, Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                        else Box(Modifier.size(56.dp).background(Color(0xFFE6E6E6)))
+                        Column(Modifier.weight(1f)) {
+                            Text(a.name, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("מחק אחרי האירוע", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.weight(1f))
+                                Switch(a.del, { v -> atts[i] = EventAtt.Item(a.file, a.uri, a.name, v) })
+                            }
+                        }
+                        TextButton({ atts.removeAt(i) }) { Text("✕", color = RED) }
+                    }
+                }
+                TextButton({ picker.launch("image/*") }) { Text("＋ הוסף תמונה", color = Color(0xFFE91E63)) }
+                if (atts.isNotEmpty()) Text("התמונות נשמרות באפליקציה בלבד (לא ביומן גוגל). \"מחק אחרי האירוע\" מוחק את התמונה אוטומטית בתום האירוע.", fontSize = 12.sp, color = Color.Gray)
                 Text("🔔 תזכורות", fontWeight = FontWeight.Bold, color = INK)
                 rems.toList().forEachIndexed { i, m ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -956,7 +1003,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     if (confirmDel) AlertDialog(
         onDismissRequest = { confirmDel = false }, title = { Text("למחוק את הפגישה?") },
         text = { Text(if (full?.rrule.isNullOrEmpty()) "הפגישה תימחק גם מיומן גוגל." else "כל הסדרה החוזרת תימחק גם מיומן גוגל.") },
-        confirmButton = { TextButton({ confirmDel = false; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, ev!!.id) }; onChanged() } }) { Text("מחיקה", color = RED) } },
+        confirmButton = { TextButton({ confirmDel = false; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, ev!!.id); EventAtt.removeAll(ctx, ev.id) }; onChanged() } }) { Text("מחיקה", color = RED) } },
         dismissButton = { TextButton({ confirmDel = false }) { Text("ביטול") } }
     )
 }
