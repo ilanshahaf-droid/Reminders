@@ -15,7 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -111,14 +111,13 @@ fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit) 
 @Composable
 private fun Modifier.vSwipe(onShift: (Int) -> Unit): Modifier {
     val cur by rememberUpdatedState(onShift)
-    return this.pointerInput(Unit) {
-        var total = 0f
-        detectVerticalDragGestures(
-            onDragStart = { total = 0f },
-            onDragEnd = { if (total < -110f) cur(1) else if (total > 110f) cur(-1) },
-            onDragCancel = { total = 0f }
-        ) { _, dy -> total += dy }
-    }
+    var total by remember { mutableStateOf(0f) }
+    val st = androidx.compose.foundation.gestures.rememberDraggableState { total += it }
+    return this.draggable(
+        st, androidx.compose.foundation.gestures.Orientation.Vertical,
+        onDragStarted = { total = 0f },
+        onDragStopped = { v -> if (total < -50f || v < -900f) cur(1) else if (total > 50f || v > 900f) cur(-1); total = 0f }
+    )
 }
 
 @Composable
@@ -411,7 +410,7 @@ private fun placeSlots(slots: List<DSlot>) {
 @Composable
 private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onNew: (LocalDate, LocalTime?) -> Unit, onEvent: (Ev) -> Unit, onDay: (LocalDate) -> Unit, onShift: (Int) -> Unit) {
     val evs = remember(all, date) { dayEvs(all, date, z) }
-    val hourH = 56.dp
+    val hourH = 64.dp
     val scroll = rememberScrollState()
     val dens = LocalDensity.current
     LaunchedEffect(date) {
@@ -423,19 +422,19 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
         object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
             var acc = 0f
             override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
-                acc = if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) acc + available.y else 0f
+                acc = if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && consumed.y == 0f) acc + available.y else 0f
                 return Offset.Zero
             }
             override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
                 val a = acc; acc = 0f
-                if (a < -90f) curShift(1) else if (a > 90f) curShift(-1)
+                if (a < -40f) curShift(1) else if (a > 40f) curShift(-1)
                 return androidx.compose.ui.unit.Velocity.Zero
             }
         }
     }
     Row(Modifier.fillMaxSize().nestedScroll(edge)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            evs.filter { it.allDay }.forEach { e -> EvLine(e, z, 14.sp) { onEvent(e) } }
+            evs.filter { it.allDay }.forEach { e -> EvLine(e, z, 16.sp) { onEvent(e) } }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val labelW = 40.dp
                 val areaW = maxWidth - labelW - 6.dp
@@ -462,7 +461,7 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                                     .clip(RoundedCornerShape(5.dp)).background(col.copy(alpha = 0.92f)).border(1.dp, Color.Black.copy(alpha = 0.25f), RoundedCornerShape(5.dp))
                                     .clickable { onEvent(s.e) }.padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
-                                Text("${hm(s.e.startTime(z))}–${hm(s.e.endTime(z))} ${s.e.title}" + if (s.e.repeat) " ⇄" else "", fontSize = 13.sp, color = Color.White, maxLines = if (h > 40.dp) 3 else 1, overflow = TextOverflow.Ellipsis)
+                                Text("${hm(s.e.startTime(z))}–${hm(s.e.endTime(z))} ${s.e.title}" + if (s.e.repeat) " ⇄" else "", fontSize = 16.sp, color = Color.White, maxLines = if (h > 44.dp) 4 else 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                         if (date == today) {
@@ -473,12 +472,11 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                 }
             }
         }
-        Column(Modifier.width(112.dp).fillMaxHeight().vSwipe(onShift).background(Color(0xFFEFF3F7)).padding(8.dp)) {
-            Text(HE_MONTHS[date.monthValue - 1], fontSize = 15.sp, color = BAR)
-            Text("${date.dayOfMonth}", fontSize = 56.sp, color = BAR, fontWeight = FontWeight.Medium)
-            Text(DAY_FULL[dayIdx(date)], fontSize = 15.sp, color = BAR)
+        Column(Modifier.width(64.dp).fillMaxHeight().vSwipe(onShift).background(Color(0xFFEFF3F7)).padding(horizontal = 4.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(HE_MONTHS[date.monthValue - 1], fontSize = 12.sp, color = BAR, maxLines = 1)
+            Text("${date.dayOfMonth}", fontSize = 34.sp, color = BAR, fontWeight = FontWeight.Medium)
+            Text(DAY_FULL[dayIdx(date)].removePrefix("יום "), fontSize = 12.sp, color = BAR, maxLines = 1)
             Spacer(Modifier.weight(1f))
-            MiniWeek(wkStart(date), all, z, date, today, Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(4.dp)), onDay)
         }
     }
 }

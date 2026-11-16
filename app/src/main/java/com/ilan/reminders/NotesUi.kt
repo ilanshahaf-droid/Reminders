@@ -58,7 +58,7 @@ import org.json.JSONObject
 /** The app has two parts: reminders (Root) and notes. Notes open over the reminders, which stay alive underneath. */
 @Composable
 fun Home() {
-    var screen by rememberSaveable { mutableStateOf("tasks") }
+    var screen by rememberSaveable { mutableStateOf("diary") }
     val startCtx = LocalContext.current
     LaunchedEffect(Unit) {
         if (PendingOpen.task == null && PendingOpen.noteId == null && PendingOpen.file == null && PendingShare.text == null &&
