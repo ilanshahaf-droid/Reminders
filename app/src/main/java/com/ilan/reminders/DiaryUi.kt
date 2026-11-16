@@ -37,6 +37,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -154,10 +155,10 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     BackHandler(enabled = pager.currentPage != 1 && editing == null) { scope.launch { pager.animateScrollToPage(1) } }
 
     fun shift(dir: Int) {
-        val n = when (pager.currentPage) { 0 -> date.plusDays(dir.toLong()); 1 -> date.plusWeeks(dir.toLong()); else -> date.plusMonths(dir.toLong()) }
+        val n = when (pager.currentPage) { 2 -> date.plusDays(dir.toLong()); 1 -> date.plusWeeks(dir.toLong()); else -> date.plusMonths(dir.toLong()) }
         dayNum = n.toEpochDay()
     }
-    val onDay: (LocalDate) -> Unit = { d -> dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(0) } }
+    val onDay: (LocalDate) -> Unit = { d -> dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(2) } }
     val onEvent: (Ev) -> Unit = { e -> editing = EditTarget(e, e.days(zone).first, null) }
     val onNew: (LocalDate, LocalTime?) -> Unit = { d, t -> editing = EditTarget(null, d, t) }
 
@@ -178,8 +179,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     }
                     val page = pager.currentPage
                     Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
-                        val title = if (page == 0) "${date.dayOfMonth} ב${HE_MONTHS[date.monthValue - 1]} ${date.year}" else "${HE_MONTHS[date.monthValue - 1]} ${date.year}"
-                        val sub = when (page) { 0 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "" }
+                        val title = if (page == 2) "${date.dayOfMonth} ב${HE_MONTHS[date.monthValue - 1]} ${date.year}" else "${HE_MONTHS[date.monthValue - 1]} ${date.year}"
+                        val sub = when (page) { 2 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "" }
                         Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, maxLines = 1)
                     }
@@ -206,7 +207,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { page ->
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                         when (page) {
-                            0 -> DayView(date, events, zone, today, onNew, onEvent, onDay)
+                            2 -> DayView(date, events, zone, today, onNew, onEvent, onDay, ::shift)
                             1 -> WeekView(date, events, zone, today, onDay, onEvent, onNew, ::shift)
                             else -> MonthView(date, events, zone, today, onDay, onEvent, ::shift)
                         }
@@ -218,6 +219,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         if (t != null) EventEditor(
             target = t, cals = cals, defaultCal = defCal, zone = zone,
             onClose = { editing = null },
+            onDefault = { defCal = it; prefs.edit().putLong("diaryDef", it).apply() },
             onChanged = { editing = null; tick++ }
         )
         if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false }) { vis, def ->
@@ -237,7 +239,7 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
         title = { Text("יומנים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("סמן יומנים להצגה. הנקודה מסמנת את היומן שאליו נוספות פגישות חדשות.", fontSize = 13.sp)
+                Text("סמן יומנים להצגה. "קבע" בוחר את יומן ברירת המחדל לפגישות חדשות (אפשר גם לבחור יומן בעורך — הבחירה נשמרת).", fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
                 cals.groupBy { it.account }.forEach { (acc, list) ->
                     Text(acc, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
@@ -246,7 +248,7 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
                             Checkbox(c.id in vis, { on -> vis = if (on) vis + c.id else vis - c.id })
                             Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(Color(c.color or 0xFF000000.toInt())))
                             Text(c.name, Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (c.writable) RadioButton(def == c.id, { def = c.id })
+                            if (c.writable) { Text(if (def == c.id) "ברירת מחדל" else "קבע", fontSize = 12.sp, color = if (def == c.id) ORANGE else BAR, modifier = Modifier.clickable { def = c.id }.padding(6.dp)) }
                         }
                     }
                 }
@@ -260,14 +262,14 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
 // ============================ WEEK ============================
 
 @Composable
-private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, onClick: () -> Unit) {
+private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, onClick: () -> Unit) {
     val col = evColor(e)
     if (e.allDay) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp).clip(RoundedCornerShape(3.dp)).background(col.copy(alpha = 0.30f)).clickable(onClick = onClick).padding(horizontal = 4.dp)) {
             Text(e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Ellipsis, color = INK)
         }
     } else {
-        Text("${hm(e.startTime(z))} ${e.title}", fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
+        Text((if (showTime) "${hm(e.startTime(z))} " else "") + e.title, fontSize = size, maxLines = 1, overflow = TextOverflow.Clip, color = col,
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 4.dp))
     }
 }
@@ -384,7 +386,7 @@ private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, 
                     Text("${wkNo(d)}", fontSize = 11.sp, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(BAR.copy(alpha = 0.65f)).padding(horizontal = 3.dp))
                 }
             }
-            shown.forEach { e -> EvLine(e, z, 11.5.sp) { onEvent(e) } }
+            shown.forEach { e -> EvLine(e, z, 12.sp, false) { onEvent(e) } }
         }
     }
 }
@@ -407,7 +409,7 @@ private fun placeSlots(slots: List<DSlot>) {
 }
 
 @Composable
-private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onNew: (LocalDate, LocalTime?) -> Unit, onEvent: (Ev) -> Unit, onDay: (LocalDate) -> Unit) {
+private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onNew: (LocalDate, LocalTime?) -> Unit, onEvent: (Ev) -> Unit, onDay: (LocalDate) -> Unit, onShift: (Int) -> Unit) {
     val evs = remember(all, date) { dayEvs(all, date, z) }
     val hourH = 56.dp
     val scroll = rememberScrollState()
@@ -416,7 +418,22 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
         val h = if (date == today) maxOf(0, LocalTime.now().hour - 1) else 6
         scroll.scrollTo((hourH.value * dens.density * h).toInt())
     }
-    Row(Modifier.fillMaxSize()) {
+    val curShift by rememberUpdatedState(onShift)
+    val edge = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            var acc = 0f
+            override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                acc = if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) acc + available.y else 0f
+                return Offset.Zero
+            }
+            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                val a = acc; acc = 0f
+                if (a < -90f) curShift(1) else if (a > 90f) curShift(-1)
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+    Row(Modifier.fillMaxSize().nestedScroll(edge)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             evs.filter { it.allDay }.forEach { e -> EvLine(e, z, 14.sp) { onEvent(e) } }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
@@ -456,7 +473,7 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
                 }
             }
         }
-        Column(Modifier.width(112.dp).fillMaxHeight().background(Color(0xFFEFF3F7)).padding(8.dp)) {
+        Column(Modifier.width(112.dp).fillMaxHeight().vSwipe(onShift).background(Color(0xFFEFF3F7)).padding(8.dp)) {
             Text(HE_MONTHS[date.monthValue - 1], fontSize = 15.sp, color = BAR)
             Text("${date.dayOfMonth}", fontSize = 56.sp, color = BAR, fontWeight = FontWeight.Medium)
             Text(DAY_FULL[dayIdx(date)], fontSize = 15.sp, color = BAR)
@@ -472,7 +489,7 @@ private val REMINDERS = listOf(-1 to "ללא", 0 to "בזמן האירוע", 5 t
 private val REPEATS = listOf("" to "ללא חזרה", "DAILY" to "כל יום", "WEEKLY" to "כל שבוע", "MONTHLY" to "כל חודש", "YEARLY" to "כל שנה")
 
 @Composable
-private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, zone: ZoneId, onClose: () -> Unit, onChanged: () -> Unit) {
+private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, zone: ZoneId, onClose: () -> Unit, onDefault: (Long) -> Unit, onChanged: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val writable = cals.filter { it.writable }
@@ -569,7 +586,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 writable.forEach { c ->
-                    Row(Modifier.fillMaxWidth().clickable { calId = c.id; pickCal = false }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clickable { calId = c.id; pickCal = false; if (ev == null) onDefault(c.id) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(14.dp).clip(RoundedCornerShape(7.dp)).background(Color(c.color or 0xFF000000.toInt())))
                         Spacer(Modifier.width(10.dp))
                         Column { Text(c.name); Text(c.account, fontSize = 12.sp, color = Color.Gray) }
