@@ -239,7 +239,7 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
         title = { Text("יומנים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("סמן יומנים להצגה. "קבע" בוחר את יומן ברירת המחדל לפגישות חדשות (אפשר גם לבחור יומן בעורך — הבחירה נשמרת).", fontSize = 13.sp)
+                Text("סמן יומנים להצגה. «קבע» בוחר את יומן ברירת המחדל לפגישות חדשות (אפשר גם לבחור יומן בעורך — הבחירה נשמרת).", fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
                 cals.groupBy { it.account }.forEach { (acc, list) ->
                     Text(acc, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
