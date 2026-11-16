@@ -6,6 +6,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
+import android.provider.CalendarContract.Attendees as A
 import androidx.core.content.ContextCompat
 import java.time.Instant
 import java.time.LocalDate
@@ -204,7 +205,6 @@ object CalRepo {
 
     private fun saveGuests(c: Context, id: Long, existing: EvFull?, guests: List<String>) {
         val old = existing?.guests.orEmpty()
-        val A = CalendarContract.Attendees
         old.filter { o -> guests.none { it.equals(o, true) } }.forEach {
             c.contentResolver.delete(A.CONTENT_URI, "${A.EVENT_ID}=? AND ${A.ATTENDEE_EMAIL}=?", arrayOf(id.toString(), it))
         }
