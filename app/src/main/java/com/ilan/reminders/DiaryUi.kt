@@ -800,12 +800,10 @@ private fun DayView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate,
 private val REM_OPTS = listOf(0, 5, 10, 15, 30, 45, 60, 120, 1440, 2880, 10080)
 private fun remLabel(m: Int) = when {
     m == 0 -> "בזמן האירוע"
-    m < 60 -> "$m דקות"
-    m == 60 -> "שעה"
-    m < 1440 -> "${m / 60} שעות"
-    m == 1440 -> "יום"
     m % 10080 == 0 -> if (m == 10080) "שבוע" else "${m / 10080} שבועות"
-    else -> "${m / 1440} ימים"
+    m % 1440 == 0 -> if (m == 1440) "יום" else "${m / 1440} ימים"
+    m % 60 == 0 -> if (m == 60) "שעה" else "${m / 60} שעות"
+    else -> "$m דקות"
 }
 private val AVAIL = listOf(0 to "עסוק", 1 to "פנוי")
 private val ACCESS = listOf(0 to "ברירת מחדל", 3 to "ציבורי", 2 to "פרטי", 1 to "חסוי")
@@ -816,7 +814,6 @@ private fun durText(mins: Long): String = when {
     mins % 60 == 0L -> if (mins == 60L) "שעה" else "${mins / 60} שעות"
     else -> "${mins / 60}:%02d שעות".format(mins % 60)
 }
-private val REPEATS = listOf("" to "ללא חזרה", "DAILY" to "כל יום", "WEEKLY" to "כל שבוע", "MONTHLY" to "כל חודש", "YEARLY" to "כל שנה")
 
 @Composable
 private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, zone: ZoneId, onClose: () -> Unit, onDefault: (Long) -> Unit, onChanged: () -> Unit) {
@@ -845,6 +842,8 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     val guests = remember { mutableStateListOf<String>() }
     var guestIn by remember { mutableStateOf("") }
     var rep by remember { mutableStateOf("") }
+    var repDlg by remember { mutableStateOf(false) }
+    var remCustom by remember { mutableStateOf<Int?>(null) }
     var confirmDel by remember { mutableStateOf(false) }
     var scope0 by remember { mutableStateOf(1) }
     val atts = remember { mutableStateListOf<EventAtt.Item>() }
@@ -869,7 +868,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             atts.clear(); EventAtt.list(ctx, src.id).forEach { atts.add(EventAtt.Item(it.file, null, it.name, it.del)) }
             avail = f?.availability ?: 0; access = f?.access ?: 0
             guests.clear(); guests.addAll(f?.guests.orEmpty())
-            rep = if (ev == null) "" else if (f != null && f.rrule.isNotEmpty()) (REPEATS.map { it.first }.firstOrNull { it.isNotEmpty() && f.rrule == "FREQ=$it" } ?: "CUSTOM") else ""
+            rep = if (ev == null) "" else f?.rrule.orEmpty()
             loaded = true
         }
     }
@@ -939,6 +938,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                         }
                     }
                 }
+                OutlinedButton({ repDlg = true }, Modifier.fillMaxWidth()) { Text("🔁 " + repText(rep, sd), Modifier.fillMaxWidth(), textAlign = TextAlign.Start) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(Modifier.weight(1f)) { Choice("📌", AVAIL.first { it.first == avail }.second, AVAIL.map { it.second }) { avail = AVAIL[it].first } }
                     Box(Modifier.weight(1f)) { Choice("👁", ACCESS.firstOrNull { it.first == access }?.second ?: "ברירת מחדל", ACCESS.map { it.second }) { access = ACCESS[it].first } }
@@ -981,17 +981,20 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                 Text("🔔 תזכורות", fontWeight = FontWeight.Bold, color = INK)
                 rems.toList().forEachIndexed { i, m ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { Choice("התראה", remLabel(m) + (if (m > 0) " לפני" else ""), REM_OPTS.map { remLabel(it) }) { rems[i] = REM_OPTS[it] } }
+                        Box(Modifier.weight(1f)) { Choice("התראה", remLabel(m) + (if (m > 0) " לפני" else ""), listOf("מותאם אישית…") + REM_OPTS.map { remLabel(it) }) { if (it == 0) remCustom = i else rems[i] = REM_OPTS[it - 1] } }
                         TextButton({ rems.removeAt(i) }) { Text("✕", color = RED) }
                     }
                 }
                 TextButton({ rems.add(REM_OPTS.firstOrNull { it !in rems } ?: 10) }) { Text("＋ הוסף תזכורת", color = Color(0xFFE91E63)) }
-                val repLabel = if (rep == "CUSTOM") "חזרה מותאמת (נשמרת)" else REPEATS.firstOrNull { it.first == rep }?.second ?: ""
-                Choice("חזרה", repLabel, REPEATS.map { it.second }) { rep = REPEATS[it].first }
                 if (full != null && full!!.rrule.isNotEmpty()) Text("שינוי בפגישה חוזרת חל על כל הסדרה.", fontSize = 12.sp, color = Color.Gray)
+                Spacer(Modifier.navigationBarsPadding().height(24.dp))
             }
         }
     }
+    remCustom?.let { idx ->
+        CustomReminderDialog(rems.getOrNull(idx) ?: 10, { remCustom = null }) { m -> if (idx in rems.indices) rems[idx] = m; remCustom = null }
+    }
+    if (repDlg) RepeatDialog(rep, sd, allDay, { repDlg = false }, { r -> rep = r; repDlg = false }) { cur, set -> pickDate(cur, set) }
     if (askScope) AlertDialog(
         onDismissRequest = { onClose() }, title = { Text("עריכה") },
         text = {
@@ -1035,4 +1038,162 @@ private fun Choice(label: String, value: String, options: List<String>, onPick: 
         OutlinedButton({ open = true }, Modifier.fillMaxWidth()) { Text("$label: $value", Modifier.fillMaxWidth(), textAlign = TextAlign.Start) }
         DropdownMenu(open, { open = false }) { options.forEachIndexed { i, o -> DropdownMenuItem({ Text(o) }, { open = false; onPick(i) }) } }
     }
+}
+
+
+private val RCODES = listOf("SU", "MO", "TU", "WE", "TH", "FR", "SA")
+private val RSHORT = listOf("א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳")
+private val RWEEKDAYS = "SU,MO,TU,WE,TH"
+
+private fun ruleMap(r: String) = r.split(";").filter { it.contains("=") }.associate { it.substringBefore("=") to it.substringAfter("=") }
+
+private fun repText(rule: String, start: LocalDate): String {
+    if (rule.isBlank()) return "לא חוזר"
+    val m = ruleMap(rule)
+    val n = (m["INTERVAL"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
+    val days = m["BYDAY"]?.split(",").orEmpty()
+    var t = when (m["FREQ"]) {
+        "DAILY" -> if (n == 1) "כל יום" else "כל $n ימים"
+        "WEEKLY" -> when {
+            n == 1 && days.joinToString(",") == RWEEKDAYS -> "כל יום חול (א׳–ה׳)"
+            else -> (if (n == 1) "כל שבוע" else "כל $n שבועות") + if (days.isNotEmpty()) " ב" + days.joinToString(", ") { c -> RSHORT.getOrElse(RCODES.indexOf(c.takeLast(2))) { c } } else ""
+        }
+        "MONTHLY" -> (if (n == 1) "כל חודש" else "כל $n חודשים") + when {
+            m["BYMONTHDAY"] != null -> " ביום ${m["BYMONTHDAY"]}"
+            days.isNotEmpty() -> { val d = days[0]; val k = d.dropLast(2); " ב" + DAY_FULL.getOrElse(RCODES.indexOf(d.takeLast(2))) { "" } + if (k == "-1") " האחרון" else " ה-$k" }
+            else -> ""
+        }
+        "YEARLY" -> if (n == 1) "כל שנה" else "כל $n שנים"
+        else -> "חוזר"
+    }
+    m["COUNT"]?.let { t += ", $it פעמים" }
+    m["UNTIL"]?.takeIf { it.length >= 8 }?.let { t += ", עד ${it.substring(6, 8)}/${it.substring(4, 6)}/${it.substring(0, 4)}" }
+    return t
+}
+
+@Composable
+private fun RepeatDialog(cur: String, start: LocalDate, allDay: Boolean, onClose: () -> Unit, onPick: (String) -> Unit, pickDate: (LocalDate, (LocalDate) -> Unit) -> Unit) {
+    var custom by remember { mutableStateOf(false) }
+    val dow = RCODES[dayIdx(start)]
+    val nth = (start.dayOfMonth - 1) / 7 + 1
+    val presets = listOf(
+        "" to "לא חוזר",
+        "FREQ=DAILY" to "כל יום",
+        "FREQ=WEEKLY;BYDAY=$dow" to "כל שבוע ביום ${DAY_FULL[dayIdx(start)].removePrefix("יום ")}",
+        "FREQ=MONTHLY;BYMONTHDAY=${start.dayOfMonth}" to "כל חודש ביום ${start.dayOfMonth}",
+        "FREQ=MONTHLY;BYDAY=$nth$dow" to "כל חודש ביום ${DAY_FULL[dayIdx(start)].removePrefix("יום ")} ה-$nth",
+        "FREQ=YEARLY" to "כל שנה ב-${start.dayOfMonth} ב${HE_MONTHS[start.monthValue - 1]}",
+        "FREQ=WEEKLY;BYDAY=$RWEEKDAYS" to "כל יום חול (א׳–ה׳)"
+    )
+    if (!custom) AlertDialog(
+        onDismissRequest = onClose, title = { Text("חזרה") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                presets.forEach { (r, l) ->
+                    Row(Modifier.fillMaxWidth().clickable { onPick(r) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(cur == r, { onPick(r) }); Spacer(Modifier.width(6.dp)); Text(l, fontSize = 17.sp)
+                    }
+                }
+                val isCustom = cur.isNotBlank() && presets.none { it.first == cur }
+                Row(Modifier.fillMaxWidth().clickable { custom = true }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(isCustom, { custom = true }); Spacer(Modifier.width(6.dp))
+                    Text(if (isCustom) "מותאם אישית: " + repText(cur, start) else "מותאם אישית…", fontSize = 17.sp)
+                }
+            }
+        },
+        confirmButton = {}, dismissButton = { TextButton(onClose) { Text("ביטול") } }
+    ) else {
+        val m = remember { ruleMap(cur) }
+        var every by remember { mutableStateOf((m["INTERVAL"] ?: "1")) }
+        var freq by remember { mutableStateOf(m["FREQ"] ?: "WEEKLY") }
+        val days = remember { mutableStateListOf<Int>().also { l -> val b = m["BYDAY"]?.split(",").orEmpty().map { RCODES.indexOf(it.takeLast(2)) }.filter { it >= 0 }; l.addAll(b.ifEmpty { listOf(dayIdx(start)) }) } }
+        var monthNth by remember { mutableStateOf(m["BYDAY"] != null && m["FREQ"] == "MONTHLY") }
+        var endMode by remember { mutableStateOf(if (m["COUNT"] != null) 2 else if (m["UNTIL"] != null) 1 else 0) }
+        var count by remember { mutableStateOf(m["COUNT"] ?: "10") }
+        var until by remember { mutableStateOf(m["UNTIL"]?.takeIf { it.length >= 8 }?.let { runCatching { LocalDate.of(it.substring(0, 4).toInt(), it.substring(4, 6).toInt(), it.substring(6, 8).toInt()) }.getOrNull() } ?: start.plusMonths(3)) }
+        AlertDialog(
+            onDismissRequest = { custom = false }, title = { Text("חזרה מותאמת") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("כל", fontSize = 16.sp)
+                        OutlinedTextField(every, { v -> every = v.filter { it.isDigit() }.take(3) }, Modifier.width(80.dp), singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("DAILY" to "יום", "WEEKLY" to "שבוע", "MONTHLY" to "חודש", "YEARLY" to "שנה").forEach { (f, l) ->
+                            Text(l, Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(if (freq == f) Color(0xFFE91E63) else Color(0xFFE6E6E6)).clickable { freq = f }.padding(vertical = 8.dp),
+                                color = if (freq == f) Color.White else INK, textAlign = TextAlign.Center, fontSize = 15.sp)
+                        }
+                    }
+                    if (freq == "WEEKLY") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        RSHORT.forEachIndexed { i, l ->
+                            val on = i in days
+                            Text(l, Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(if (on) Color(0xFFE91E63) else Color(0xFFE6E6E6))
+                                .clickable { if (on) { if (days.size > 1) days.remove(i) } else days.add(i) }.padding(vertical = 8.dp),
+                                color = if (on) Color.White else INK, textAlign = TextAlign.Center, fontSize = 14.sp)
+                        }
+                    }
+                    if (freq == "MONTHLY") {
+                        Row(Modifier.fillMaxWidth().clickable { monthNth = false }, verticalAlignment = Alignment.CenterVertically) { RadioButton(!monthNth, { monthNth = false }); Text("ביום ${start.dayOfMonth} בחודש") }
+                        Row(Modifier.fillMaxWidth().clickable { monthNth = true }, verticalAlignment = Alignment.CenterVertically) { RadioButton(monthNth, { monthNth = true }); Text("ביום ${DAY_FULL[dayIdx(start)].removePrefix("יום ")} ה-$nth") }
+                    }
+                    Text("סיום", fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth().clickable { endMode = 0 }, verticalAlignment = Alignment.CenterVertically) { RadioButton(endMode == 0, { endMode = 0 }); Text("אף פעם") }
+                    Row(Modifier.fillMaxWidth().clickable { endMode = 1 }, verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(endMode == 1, { endMode = 1 }); Text("בתאריך ")
+                        OutlinedButton({ endMode = 1; pickDate(until) { until = it } }) { Text("${until.dayOfMonth}/${until.monthValue}/${until.year}") }
+                    }
+                    Row(Modifier.fillMaxWidth().clickable { endMode = 2 }, verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(endMode == 2, { endMode = 2 }); Text("אחרי ")
+                        OutlinedTextField(count, { v -> count = v.filter { it.isDigit() }.take(3); endMode = 2 }, Modifier.width(80.dp), singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                        Text(" פעמים")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    val n = every.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                    val sb = StringBuilder("FREQ=$freq")
+                    if (n > 1) sb.append(";INTERVAL=$n")
+                    if (freq == "WEEKLY") sb.append(";BYDAY=" + days.sorted().joinToString(",") { RCODES[it] })
+                    if (freq == "MONTHLY") sb.append(if (monthNth) ";BYDAY=$nth$dow" else ";BYMONTHDAY=${start.dayOfMonth}")
+                    when (endMode) {
+                        1 -> sb.append(";UNTIL=" + if (allDay) until.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+                            else until.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).withZoneSameInstant(java.time.ZoneOffset.UTC).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")))
+                        2 -> sb.append(";COUNT=${(count.toIntOrNull() ?: 1).coerceAtLeast(1)}")
+                    }
+                    onPick(sb.toString())
+                }) { Text("אישור") }
+            },
+            dismissButton = { TextButton({ custom = false }) { Text("חזרה") } }
+        )
+    }
+}
+
+@Composable
+private fun CustomReminderDialog(initial: Int, onClose: () -> Unit, onOk: (Int) -> Unit) {
+    val units = listOf(1 to "דקות", 60 to "שעות", 1440 to "ימים", 10080 to "שבועות")
+    val u0 = units.lastOrNull { initial > 0 && initial % it.first == 0 } ?: units[0]
+    var unit by remember { mutableStateOf(u0.first) }
+    var num by remember { mutableStateOf((initial / u0.first).toString()) }
+    AlertDialog(
+        onDismissRequest = onClose, title = { Text("התראה מותאמת אישית") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(num, { v -> num = v.filter { it.isDigit() }.take(4) }, Modifier.width(110.dp), singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    units.forEach { (f, l) ->
+                        Text(l, Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(if (unit == f) Color(0xFFE91E63) else Color(0xFFE6E6E6)).clickable { unit = f }.padding(vertical = 8.dp),
+                            color = if (unit == f) Color.White else INK, textAlign = TextAlign.Center, fontSize = 14.sp)
+                    }
+                }
+                Text("לפני תחילת האירוע", fontSize = 14.sp, color = Color.Gray)
+            }
+        },
+        confirmButton = { TextButton({ onOk(((num.toIntOrNull() ?: 0) * unit).coerceIn(0, 40320)) }) { Text("אישור") } },
+        dismissButton = { TextButton(onClose) { Text("ביטול") } }
+    )
 }

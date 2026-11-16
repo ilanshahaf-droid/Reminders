@@ -164,6 +164,7 @@ object CalRepo {
         var rule = when {
             s.repeat == "CUSTOM" -> existing?.rrule.orEmpty()
             s.repeat.isEmpty() -> ""
+            s.repeat.startsWith("FREQ=") -> s.repeat
             else -> "FREQ=${s.repeat}"
         }
         if (sc == 1) rule = ""
