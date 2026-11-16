@@ -245,6 +245,20 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         val n = when (pager.currentPage) { 2 -> date.plusDays(dir.toLong()); 1 -> date.plusWeeks(dir.toLong()); else -> date.plusMonths(dir.toLong()) }
         dayNum = n.toEpochDay()
     }
+    val pend = PendingOpen.evId
+    LaunchedEffect(pend, PendingOpen.evBegin) {
+        if (pend == null) return@LaunchedEffect
+        val b = PendingOpen.evBegin
+        val d = java.time.Instant.ofEpochMilli(b).atZone(zone).toLocalDate()
+        editing = null; showSettings = false; dayDlg = null
+        dayNum = d.toEpochDay()
+        if (pager.currentPage != 1) pager.scrollToPage(1)
+        var waited = 0
+        while (waited < 3000 && events.none { it.id == pend && it.begin == b }) { kotlinx.coroutines.delay(100); waited += 100 }
+        dayEvSel = pend to b
+        dayDlg = d
+        PendingOpen.evId = null
+    }
     val onDay: (LocalDate) -> Unit = { d -> dayEvSel = null; dayDlg = d }
     val onCellEv: (Ev, LocalDate) -> Unit = { e, d -> dayEvSel = e.id to e.begin; dayDlg = d }
     val onEvent: (Ev) -> Unit = { e -> if (e.id < 0) remTask = taskList.firstOrNull { it.id == -e.id } else editing = EditTarget(e, e.days(zone).first, null) }

@@ -69,12 +69,14 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
+        takeEvent(this, intent)
         takeShare(this, intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
+        takeEvent(this, intent)
         takeShare(this, intent)
         setContent { AppTheme { Home() } }
         // while the app is on screen: pull web changes right away and then every 15 seconds
@@ -93,7 +95,17 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 object PendingShare { var text by mutableStateOf<String?>(null) }
 
 /** A Word / PDF file opened from another app ("Open with" or Share). */
+private fun takeEvent(c: Context, i: Intent) {
+    val id = i.getLongExtra("evId", Long.MIN_VALUE)
+    if (id == Long.MIN_VALUE) return
+    PendingOpen.evBegin = i.getLongExtra("evBegin", 0L); PendingOpen.evId = id
+    runCatching { NotificationManagerCompat.from(c).cancel(i.getIntExtra("evNid", 0)) }
+    i.removeExtra("evId"); i.removeExtra("evBegin"); i.removeExtra("evNid")
+}
+
 object PendingOpen {
+    var evId by mutableStateOf<Long?>(null)
+    var evBegin by mutableStateOf(0L)
     var file by mutableStateOf<java.io.File?>(null)
     var noteId by mutableStateOf<Long?>(null)
     var task by mutableStateOf<Task?>(null)
@@ -822,7 +834,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v114") },
+        title = { Text("הגדרות · v115") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

@@ -101,7 +101,7 @@ object EventNotify {
     fun post(c: Context, key: String, title: String, text: String, count: Int) {
         if (!NotificationManagerCompat.from(c).areNotificationsEnabled()) return
         val nid = 900000 + abs(key.hashCode() % 90000)
-        val open = PendingIntent.getActivity(c, nid, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val open = PendingIntent.getActivity(c, nid, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP).also { i -> val p = key.split(":"); if (p.size >= 2) { i.putExtra("evId", p[0].toLongOrNull() ?: -1L); i.putExtra("evBegin", p[1].toLongOrNull() ?: 0L); i.putExtra("evNid", nid) } }, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val snz = snooze(c)
         val b = NotificationCompat.Builder(c, channel(c))
             .setSmallIcon(android.R.drawable.ic_menu_my_calendar)

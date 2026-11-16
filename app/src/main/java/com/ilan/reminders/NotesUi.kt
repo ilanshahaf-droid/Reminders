@@ -65,6 +65,7 @@ fun Home() {
             startCtx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).getBoolean("startToday", false)) TodayView.open = true
     }
     if ((PendingShare.text != null || PendingOpen.newNote) && screen != "notes") screen = "notes"
+    if (PendingOpen.evId != null && screen != "diary") screen = "diary"
     if ((PendingOpen.file != null || PendingOpen.template != null) && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" }, onOpenDiary = { screen = "diary" })
