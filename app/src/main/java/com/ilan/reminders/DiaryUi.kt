@@ -203,6 +203,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showNotif by remember { mutableStateOf(false) }
+    var showDiag by remember { mutableStateOf(false) }
     var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
     var dayEvSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) } } }
@@ -284,6 +285,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                             })
                             DropdownMenuItem({ Text("הגדרות יומנים") }, { menuMore = false; showSettings = true })
                             DropdownMenuItem({ Text("רענון") }, { menuMore = false; tick++ })
+                            DropdownMenuItem({ Text("אבחון היום הנוכחי") }, { menuMore = false; showDiag = true })
                         }
                     }
                 }
@@ -327,6 +329,18 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             onDefault = { defCal = it; prefs.edit().putLong("diaryDef", it).apply() },
             onChanged = { editing = null; tick++ }
         )
+        if (showDiag) {
+            val fmt = { ms: Long -> Instant.ofEpochMilli(ms).atZone(zone).let { "%02d/%02d %02d:%02d".format(it.dayOfMonth, it.monthValue, it.hour, it.minute) } }
+            val txt = buildString {
+                append("תאריך: $date\nסה״כ נטענו: ${events.size} אירועים, יומנים מוצגים: ${visible.size}/${cals.size}\n\n")
+                dayEvs(events, date, zone).forEach { e ->
+                    append("• ${e.title}\n  ${fmt(e.begin)} → ${fmt(e.end)}${if (e.allDay) " (כל היום)" else ""}${if (e.repeat) " (חוזר)" else ""}\n  יומן ${e.calId} · מזהה ${e.id}\n")
+                }
+            }
+            AlertDialog(onDismissRequest = { showDiag = false }, title = { Text("אבחון") },
+                text = { Text(txt, Modifier.verticalScroll(rememberScrollState()), fontSize = 13.sp) },
+                confirmButton = { TextButton({ showDiag = false }) { Text("סגירה") } })
+        }
         if (showNotif) NotifSettings(onDismiss = { showNotif = false; tick++ })
         if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false }) { vis, def ->
             visPref = vis; defCal = def
