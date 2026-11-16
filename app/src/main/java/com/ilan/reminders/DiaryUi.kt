@@ -203,6 +203,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showNotif by remember { mutableStateOf(false) }
+    var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
     LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) } } }
     var menuNav by remember { mutableStateOf(false) }
     var menuMore by remember { mutableStateOf(false) }
@@ -238,7 +239,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         val n = when (pager.currentPage) { 2 -> date.plusDays(dir.toLong()); 1 -> date.plusWeeks(dir.toLong()); else -> date.plusMonths(dir.toLong()) }
         dayNum = n.toEpochDay()
     }
-    val onDay: (LocalDate) -> Unit = { d -> dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(2) } }
+    val onDay: (LocalDate) -> Unit = { d -> dayDlg = d }
     val onEvent: (Ev) -> Unit = { e -> if (e.id < 0) remTask = taskList.firstOrNull { it.id == -e.id } else editing = EditTarget(e, e.days(zone).first, null) }
     val onNew: (LocalDate, LocalTime?) -> Unit = { d, t -> editing = EditTarget(null, d, t) }
 
@@ -296,6 +297,16 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 }
             }
         }
+        dayDlg?.let { d ->
+            DayDialog(
+                d, dayEvs(events, d, zone), cals, zone,
+                onClose = { dayDlg = null },
+                onEdit = { e -> dayDlg = null; onEvent(e) },
+                onNew = { dayDlg = null; onNew(d, null) },
+                onOpenDay = { dayDlg = null; dayNum = d.toEpochDay(); scope.launch { pager.animateScrollToPage(2) } },
+                onChanged = { tick++ }
+            )
+        }
         remTask?.let { rt ->
             AlertDialog(
                 onDismissRequest = { remTask = null }, title = { Text("⏰ " + rt.title) },
@@ -317,6 +328,113 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             prefs.edit().putStringSet("diaryVis", vis.map { it.toString() }.toSet()).putLong("diaryDef", def).apply()
             showSettings = false
         }
+    }
+}
+
+@Composable
+private fun DayDialog(
+    date: LocalDate, evs: List<Ev>, cals: List<Cal>, zone: ZoneId,
+    onClose: () -> Unit, onEdit: (Ev) -> Unit, onNew: () -> Unit, onOpenDay: () -> Unit, onChanged: () -> Unit
+) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var sel by remember { mutableStateOf(0) }
+    var delAsk by remember { mutableStateOf<Ev?>(null) }
+    fun timeOf(e: Ev) = if (e.allDay) "כל היום" else "${hm(e.startTime(zone))}–${hm(e.endTime(zone))}"
+    fun dateOf(e: Ev): String {
+        val (a, b) = e.days(zone)
+        val f = { d: LocalDate -> "${DAY_FULL[dayIdx(d)].replace("יום ", "יום ")}, ${d.dayOfMonth} ב${HE_MONTHS[d.monthValue - 1]} ${d.year}" }
+        return if (a == b) f(a) else f(a) + " – " + f(b)
+    }
+    fun share(e: Ev) {
+        val txt = buildString {
+            append(e.title).append("\n").append(dateOf(e)).append("\n").append(timeOf(e))
+            if (e.location.isNotBlank()) append("\n📍 ").append(e.location)
+            val d = CalRepo.load(ctx, e.id)?.desc.orEmpty()
+            if (d.isNotBlank()) append("\n\n").append(d)
+        }
+        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, txt), "שיתוף אירוע").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+    fun copy(e: Ev) {
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                val f = CalRepo.load(ctx, e.id) ?: return@withContext false
+                val (a, b) = e.days(zone)
+                val s = EdState(f.title, f.calId, a, if (e.allDay) LocalTime.MIDNIGHT else e.startTime(zone), b, if (e.allDay) LocalTime.MIDNIGHT else e.endTime(zone),
+                    e.allDay, f.location, f.desc, f.reminders, "", f.availability, f.access, emptyList())
+                CalRepo.save(ctx, null, 0L, s) > 0
+            }
+            android.widget.Toast.makeText(ctx, if (ok) "האירוע הועתק" else "ההעתקה נכשלה", android.widget.Toast.LENGTH_SHORT).show()
+            if (ok) onChanged()
+        }
+    }
+    androidx.compose.ui.window.Dialog(onClose, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.8f), shape = RoundedCornerShape(6.dp), color = Color.White) {
+            Box(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${DAY_FULL[dayIdx(date)].replace("יום ", "יום ")}, ${date.dayOfMonth} ב${HE_MONTHS[date.monthValue - 1]} ${date.year}", Modifier.weight(1f), fontSize = 20.sp, color = INK)
+                        TextButton(onOpenDay) { Text("תצוגת יום", color = BAR) }
+                    }
+                    HorizontalDivider()
+                    if (evs.isEmpty()) Text("אין אירועים ביום הזה", Modifier.padding(24.dp), color = Color.Gray)
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        evs.forEachIndexed { i, e ->
+                            val col = evColor(e)
+                            val isRem = e.id < 0
+                            if (i == sel.coerceAtMost(evs.size - 1)) {
+                                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Color(0xFFFAFAFA)).border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(4.dp))) {
+                                    Column(Modifier.fillMaxWidth().background(col).padding(14.dp)) {
+                                        Text(if (isRem) "תזכורת" else cals.firstOrNull { it.id == e.calId }?.name.orEmpty(), color = Color.White.copy(alpha = 0.9f), fontSize = 15.sp)
+                                        Text(e.title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Medium)
+                                    }
+                                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("📅", fontSize = 22.sp); Spacer(Modifier.width(12.dp)); Text(dateOf(e), fontSize = 17.sp, color = INK)
+                                    }
+                                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🕐", fontSize = 22.sp); Spacer(Modifier.width(12.dp)); Text(timeOf(e), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = INK)
+                                        if (!e.allDay) Text("  ·  " + durText(((e.end - e.begin) / 60000L).coerceAtLeast(0)), fontSize = 15.sp, color = Color.Gray)
+                                    }
+                                    if (e.location.isNotBlank()) Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
+                                        Text("📍", fontSize = 20.sp); Spacer(Modifier.width(12.dp)); Text(e.location, fontSize = 16.sp, color = INK)
+                                    }
+                                    Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                        if (!isRem) {
+                                            TextButton({ delAsk = e }) { Text("🗑", fontSize = 24.sp) }
+                                            TextButton({ copy(e) }) { Text("📋", fontSize = 24.sp) }
+                                            TextButton({ share(e) }) { Text("📤", fontSize = 24.sp) }
+                                        }
+                                        TextButton({ onEdit(e) }) { Text(if (isRem) "פתח בתזכורות" else "✏️", fontSize = if (isRem) 16.sp else 24.sp) }
+                                    }
+                                }
+                            } else {
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Color(0xFFF1F1F1)).clickable { sel = i }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(col))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text((if (e.repeat) "⇄ " else "") + e.title, fontSize = 18.sp, color = INK)
+                                        Text(timeOf(e), fontSize = 16.sp, color = Color.Gray)
+                                    }
+                                    if (e.alarm || isRem) Text("🔔", fontSize = 20.sp)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(56.dp))
+                    }
+                }
+                FloatingActionButton(onNew, Modifier.align(Alignment.BottomStart).padding(16.dp), containerColor = Color.White, contentColor = Color(0xFFE91E63)) {
+                    Icon(Icons.Default.Add, "אירוע חדש")
+                }
+            }
+        }
+    }
+    delAsk?.let { e ->
+        AlertDialog(
+            onDismissRequest = { delAsk = null }, title = { Text("למחוק את האירוע?") },
+            text = { Text(if (e.repeat) "כל הסדרה החוזרת תימחק גם מיומן גוגל." else "האירוע יימחק גם מיומן גוגל.") },
+            confirmButton = { TextButton({ delAsk = null; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, e.id) }; sel = 0; onChanged() } }) { Text("מחיקה", color = RED) } },
+            dismissButton = { TextButton({ delAsk = null }) { Text("ביטול") } }
+        )
     }
 }
 
