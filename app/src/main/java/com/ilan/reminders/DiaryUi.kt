@@ -806,6 +806,8 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     var guestIn by remember { mutableStateOf("") }
     var rep by remember { mutableStateOf("") }
     var confirmDel by remember { mutableStateOf(false) }
+    var scope0 by remember { mutableStateOf(1) }
+    var askScope by remember { mutableStateOf(ev?.repeat == true) }
     var pickCal by remember { mutableStateOf(false) }
 
     LaunchedEffect(src?.id) {
@@ -832,7 +834,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         if (calId < 0) { android.widget.Toast.makeText(ctx, "אין יומן לכתיבה", android.widget.Toast.LENGTH_SHORT).show(); return }
         val s = EdState(title.trim(), calId, sd, stT, if (ed.isBefore(sd)) sd else ed, enT, allDay, loc, desc, rems.toList(), rep, avail, access, guests.toList())
         scope.launch {
-            val id = withContext(Dispatchers.IO) { CalRepo.save(ctx, full, ev?.begin ?: 0L, s) }
+            val id = withContext(Dispatchers.IO) { CalRepo.save(ctx, full, ev?.begin ?: 0L, s, scope0) }
             if (id < 0) android.widget.Toast.makeText(ctx, "השמירה נכשלה", android.widget.Toast.LENGTH_SHORT).show() else onChanged()
         }
     }
@@ -923,6 +925,20 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             }
         }
     }
+    if (askScope) AlertDialog(
+        onDismissRequest = { onClose() }, title = { Text("עריכה") },
+        text = {
+            Column {
+                listOf(1 to "רק האירוע הזה", 2 to "האירוע הזה ואירועים עתידיים", 0 to "כל האירועים").forEach { (v, l) ->
+                    Row(Modifier.fillMaxWidth().clickable { scope0 = v }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(scope0 == v, { scope0 = v }); Spacer(Modifier.width(6.dp)); Text(l, fontSize = 17.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton({ askScope = false }) { Text("אישור") } },
+        dismissButton = { TextButton({ onClose() }) { Text("ביטול") } }
+    )
     if (pickCal) AlertDialog(
         onDismissRequest = { pickCal = false }, title = { Text("בחירת יומן") },
         text = {

@@ -141,7 +141,11 @@ object CalRepo {
     private fun utc(d: LocalDate) = d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
     /** creates (existing == null) or updates an event; [instanceBegin] is the start of the occurrence the user opened. Returns the event id or -1. */
-    fun save(c: Context, existing: EvFull?, instanceBegin: Long, s: EdState): Long = runCatching {
+    private fun stripRule(rule: String, until: Boolean): String =
+        rule.split(";").filter { it.isNotBlank() && !it.startsWith("COUNT=") && !(until && it.startsWith("UNTIL=")) }.joinToString(";")
+
+    /** scope for a recurring event: 0 = whole series, 1 = only this occurrence, 2 = this and the following ones */
+    fun save(c: Context, existing: EvFull?, instanceBegin: Long, s: EdState, scope: Int = 0): Long = runCatching {
         val zone = ZoneId.systemDefault()
         var newBegin: Long; var newEnd: Long
         if (s.allDay) {
@@ -152,11 +156,15 @@ object CalRepo {
             newEnd = ms(s.endDate, s.endTime, zone)
             if (newEnd <= newBegin) newEnd = newBegin + 3600_000L
         }
-        val rule = when {
+        val recurring = existing != null && existing.rrule.isNotEmpty()
+        val sc = if (!recurring) 0 else if (scope == 2 && instanceBegin <= existing!!.dtstart) 0 else scope
+        var rule = when {
             s.repeat == "CUSTOM" -> existing?.rrule.orEmpty()
             s.repeat.isEmpty() -> ""
             else -> "FREQ=${s.repeat}"
         }
+        if (sc == 1) rule = ""
+        if (sc == 2 && rule.isNotEmpty()) rule = stripRule(rule, false)
         val v = ContentValues()
         v.put(CalendarContract.Events.CALENDAR_ID, s.calId)
         v.put(CalendarContract.Events.TITLE, s.title)
@@ -168,9 +176,9 @@ object CalRepo {
         v.put(CalendarContract.Events.AVAILABILITY, s.availability)
         v.put(CalendarContract.Events.ACCESS_LEVEL, s.access)
         if (s.guests.isNotEmpty()) v.put(CalendarContract.Events.HAS_ATTENDEE_DATA, 1)
-        if (existing == null && s.guests.isNotEmpty()) v.put(CalendarContract.Events.ORGANIZER, calendars(c).firstOrNull { it.id == s.calId }?.account.orEmpty())
+        if ((existing == null || sc != 0) && s.guests.isNotEmpty()) v.put(CalendarContract.Events.ORGANIZER, calendars(c).firstOrNull { it.id == s.calId }?.account.orEmpty())
         // an existing series keeps its own first occurrence: shift it by however much the opened occurrence moved
-        val series = existing != null && existing.rrule.isNotEmpty() && rule.isNotEmpty()
+        val series = sc == 0 && existing != null && existing.rrule.isNotEmpty() && rule.isNotEmpty()
         val start = if (series) existing!!.dtstart + (newBegin - instanceBegin) else newBegin
         v.put(CalendarContract.Events.DTSTART, start)
         if (rule.isNotEmpty()) {
@@ -184,7 +192,22 @@ object CalRepo {
             v.put(CalendarContract.Events.DTEND, newEnd)
         }
         val id: Long
-        if (existing == null) {
+        if (sc == 2) {
+            // end the old series just before this occurrence, then start a new series from here
+            val e = existing!!
+            val until = if (e.allDay) java.time.format.DateTimeFormatter.BASIC_ISO_DATE.format(Instant.ofEpochMilli(instanceBegin).atZone(ZoneOffset.UTC).toLocalDate().minusDays(1))
+            else java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").format(Instant.ofEpochMilli(instanceBegin - 1000).atZone(ZoneOffset.UTC))
+            val ov = ContentValues()
+            ov.put(CalendarContract.Events.RRULE, stripRule(e.rrule, true) + ";UNTIL=" + until)
+            c.contentResolver.update(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, e.id), ov, null, null)
+            val u = c.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v) ?: return -1
+            id = ContentUris.parseId(u)
+        } else if (sc == 1) {
+            v.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
+            v.put(CalendarContract.Events.ORIGINAL_ALL_DAY, if (existing!!.allDay) 1 else 0)
+            val u = c.contentResolver.insert(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, existing.id), v) ?: return -1
+            id = ContentUris.parseId(u)
+        } else if (existing == null) {
             val u = c.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v) ?: return -1
             id = ContentUris.parseId(u)
         } else {
@@ -199,7 +222,7 @@ object CalRepo {
             r.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
             c.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, r)
         }
-        runCatching { saveGuests(c, id, existing, s.guests) }
+        runCatching { saveGuests(c, id, if (sc == 0) existing else null, s.guests) }
         id
     }.getOrDefault(-1L)
 
