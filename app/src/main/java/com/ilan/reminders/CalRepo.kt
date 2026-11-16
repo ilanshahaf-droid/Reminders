@@ -208,17 +208,24 @@ object CalRepo {
         } else if (sc == 1) {
             v.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
             val exUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, existing!!.id)
-            // the provider is picky about exceptions: try the full set, then leaner ones
-            val attempts = listOf<(ContentValues) -> Unit>(
-                { },
-                { it.remove(CalendarContract.Events.RRULE); it.remove(CalendarContract.Events.DURATION) },
-                { it.remove(CalendarContract.Events.RRULE); it.remove(CalendarContract.Events.DURATION); it.remove(CalendarContract.Events.HAS_ATTENDEE_DATA); it.remove(CalendarContract.Events.ORGANIZER); it.remove(CalendarContract.Events.AVAILABILITY); it.remove(CalendarContract.Events.ACCESS_LEVEL); it.remove(CalendarContract.Events.CALENDAR_ID) }
-            )
+            // an exception may not carry DTEND: give it a DURATION instead; if the provider still refuses,
+            // cancel this occurrence and create a separate one-off event in its place
             var made: Uri? = null; var err: Throwable? = null
-            for (a in attempts) {
-                val vv = ContentValues(v); a(vv)
-                try { made = c.contentResolver.insert(exUri, vv) } catch (t: Throwable) { err = t }
-                if (made != null) break
+            val secs = maxOf(60L, (newEnd - newBegin) / 1000)
+            val v1 = ContentValues(v)
+            v1.remove(CalendarContract.Events.DTEND); v1.remove(CalendarContract.Events.RRULE)
+            v1.put(CalendarContract.Events.DURATION, if (s.allDay) "P${maxOf(1L, secs / 86400)}D" else "P${secs}S")
+            try { made = c.contentResolver.insert(exUri, v1) } catch (t: Throwable) { err = t }
+            if (made == null) {
+                try {
+                    val cv = ContentValues()
+                    cv.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
+                    cv.put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+                    c.contentResolver.insert(exUri, cv)
+                    val v2 = ContentValues(v)
+                    v2.remove(CalendarContract.Events.ORIGINAL_INSTANCE_TIME)
+                    made = c.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v2)
+                } catch (t: Throwable) { err = t }
             }
             if (made == null) { lastError = err?.message.orEmpty(); return -1 }
             id = ContentUris.parseId(made)
