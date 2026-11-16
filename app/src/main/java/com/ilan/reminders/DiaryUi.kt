@@ -266,10 +266,11 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     }
                     val page = pager.currentPage
                     Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
-                        val title = if (page == 2) "${date.dayOfMonth} ב${HE_MONTHS[date.monthValue - 1]} ${date.year}" else "${HE_MONTHS[date.monthValue - 1]} ${date.year}"
-                        val sub = when (page) { 2 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "" }
-                        Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (sub.isNotEmpty()) Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, maxLines = 1)
+                        val mon = HE_MONTHS[date.monthValue - 1]
+                        val title = when (page) { 2 -> "${date.dayOfMonth} ב$mon ${date.year}"; 1 -> "$mon ${date.year}"; else -> mon }
+                        val sub = when (page) { 2 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "${date.year}" }
+                        Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, maxLines = 1)
                     }
                     Text("▶", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(-1) }.padding(horizontal = 10.dp, vertical = 12.dp))
                     Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 10.dp, vertical = 12.dp))
