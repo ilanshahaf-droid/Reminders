@@ -5,6 +5,7 @@ import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.CalendarContract
 import android.provider.CalendarContract.Attendees as A
 import androidx.core.content.ContextCompat
@@ -141,6 +142,8 @@ object CalRepo {
     private fun utc(d: LocalDate) = d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
     /** creates (existing == null) or updates an event; [instanceBegin] is the start of the occurrence the user opened. Returns the event id or -1. */
+    var lastError = ""
+
     private fun stripRule(rule: String, until: Boolean): String =
         rule.split(";").filter { it.isNotBlank() && !it.startsWith("COUNT=") && !(until && it.startsWith("UNTIL=")) }.joinToString(";")
 
@@ -204,9 +207,21 @@ object CalRepo {
             id = ContentUris.parseId(u)
         } else if (sc == 1) {
             v.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
-            v.put(CalendarContract.Events.ORIGINAL_ALL_DAY, if (existing!!.allDay) 1 else 0)
-            val u = c.contentResolver.insert(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, existing.id), v) ?: return -1
-            id = ContentUris.parseId(u)
+            val exUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, existing!!.id)
+            // the provider is picky about exceptions: try the full set, then leaner ones
+            val attempts = listOf<(ContentValues) -> Unit>(
+                { },
+                { it.remove(CalendarContract.Events.RRULE); it.remove(CalendarContract.Events.DURATION) },
+                { it.remove(CalendarContract.Events.RRULE); it.remove(CalendarContract.Events.DURATION); it.remove(CalendarContract.Events.HAS_ATTENDEE_DATA); it.remove(CalendarContract.Events.ORGANIZER); it.remove(CalendarContract.Events.AVAILABILITY); it.remove(CalendarContract.Events.ACCESS_LEVEL); it.remove(CalendarContract.Events.CALENDAR_ID) }
+            )
+            var made: Uri? = null; var err: Throwable? = null
+            for (a in attempts) {
+                val vv = ContentValues(v); a(vv)
+                try { made = c.contentResolver.insert(exUri, vv) } catch (t: Throwable) { err = t }
+                if (made != null) break
+            }
+            if (made == null) { lastError = err?.message.orEmpty(); return -1 }
+            id = ContentUris.parseId(made)
         } else if (existing == null) {
             val u = c.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v) ?: return -1
             id = ContentUris.parseId(u)
@@ -224,7 +239,7 @@ object CalRepo {
         }
         runCatching { saveGuests(c, id, if (sc == 0) existing else null, s.guests) }
         id
-    }.getOrDefault(-1L)
+    }.onFailure { lastError = it.message ?: it.toString() }.getOrDefault(-1L)
 
     private fun saveGuests(c: Context, id: Long, existing: EvFull?, guests: List<String>) {
         val old = existing?.guests.orEmpty()

@@ -835,7 +835,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         val s = EdState(title.trim(), calId, sd, stT, if (ed.isBefore(sd)) sd else ed, enT, allDay, loc, desc, rems.toList(), rep, avail, access, guests.toList())
         scope.launch {
             val id = withContext(Dispatchers.IO) { CalRepo.save(ctx, full, ev?.begin ?: 0L, s, scope0) }
-            if (id < 0) android.widget.Toast.makeText(ctx, "השמירה נכשלה", android.widget.Toast.LENGTH_SHORT).show() else onChanged()
+            if (id < 0) android.widget.Toast.makeText(ctx, "השמירה נכשלה: " + CalRepo.lastError.take(160), android.widget.Toast.LENGTH_LONG).show() else onChanged()
         }
     }
     fun startMoved(oldD: LocalDate, oldT: LocalTime, newD: LocalDate, newT: LocalTime) {
