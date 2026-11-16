@@ -88,14 +88,14 @@ fun Home() {
 }
 
 @Composable
-fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 24.dp, onDiary: () -> Unit = {}) {
+fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 10.dp, onDiary: () -> Unit = {}) {
     val cs = MaterialTheme.colorScheme
     // segmented control: one rounded track, the selected tab is a filled, raised pill
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 6.dp),
         shape = RoundedCornerShape(26.dp), color = cs.primary.copy(alpha = 0.10f), shadowElevation = 0.dp
     ) {
-        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             listOf(Triple("tasks", "⏰", "תזכורות"), Triple("notes", "📝", "פתקים"), Triple("docs", "📄", "מסמכים"), Triple("diary", "📅", "יומן")).forEach { (key, icon, label) ->
                 val sel = current == key
                 Surface(
@@ -106,10 +106,10 @@ fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onD
                     shadowElevation = if (sel) 4.dp else 0.dp
                 ) {
                     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        Text(icon, fontSize = 15.sp)
-                        Spacer(Modifier.width(5.dp))
+                        Text(icon, fontSize = 14.sp)
+                        Spacer(Modifier.width(3.dp))
                         Text(
-                            label, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false,
+                            label, style = MaterialTheme.typography.labelLarge, fontSize = 13.sp, maxLines = 1, softWrap = false,
                             fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                             color = if (sel) cs.onPrimary else cs.onSurfaceVariant
                         )
