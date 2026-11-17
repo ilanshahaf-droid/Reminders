@@ -126,6 +126,14 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 .dnav{display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap}
 .dnav h2{margin:0;font-size:22px;flex:1;min-width:140px}
 .dnav button{padding:8px 14px}
+button.sec.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dtl{position:relative;height:1152px;margin-top:6px;background:var(--card);border-radius:14px;border:1px solid var(--line);overflow:hidden}
+.dtl .hr{position:absolute;inset-inline:0;border-top:1px solid var(--line);font-size:12px;color:var(--sub)}
+.dtl .hr span{position:absolute;inset-inline-start:6px;top:2px}
+.dtl .ev{position:absolute;border-radius:6px;padding:2px 6px;font-size:14px;overflow:hidden;cursor:pointer;border:1px solid #0003;line-height:1.25;box-sizing:border-box}
+.dtl .now{position:absolute;inset-inline:0;border-top:2px solid #e53935}
+.dadl{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.dadl .de{font-size:15px;padding:3px 8px;cursor:pointer}
 .dgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .dgrid .dh{background:var(--accent);color:#fff;text-align:center;padding:6px 0;font-size:14px;font-weight:600}
 .dc{background:var(--card);min-height:96px;padding:3px 4px;cursor:pointer;overflow:hidden}
@@ -196,11 +204,11 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
       <div class="bar" style="margin:0"><button class="ghost" onclick="logout()">התנתק</button></div>
     </div>
     <div class="dnav">
-      <button class="sec" onclick="dyStep(-1)">›</button>
+      <button class="sec" onclick="dyStep(-1)" aria-label="הקודם">→</button>
       <h2 id="dyTitle"></h2>
-      <button class="sec" onclick="dyStep(1)">‹</button>
+      <button class="sec" onclick="dyStep(1)" aria-label="הבא">←</button>
       <button class="sec" onclick="dyToday()">היום</button>
-      <button class="sec" id="dyMode" onclick="dyToggle()">שבוע</button>
+      <span id="dyModes" style="display:flex;gap:4px"><button class="sec" id="dyM_month" onclick="dySet('month')">חודש</button><button class="sec" id="dyM_week" onclick="dySet('week')">שבוע</button><button class="sec" id="dyM_day" onclick="dySet('day')">יום</button></span>
     </div>
     <div id="dymsg" class="err"></div>
     <div id="dybody"></div>
@@ -1270,7 +1278,7 @@ function exportNote(){
 }
 
 // ---------- diary (read-only copy of the phone calendar, table rem_events) ----------
-let dyEvents = [], dyMissing = false, dyMode = LS.getItem('dyMode') === 'week' ? 'week' : 'month', dyDate = new Date();
+let dyEvents = [], dyMissing = false, dyMode = ['week', 'day'].includes(LS.getItem('dyMode')) ? LS.getItem('dyMode') : 'month', dyDate = new Date();
 dyDate.setHours(0, 0, 0, 0);
 const DY_DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 const DY_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -1280,6 +1288,7 @@ const dyKey = d => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDat
 const dyCol = e => { const c = e.color ? (e.color >>> 0) & 0xFFFFFF : 0x4A7391; return '#' + c.toString(16).padStart(6, '0'); };
 const dyHM = ms => new Date(ms).toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', hour12:false});
 function dyRange(){
+  if(dyMode === 'day') return [dyDate, dyAddDays(dyDate, 1)];
   if(dyMode === 'week'){ const a = dyWeekStart(dyDate); return [a, dyAddDays(a, 7)]; }
   const first = new Date(dyDate.getFullYear(), dyDate.getMonth(), 1), a = dyWeekStart(first);
   const last = new Date(dyDate.getFullYear(), dyDate.getMonth() + 1, 0);
@@ -1311,9 +1320,9 @@ async function loadDiary(){
   }catch(e){ $('dyupd').textContent = 'שגיאת רשת'; }
   renderDiary();
 }
-function dyStep(n){ dyDate = dyMode === 'week' ? dyAddDays(dyDate, 7 * n) : new Date(dyDate.getFullYear(), dyDate.getMonth() + n, 1); loadDiary(); }
+function dyStep(n){ dyDate = dyMode === 'day' ? dyAddDays(dyDate, n) : dyMode === 'week' ? dyAddDays(dyDate, 7 * n) : new Date(dyDate.getFullYear(), dyDate.getMonth() + n, 1); loadDiary(); }
 function dyToday(){ dyDate = new Date(); dyDate.setHours(0, 0, 0, 0); loadDiary(); }
-function dyToggle(){ dyMode = dyMode === 'week' ? 'month' : 'week'; LS.setItem('dyMode', dyMode); loadDiary(); }
+function dySet(m){ dyMode = m; LS.setItem('dyMode', m); loadDiary(); }
 function dyLine(e, withTime){
   const ad = e.all_day, d = el('div', 'de' + (ad ? ' ad' : ''), (ad || !withTime ? '' : dyHM(e.start_ms) + ' ') + e.title + (e.rep ? ' ⇄' : ''));
   if(ad) d.style.background = dyCol(e) + '55'; else d.style.color = dyCol(e);
@@ -1321,10 +1330,37 @@ function dyLine(e, withTime){
 }
 function renderDiary(){
   $('dymsg').textContent = dyMissing ? 'טבלת היומן עוד לא קיימת ב-Supabase. הרץ את הקובץ diary.sql ב-SQL Editor, ופתח את האפליקציה בטלפון.' : '';
-  $('dyMode').textContent = dyMode === 'week' ? 'חודש' : 'שבוע';
+  ['month', 'week', 'day'].forEach(m => $('dyM_' + m).classList.toggle('on', dyMode === m));
   const box = $('dybody'); box.innerHTML = ''; const todayK = dyKey(new Date());
   const [a, b] = dyRange();
-  if(dyMode === 'week'){
+  if(dyMode === 'day'){
+    $('dyTitle').textContent = 'יום ' + DY_DAYS[a.getDay()] + ', ' + a.getDate() + ' ב' + DY_MONTHS[a.getMonth()] + ' ' + a.getFullYear();
+    const evs = dyOn(a), ad = evs.filter(e => e.all_day), tm = evs.filter(e => !e.all_day);
+    if(ad.length){ const l = el('div', 'dadl'); ad.forEach(e => { const d = dyLine(e, false); d.onclick = () => dayPop(a, e); l.appendChild(d); }); box.appendChild(l); }
+    const tl = el('div', 'dtl'), H = 48;
+    for(let h = 0; h < 24; h++){ const r = el('div', 'hr'); r.style.top = (h * H) + 'px'; r.appendChild(el('span', '', String(h).padStart(2, '0') + ':00')); tl.appendChild(r); }
+    const d0 = a.getTime(), d1 = dyAddDays(a, 1).getTime();
+    const items = tm.map(e => ({e, s: Math.max(e.start_ms, d0), f: Math.min(Math.max(e.end_ms, e.start_ms + 20 * 60000), d1)})).sort((x, y) => x.s - y.s || y.f - x.f);
+    const cols = []; let grp = [];
+    const flush = () => { grp.forEach(it => it.n = cols.length); cols.length = 0; grp = []; };
+    items.forEach(it => {
+      if(grp.length && cols.every(c => c <= it.s)) flush();
+      let k = cols.findIndex(c => c <= it.s); if(k < 0){ k = cols.length; cols.push(0); }
+      cols[k] = it.f; it.k = k; grp.push(it);
+    });
+    flush();
+    items.forEach(it => {
+      const ev = el('div', 'ev', dyHM(it.e.start_ms) + ' ' + it.e.title + (it.e.rep ? ' ⇄' : '')), top = (it.s - d0) / 60000 * H / 60, hgt = Math.max((it.f - it.s) / 60000 * H / 60, 22);
+      ev.style.top = top + 'px'; ev.style.height = hgt + 'px';
+      const w = 100 / (it.n || 1), padS = 52;
+      ev.style.insetInlineStart = 'calc(' + padS + 'px + (100% - ' + (padS + 4) + 'px) * ' + (it.k * w / 100) + ')';
+      ev.style.width = 'calc((100% - ' + (padS + 4) + 'px) * ' + (w / 100) + ' - 2px)';
+      ev.style.background = dyCol(it.e) + 'cc'; ev.style.color = '#111';
+      ev.onclick = () => dayPop(a, it.e); tl.appendChild(ev);
+    });
+    if(dyKey(a) === todayK){ const n = new Date(), nl = el('div', 'now'); nl.style.top = ((n.getHours() * 60 + n.getMinutes()) * H / 60) + 'px'; tl.appendChild(nl); }
+    box.appendChild(tl);
+  } else if(dyMode === 'week'){
     const e = dyAddDays(a, 6);
     $('dyTitle').textContent = a.getDate() + ' ' + DY_MONTHS[a.getMonth()] + ' – ' + e.getDate() + ' ' + DY_MONTHS[e.getMonth()] + ' ' + e.getFullYear();
     for(let d = new Date(a); d < b; d = dyAddDays(d, 1)){
@@ -1350,10 +1386,10 @@ function renderDiary(){
     box.appendChild(g);
   }
 }
-function dayPop(d){
+function dayPop(d, only){
   const p = $('dayPanel'); p.innerHTML = '';
   p.appendChild(el('h1', '', 'יום ' + DY_DAYS[d.getDay()] + ', ' + d.getDate() + ' ב' + DY_MONTHS[d.getMonth()] + ' ' + d.getFullYear())).style.fontSize = '22px';
-  const evs = dyOn(d);
+  const evs = only ? [only] : dyOn(d);
   if(!evs.length) p.appendChild(el('div', 'sub', 'אין אירועים ביום הזה'));
   evs.forEach(e => {
     const c = el('div', 'dcard'), bar = el('div', 'bar'); bar.style.background = dyCol(e); c.appendChild(bar);
@@ -1364,6 +1400,7 @@ function dayPop(d){
     if(e.cal) bd.appendChild(el('div', 'sub', e.cal)).style.fontSize = '14px';
     c.appendChild(bd); p.appendChild(c);
   });
+  if(!only && dyMode !== 'day'){ const v = el('button', 'sec', 'תצוגת יום'); v.style.marginInlineEnd = '8px'; v.onclick = () => { $('dayModal').classList.add('hide'); dyDate = new Date(d); dySet('day'); }; p.appendChild(v); }
   const x = el('button', 'ghost', 'סגירה'); x.onclick = () => $('dayModal').classList.add('hide'); p.appendChild(x);
   $('dayModal').classList.remove('hide');
 }
