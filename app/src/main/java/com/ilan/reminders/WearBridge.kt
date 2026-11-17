@@ -89,8 +89,33 @@ class WearActionService : WearableListenerService() {
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
         when (e.path) {
             "/reminder/create", "/reminder/delete", "/reminder/settime" -> { edit(e.path, j); return }
-            "/reminder/action" -> Unit
-            else -> return
+            "/reminder/action" -> action(j)
+        }
+    }
+
+    /** The same watch action also arrives as a stored Data Layer item (reliable after a Bluetooth drop); the first copy wins. */
+    override fun onDataChanged(events: com.google.android.gms.wearable.DataEventBuffer) {
+        for (ev in events) {
+            val path = ev.dataItem.uri.path ?: continue
+            if (ev.type != com.google.android.gms.wearable.DataEvent.TYPE_CHANGED || !path.startsWith("/act/")) continue
+            val json = com.google.android.gms.wearable.DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
+            runCatching { action(JSONObject(json)) }
+            runCatching { Wearable.getDataClient(this).deleteDataItems(ev.dataItem.uri) }
+        }
+    }
+
+    private fun action(j: JSONObject) {
+        val ts = j.optLong("ts", 0)
+        if (ts > 0) {
+            val p = getSharedPreferences("alerts", Context.MODE_PRIVATE)
+            synchronized(WearActionService::class.java) {
+                if (p.getLong("wa$ts", 0) > 0) return
+                if (System.currentTimeMillis() - ts > 6 * 3600_000L) return
+                p.edit().putLong("wa$ts", System.currentTimeMillis()).apply()
+                // keep the list small
+                val old = p.all.keys.filter { it.startsWith("wa") && (p.getLong(it, 0) < System.currentTimeMillis() - 24 * 3600_000L) }
+                if (old.isNotEmpty()) p.edit().apply { old.forEach { remove(it) } }.apply()
+            }
         }
         val minutes = j.optInt("minutes", 0).takeIf { it > 0 }
             ?: getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)

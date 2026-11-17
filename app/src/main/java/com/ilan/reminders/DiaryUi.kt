@@ -358,7 +358,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                         when (page) {
                             2 -> VPager(date, { it }, { d, n -> d.plusDays(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> DayView(d, events, zone, today, onNew, onEvent, onDay, {}) }
-                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onCellEv, onNew, cals, taskList, weekCell) }
+                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onCellEv, onNew, cals, taskList, weekCell, listOf(onReminders, onNotes, onDocs)) }
                             else -> VPager(date, { it.year * 12 + it.monthValue }, { d, n -> d.plusMonths(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> MonthView(d, events, zone, today, onDay, onCellEv, {}) }
                         }
                     }
@@ -726,7 +726,7 @@ private fun MiniWeek(start: LocalDate, all: List<Ev>, z: ZoneId, selected: Local
 }
 
 @Composable
-private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, cals: List<Cal>, tasks: List<Task>, cellMode: String) {
+private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, cals: List<Cal>, tasks: List<Task>, cellMode: String, nav: List<() -> Unit>) {
     val start = wkStart(date)
     Row(Modifier.fillMaxSize().background(Color.White)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -736,7 +736,7 @@ private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
         Column(Modifier.weight(1f).fillMaxHeight()) {
             for (i in 4..6) WeekDayCell(start.plusDays(i.toLong()), all, z, today, Modifier.weight(1f).fillMaxWidth(), onDay, onEvent, onNew)
             if (cellMode == "chart") MiniWeek(start, all, z, date, today, Modifier.weight(1f).fillMaxWidth(), onDay)
-            else WeekExtraCell(cellMode, start, all, z, today, cals, tasks, Modifier.weight(1f).fillMaxWidth())
+            else WeekExtraCell(cellMode, start, all, z, today, cals, tasks, nav, Modifier.weight(1f).fillMaxWidth())
         }
     }
 }
@@ -748,7 +748,8 @@ private val WEEK_CELL_OPTIONS = listOf(
     "tasks" to "משימות ותזכורות פתוחות השבוע",
     "next" to "האירוע הבא",
     "free" to "חלונות פנויים",
-    "note" to "פתק חופשי לשבוע"
+    "note" to "פתק חופשי לשבוע",
+    "links" to "מעבר לתזכורות, פתקים ומסמכים"
 )
 
 @Composable
@@ -767,7 +768,7 @@ private fun WeekCellSettings(cur: String, onDismiss: () -> Unit, onPick: (String
 }
 
 @Composable
-private fun WeekExtraCell(mode: String, start: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, cals: List<Cal>, tasks: List<Task>, modifier: Modifier) {
+private fun WeekExtraCell(mode: String, start: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, cals: List<Cal>, tasks: List<Task>, nav: List<() -> Unit>, modifier: Modifier) {
     val ctx = LocalContext.current
     val endD = start.plusDays(6)
     val weekMs0 = start.atStartOfDay(z).toInstant().toEpochMilli()
@@ -834,6 +835,13 @@ private fun WeekExtraCell(mode: String, start: LocalDate, all: List<Ev>, z: Zone
                 }
                 if (slots.isEmpty()) Text("אין חלונות של שעה ומעלה", fontSize = 12.sp, color = Color.Gray)
                 slots.forEach { (d, a, b) -> Text("${HE_DAYS[dayIdx(d)]} ${d.dayOfMonth}/${d.monthValue}  ${hm(LocalTime.of(a / 60, a % 60))}–${hm(LocalTime.of(b / 60, b % 60))}", fontSize = 12.sp, modifier = Modifier.padding(vertical = 1.dp)) }
+            }
+            "links" -> {
+                listOf("⏰ תזכורות", "📝 פתקים", "📄 מסמכים").forEachIndexed { i, l ->
+                    Text(l, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = BAR, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color.White)
+                        .clickable { nav[i]() }.padding(horizontal = 10.dp, vertical = 7.dp))
+                    Spacer(Modifier.height(4.dp))
+                }
             }
             else -> {
                 val key = "weekNote_${start.toEpochDay()}"
