@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
@@ -62,8 +63,8 @@ import java.time.ZoneId
 import java.time.temporal.IsoFields
 
 /** Meetings diary: week (default) / day (swipe right) / month (swipe left) views over the phone's calendar provider. */
-private val BAR = Color(0xFF4A7391)
-private val ORANGE = Color(0xFFFB8C00)
+private val BAR: Color get() = Color(DS.bar)
+private val ORANGE: Color get() = Color(DS.today)
 private val WEEKEND_BG = Color(0xFFEFEFEF)
 private val GRID = Color(0xFFD9DCE3)
 private val INK = Color(0xFF222222)
@@ -128,6 +129,7 @@ class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?, val cop
 @Composable
 fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, onTask: (Task) -> Unit = {}) {
     val ctx = LocalContext.current
+    remember { DS.load(ctx); 0 }
     var granted by remember { mutableStateOf(CalRepo.hasRead(ctx) && CalRepo.hasWrite(ctx)) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         granted = CalRepo.hasRead(ctx) && CalRepo.hasWrite(ctx)
@@ -145,7 +147,14 @@ fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, 
                 Button({ launcher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)) }) { Text("אישור גישה ליומן") }
                 TextButton(onReminders) { Text("חזרה") }
             }
-        } else DiaryMain(onReminders, onNotes, onDocs, onTask)
+        } else {
+            val cur = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(cur.density, cur.fontScale * DS.scale)) {
+                androidx.compose.material3.ProvideTextStyle(androidx.compose.ui.text.TextStyle(fontFamily = DS.fontFamily())) {
+                    DiaryMain(onReminders, onNotes, onDocs, onTask)
+                }
+            }
+        }
     }
 }
 
@@ -204,6 +213,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var editing by remember { mutableStateOf<EditTarget?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showNotif by remember { mutableStateOf(false) }
+    var showFont by remember { mutableStateOf(false) }
+    var showDefs by remember { mutableStateOf(false) }
     var showDiag by remember { mutableStateOf(false) }
     var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
     var dayEvSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }
@@ -278,6 +289,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                             HorizontalDivider()
                             DropdownMenuItem({ Text("🗓 הגדרות יומנים") }, { menuNav = false; showSettings = true })
                             DropdownMenuItem({ Text("🔔 התראות אירועים") }, { menuNav = false; showNotif = true })
+                            DropdownMenuItem({ Text("🔤 תצוגה: פונט וצבעים") }, { menuNav = false; showFont = true })
+                            DropdownMenuItem({ Text("⚙ ברירות מחדל לאירוע") }, { menuNav = false; showDefs = true })
                         }
                     }
                     val page = pager.currentPage
@@ -360,6 +373,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 text = { Text(txt, Modifier.verticalScroll(rememberScrollState()), fontSize = 13.sp) },
                 confirmButton = { TextButton({ showDiag = false }) { Text("סגירה") } })
         }
+        if (showFont) FontSettings { showFont = false }
+        if (showDefs) EventDefaults { showDefs = false }
         if (showNotif) NotifSettings(onDismiss = { showNotif = false; tick++ })
         if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false }) { vis, def ->
             visPref = vis; defCal = def
@@ -475,14 +490,7 @@ private fun DayDialog(
             }
         }
     }
-    delAsk?.let { e ->
-        AlertDialog(
-            onDismissRequest = { delAsk = null }, title = { Text("למחוק את האירוע?") },
-            text = { Text(if (e.repeat) "כל הסדרה החוזרת תימחק גם מיומן גוגל." else "האירוע יימחק גם מיומן גוגל.") },
-            confirmButton = { TextButton({ delAsk = null; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, e.id); EventAtt.removeAll(ctx, e.id) }; sel = 0; onChanged() } }) { Text("מחיקה", color = RED) } },
-            dismissButton = { TextButton({ delAsk = null }) { Text("ביטול") } }
-        )
-    }
+    delAsk?.let { e -> DeleteDialog(e, { delAsk = null }) { sel = 0; onChanged() } }
 }
 
 @Composable
@@ -568,12 +576,13 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
 
 /** how many of [evs] fit in [avail] when a long title wraps onto a second line (estimated from text length) */
 private fun packEvs(evs: List<Ev>, avail: androidx.compose.ui.unit.Dp, width: androidx.compose.ui.unit.Dp, sizeSp: Float, lineDp: Float, showTime: Boolean): List<Ev> {
-    val cpl = ((width.value - 8f) / (sizeSp * 0.56f)).toInt().coerceAtLeast(4)
+    val sc = DS.scale
+    val cpl = ((width.value - 8f) / (sizeSp * sc * 0.56f)).toInt().coerceAtLeast(4)
     var used = 0f
     val out = ArrayList<Ev>()
     for (e in evs) {
         val len = e.title.length + (if (showTime && !e.allDay) 6 else 0) + (if (e.repeat) 2 else 0) + (if (e.att) 3 else 0)
-        val h = (if (len > cpl) 2 else 1) * lineDp
+        val h = (if (len > cpl) 2 else 1) * lineDp * sc
         if (used + h > avail.value + 1f) break
         used += h; out.add(e)
     }
@@ -582,7 +591,7 @@ private fun packEvs(evs: List<Ev>, avail: androidx.compose.ui.unit.Dp, width: an
 
 @Composable
 private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, onClick: () -> Unit) {
-    val col = evColor(e)
+    val col = if (DS.evText != 0) Color(DS.evText) else evColor(e)
     if (e.allDay) {
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp).clip(RoundedCornerShape(3.dp)).background(col.copy(alpha = 0.30f)).clickable(onClick = onClick).padding(horizontal = 4.dp)) {
             Text((if (e.att) "📎 " else "") + e.title + (if (e.repeat) " ⇄" else ""), fontSize = size, maxLines = 2, overflow = TextOverflow.Ellipsis, color = INK)
@@ -840,17 +849,21 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     var title by remember { mutableStateOf("") }
     var calId by remember { mutableStateOf(firstCal?.id ?: -1L) }
     val now = LocalTime.now()
-    val st0 = target.time ?: LocalTime.of(minOf(now.hour + 1, 23), 0)
+    val dStart = remember { DS.defStart(ctx) }
+    val dDur = remember { DS.defDur(ctx) }
+    val st0 = target.time ?: if (dStart >= 0) LocalTime.of(dStart / 60, dStart % 60) else LocalTime.of(minOf(now.hour + 1, 23), 0)
+    val end0 = remember { target.date.atTime(st0).plusMinutes(dDur.toLong()) }
     var sd by remember { mutableStateOf(target.date) }
     var stT by remember { mutableStateOf(st0) }
-    var ed by remember { mutableStateOf(target.date) }
-    var enT by remember { mutableStateOf(if (st0.hour >= 23) LocalTime.of(23, 59) else st0.plusHours(1)) }
+    var ed by remember { mutableStateOf(end0.toLocalDate()) }
+    var enT by remember { mutableStateOf(end0.toLocalTime()) }
     var allDay by remember { mutableStateOf(false) }
     var loc by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    val rems = remember { mutableStateListOf(10) }
-    var avail by remember { mutableStateOf(0) }
-    var access by remember { mutableStateOf(0) }
+    val isNew = ev == null && target.copyOf == null
+    val rems = remember { mutableStateListOf<Int>().also { l -> if (isNew) DS.defRem(ctx).let { if (it != -2) l.add(it) } else l.add(10) } }
+    var avail by remember { mutableStateOf(if (isNew) DS.defAvail(ctx) else 0) }
+    var access by remember { mutableStateOf(if (isNew) DS.defAccess(ctx) else 0) }
     val guests = remember { mutableStateListOf<String>() }
     var guestIn by remember { mutableStateOf("") }
     var rep by remember { mutableStateOf("") }
@@ -931,7 +944,15 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                 }
                 if (!canWrite) Text("היומן הזה לקריאה בלבד", color = RED, fontSize = 13.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("כל היום", Modifier.weight(1f), fontSize = 16.sp); Switch(allDay, { allDay = it })
+                    Text("כל היום", Modifier.weight(1f), fontSize = 16.sp); Switch(allDay, { v ->
+                        if (isNew) {
+                            val from = if (allDay) DS.defRemAll(ctx) else DS.defRem(ctx)
+                            val to = if (v) DS.defRemAll(ctx) else DS.defRem(ctx)
+                            val untouched = rems.toList() == (if (from == -2) emptyList() else listOf(from))
+                            if (untouched) { rems.clear(); if (to != -2) rems.add(to) }
+                        }
+                        allDay = v
+                    })
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton({ pickDate(sd) { n -> if (allDay) { sd = n; if (ed.isBefore(n)) ed = n } else { val od = sd; sd = n; startMoved(od, stT, n, stT) } } }, Modifier.weight(1f)) { Text("${sd.dayOfMonth}/${sd.monthValue}/${sd.year}") }
@@ -1035,12 +1056,8 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             }
         }, confirmButton = {}, dismissButton = { TextButton({ pickCal = false }) { Text("סגירה") } }
     )
-    if (confirmDel) AlertDialog(
-        onDismissRequest = { confirmDel = false }, title = { Text("למחוק את הפגישה?") },
-        text = { Text(if (full?.rrule.isNullOrEmpty()) "הפגישה תימחק גם מיומן גוגל." else "כל הסדרה החוזרת תימחק גם מיומן גוגל.") },
-        confirmButton = { TextButton({ confirmDel = false; scope.launch { withContext(Dispatchers.IO) { CalRepo.delete(ctx, ev!!.id); EventAtt.removeAll(ctx, ev.id) }; onChanged() } }) { Text("מחיקה", color = RED) } },
-        dismissButton = { TextButton({ confirmDel = false }) { Text("ביטול") } }
-    )
+    if (confirmDel && ev != null) DeleteDialog(ev.copy(repeat = ev.repeat || !full?.rrule.isNullOrEmpty()), { confirmDel = false }) { confirmDel = false; onChanged() }
+)
 }
 
 @Composable
@@ -1240,5 +1257,123 @@ private fun CustomReminderDialog(initial: Int, allDay: Boolean, startMin: Int, o
             }) { Text("אישור") }
         },
         dismissButton = { TextButton(onClose) { Text("ביטול") } }
+    )
+}
+
+
+@Composable
+private fun DeleteDialog(e: Ev, onClose: () -> Unit, onDone: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var sc by remember { mutableStateOf(1) }
+    AlertDialog(
+        onDismissRequest = onClose, title = { Text(if (e.repeat) "מחיקה" else "למחוק את האירוע?") },
+        text = {
+            if (e.repeat) Column {
+                listOf(1 to "רק האירוע הזה", 2 to "האירוע הזה ואירועים עתידיים", 0 to "כל האירועים").forEach { (v, l) ->
+                    Row(Modifier.fillMaxWidth().clickable { sc = v }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(sc == v, { sc = v }); Spacer(Modifier.width(6.dp)); Text(l, fontSize = 17.sp)
+                    }
+                }
+            } else Text("האירוע יימחק גם מיומן גוגל.")
+        },
+        confirmButton = {
+            TextButton({
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        CalRepo.delete(ctx, e.id, e.begin, if (e.repeat) sc else 0)
+                        if (!e.repeat || sc == 0) EventAtt.removeAll(ctx, e.id)
+                    }
+                    onDone()
+                }
+            }) { Text("אישור", color = RED) }
+        },
+        dismissButton = { TextButton(onClose) { Text("ביטול") } }
+    )
+}
+
+@Composable
+private fun SwatchRow(options: List<Int>, sel: Int, onPick: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { c ->
+            Box(
+                Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(if (c == 0) Color(0xFFE0E0E0) else Color(c))
+                    .border(if (c == sel) 3.dp else 1.dp, if (c == sel) Color.Black else Color(0xFFBDBDBD), RoundedCornerShape(17.dp)).clickable { onPick(c) },
+                contentAlignment = Alignment.Center
+            ) { if (c == 0) Text("A", fontSize = 13.sp, color = Color.DarkGray) }
+        }
+    }
+}
+
+@Composable
+private fun FontSettings(onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val fams = listOf("default" to "ברירת מחדל", "sans" to "Sans", "serif" to "Serif", "mono" to "Mono", "cursive" to "כתב יד")
+    val textCols = listOf(0, 0xFF222222.toInt(), 0xFF000000.toInt(), 0xFF0D47A1.toInt(), 0xFFB71C1C.toInt(), 0xFF1B5E20.toInt(), 0xFF4A148C.toInt(), 0xFF6D4C41.toInt())
+    val barCols = listOf(0xFF4A7391.toInt(), 0xFF1E3A5F.toInt(), 0xFF2E7D32.toInt(), 0xFF6A1B9A.toInt(), 0xFFC62828.toInt(), 0xFF37474F.toInt(), 0xFFE91E63.toInt(), 0xFF00796B.toInt())
+    val todayCols = listOf(0xFFFB8C00.toInt(), 0xFFE53935.toInt(), 0xFF43A047.toInt(), 0xFF1E88E5.toInt(), 0xFF8E24AA.toInt(), 0xFFE91E63.toInt())
+    AlertDialog(
+        onDismissRequest = { DS.save(ctx); onDismiss() }, title = { Text("תצוגה: פונט וצבעים") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("גודל גופן: ${(DS.scale * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                Slider(DS.scale, { DS.scale = (Math.round(it * 20f) / 20f) }, valueRange = 0.8f..1.6f)
+                Text("סוג גופן", fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    fams.forEach { (k, l) ->
+                        val on = DS.family == k
+                        Text(l, Modifier.clip(RoundedCornerShape(18.dp)).background(if (on) Color(0xFFE91E63) else Color(0xFFE6E6E6)).clickable { DS.family = k }.padding(horizontal = 14.dp, vertical = 8.dp),
+                            color = if (on) Color.White else INK, fontSize = 15.sp,
+                            fontFamily = when (k) { "sans" -> FontFamily.SansSerif; "serif" -> FontFamily.Serif; "mono" -> FontFamily.Monospace; "cursive" -> FontFamily.Cursive; else -> null })
+                    }
+                }
+                Text("צבע טקסט האירועים (A = צבע היומן)", fontWeight = FontWeight.Bold)
+                SwatchRow(textCols, DS.evText) { DS.evText = it }
+                Text("צבע הסרגל העליון", fontWeight = FontWeight.Bold)
+                SwatchRow(barCols, DS.bar) { DS.bar = it }
+                Text("צבע היום הנוכחי", fontWeight = FontWeight.Bold)
+                SwatchRow(todayCols, DS.today) { DS.today = it }
+                TextButton({ DS.scale = 1f; DS.family = "default"; DS.evText = 0; DS.bar = barCols[0]; DS.today = todayCols[0] }) { Text("איפוס לברירת מחדל") }
+            }
+        },
+        confirmButton = { TextButton({ DS.save(ctx); onDismiss() }) { Text("סגירה") } }
+    )
+}
+
+@Composable
+private fun EventDefaults(onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var start by remember { mutableStateOf(DS.defStart(ctx)) }
+    var dur by remember { mutableStateOf(DS.defDur(ctx)) }
+    var rem by remember { mutableStateOf(DS.defRem(ctx)) }
+    var remAll by remember { mutableStateOf(DS.defRemAll(ctx)) }
+    var avail by remember { mutableStateOf(DS.defAvail(ctx)) }
+    var access by remember { mutableStateOf(DS.defAccess(ctx)) }
+    val durs = listOf(15, 30, 45, 60, 90, 120, 180)
+    val allOpts = listOf(-540, 900, 2340, 9540)
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text("ברירות מחדל לאירוע חדש") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("(היומן ברירת המחדל נבחר ב\"הגדרות יומנים\")", fontSize = 12.sp, color = Color.Gray)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton({
+                        val m = if (start >= 0) start else 10 * 60
+                        android.app.TimePickerDialog(ctx, { _, h, mi -> start = h * 60 + mi; DS.setInt(ctx, "evDefStart", start) }, m / 60, m % 60, true).show()
+                    }, Modifier.weight(1f)) { Text("שעת התחלה: " + if (start < 0) "השעה הקרובה" else "%02d:%02d".format(start / 60, start % 60)) }
+                    if (start >= 0) TextButton({ start = -1; DS.setInt(ctx, "evDefStart", -1) }) { Text("אוטומטי") }
+                }
+                Choice("משך", durText(dur.toLong()), durs.map { durText(it.toLong()) }) { dur = durs[it]; DS.setInt(ctx, "evDefDur", dur) }
+                Choice("התראה", if (rem == -2) "ללא" else remLabel(rem) + (if (rem > 0) " לפני" else ""), listOf("ללא") + REM_OPTS.map { remLabel(it) }) {
+                    rem = if (it == 0) -2 else REM_OPTS[it - 1]; DS.setInt(ctx, "evDefRem", rem)
+                }
+                Choice("התראה (כל היום)", if (remAll == -2) "ללא" else remAbs(remAll), listOf("ללא") + allOpts.map { remAbs(it) }) {
+                    remAll = if (it == 0) -2 else allOpts[it - 1]; DS.setInt(ctx, "evDefRemAll", remAll)
+                }
+                Choice("📌", AVAIL.first { it.first == avail }.second, AVAIL.map { it.second }) { avail = AVAIL[it].first; DS.setInt(ctx, "evDefAvail", avail) }
+                Choice("👁 פרטיות", ACCESS.firstOrNull { it.first == access }?.second ?: "ברירת מחדל", ACCESS.map { it.second }) { access = ACCESS[it].first; DS.setInt(ctx, "evDefAccess", access) }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("סגירה") } }
     )
 }

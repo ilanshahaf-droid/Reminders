@@ -271,7 +271,23 @@ object CalRepo {
         }
     }
 
-    fun delete(c: Context, id: Long): Boolean = runCatching {
-        c.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id), null, null) > 0
+    /** scope for a recurring event: 0 = whole series, 1 = only this occurrence, 2 = this and the following ones */
+    fun delete(c: Context, id: Long, instanceBegin: Long = 0L, scope: Int = 0): Boolean = runCatching {
+        val f = if (scope != 0) load(c, id) else null
+        val whole = { c.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id), null, null) > 0 }
+        if (f == null || f.rrule.isEmpty()) return@runCatching whole()
+        if (scope == 1) {
+            val cv = ContentValues()
+            cv.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
+            cv.put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+            c.contentResolver.insert(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, id), cv) != null
+        } else {
+            if (instanceBegin <= f.dtstart) return@runCatching whole()
+            val until = if (f.allDay) java.time.format.DateTimeFormatter.BASIC_ISO_DATE.format(Instant.ofEpochMilli(instanceBegin).atZone(ZoneOffset.UTC).toLocalDate().minusDays(1))
+            else java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").format(Instant.ofEpochMilli(instanceBegin - 1000).atZone(ZoneOffset.UTC))
+            val ov = ContentValues()
+            ov.put(CalendarContract.Events.RRULE, stripRule(f.rrule, true) + ";UNTIL=" + until)
+            c.contentResolver.update(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id), ov, null, null) > 0
+        }
     }.getOrDefault(false)
 }
