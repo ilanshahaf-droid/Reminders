@@ -17,7 +17,7 @@ import com.google.common.util.concurrent.ListenableFuture
 class ReminderTileService : TileService() {
     override fun onTileRequest(req: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         TaskStore.load(this)
-        val tasks = TaskStore.tasks.value.sortedWith(compareBy({ it.at == 0L }, { it.at })).take(3)
+        val tasks = TaskStore.tasks.value.sortedWith(compareBy({ it.at == 0L }, { it.at })).take(2)
         val open = ModifiersBuilders.Clickable.Builder().setId("open").setOnClick(
             ActionBuilders.LaunchAction.Builder().setAndroidActivity(
                 ActionBuilders.AndroidActivity.Builder().setPackageName(packageName)
@@ -41,10 +41,40 @@ class ReminderTileService : TileService() {
             col.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(8f)).build())
             col.addContent(text("אין תזכורות קרובות", 14f, 0xFFFFFFFF.toInt()))
         }
-        tasks.forEach { t ->
+        fun button(label: String, bg: Int, act: String, id: Long): LayoutElementBuilders.LayoutElement {
+            val click = ModifiersBuilders.Clickable.Builder().setId("$act$id").setOnClick(
+                ActionBuilders.LaunchAction.Builder().setAndroidActivity(
+                    ActionBuilders.AndroidActivity.Builder().setPackageName(packageName)
+                        .setClassName("com.ilan.reminders.wear.QuickActionActivity")
+                        .addKeyToExtraMapping("id", ActionBuilders.AndroidStringExtra.Builder().setValue(id.toString()).build())
+                        .addKeyToExtraMapping("act", ActionBuilders.AndroidStringExtra.Builder().setValue(act).build())
+                        .build()
+                ).build()
+            ).build()
+            return LayoutElementBuilders.Box.Builder()
+                .setWidth(DimensionBuilders.wrap()).setHeight(DimensionBuilders.wrap())
+                .setModifiers(
+                    ModifiersBuilders.Modifiers.Builder().setClickable(click)
+                        .setBackground(ModifiersBuilders.Background.Builder().setColor(argb(bg))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(DimensionBuilders.dp(14f)).build()).build())
+                        .setPadding(ModifiersBuilders.Padding.Builder().setStart(DimensionBuilders.dp(10f)).setEnd(DimensionBuilders.dp(10f))
+                            .setTop(DimensionBuilders.dp(5f)).setBottom(DimensionBuilders.dp(5f)).build()).build()
+                )
+                .addContent(text(label, 13f, 0xFFFFFFFF.toInt(), true)).build()
+        }
+        tasks.forEachIndexed { i, t ->
             col.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(6f)).build())
             col.addContent(text(t.title, 14f, if (t.overdue) 0xFFFF8A80.toInt() else 0xFFFFFFFF.toInt(), true))
             col.addContent(text(t.whenText, 12f, 0xFFB0B0C0.toInt()))
+            if (i == 0) {
+                col.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(4f)).build())
+                col.addContent(
+                    LayoutElementBuilders.Row.Builder()
+                        .addContent(button("✓ הושלמה", 0xFF6D4AFF.toInt(), "DONE", t.id))
+                        .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(DimensionBuilders.dp(8f)).build())
+                        .addContent(button("⏱ נודניק", 0xFF3A3358.toInt(), "SNOOZE", t.id)).build()
+                )
+            }
         }
         val root = LayoutElementBuilders.Box.Builder()
             .setWidth(DimensionBuilders.expand()).setHeight(DimensionBuilders.expand())

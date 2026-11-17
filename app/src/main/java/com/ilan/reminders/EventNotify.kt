@@ -113,6 +113,7 @@ object EventNotify {
             .addAction(0, "סגור", pi(c, nid + 3, "DISMISS") { it.putExtra("nid", nid) })
         if (led(c)) b.setLights(0xFFFB8C00.toInt(), 600, 600)
         NotificationManagerCompat.from(c).notify(nid, b.build())
+        WearBridge.fireEvent(c, nid, key, title, text)
         val rn = renotify(c)
         if (rn > 0 && count < 5) setClock(c, System.currentTimeMillis() + rn * 60_000L, pi(c, nid + 4, "REPOST") {
             it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text).putExtra("count", count + 1)
@@ -152,6 +153,7 @@ object EventNotify {
         if (next != null) setClock(c, next, pi(c, 1, "RUN")) else am.cancel(pi(c, 1, "RUN"))
         // safety net: look again in 6 hours even if nothing woke us earlier
         am.setAndAllowWhileIdle(AlarmManager.RTC, now + 6 * 3600_000L, pi(c, 2, "RUN"))
+        WearBridge.pushAgenda(c)
     }
 }
 
@@ -159,8 +161,8 @@ class EventReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val nid = i.getIntExtra("nid", 0)
         when (i.action) {
-            "DISMISS" -> { EventNotify.cancelRepeat(c, nid); NotificationManagerCompat.from(c).cancel(nid) }
-            "SNOOZE" -> EventNotify.snoozeNow(c, nid, i.getStringExtra("key").orEmpty(), i.getStringExtra("title").orEmpty(), i.getStringExtra("text").orEmpty())
+            "DISMISS" -> { EventNotify.cancelRepeat(c, nid); NotificationManagerCompat.from(c).cancel(nid); WearBridge.eventDismiss(c, nid) }
+            "SNOOZE" -> { EventNotify.snoozeNow(c, nid, i.getStringExtra("key").orEmpty(), i.getStringExtra("title").orEmpty(), i.getStringExtra("text").orEmpty()); WearBridge.eventDismiss(c, nid) }
             "REPOST", "SNOOZE_FIRE" -> EventNotify.post(c, i.getStringExtra("key").orEmpty(), i.getStringExtra("title").orEmpty(), i.getStringExtra("text").orEmpty(), i.getIntExtra("count", 0))
             else -> {
                 val p = goAsync()

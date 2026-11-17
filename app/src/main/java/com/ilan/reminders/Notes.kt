@@ -83,12 +83,14 @@ object Notes {
     suspend fun save(c: Context, n: Note) {
         dao(c).upsert(n.copy(updatedAt = System.currentTimeMillis()))
         Sync.schedulePush(c)
+        WearBridge.pushNotes(c)
     }
 
     suspend fun trash(c: Context, n: Note) {
         val now = System.currentTimeMillis()
         dao(c).upsert(n.copy(deletedAt = now, updatedAt = now))
         Sync.schedulePush(c)
+        WearBridge.pushNotes(c)
     }
 
     suspend fun restore(c: Context, n: Note) {

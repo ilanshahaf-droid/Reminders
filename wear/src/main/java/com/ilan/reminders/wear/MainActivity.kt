@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         TaskStore.load(this)
+        WatchData.load(this)
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { WatchRoot() }
@@ -81,6 +82,10 @@ class MainActivity : ComponentActivity() {
 /** Simple navigation between the watch screens. */
 private sealed class Nav {
     object Home : Nav()
+    object Agenda : Nav()
+    object Notes : Nav()
+    data class EventView(val e: WatchEvent) : Nav()
+    data class NoteView(val n: WatchNote) : Nav()
     data class Menu(val t: WatchTask) : Nav()
     data class Snooze(val t: WatchTask) : Nav()
     data class SetTime(val t: WatchTask) : Nav()
@@ -127,17 +132,23 @@ private fun WatchRoot() {
     var nav by remember { mutableStateOf<Nav>(Nav.Home) }
     BackHandler(nav != Nav.Home) { nav = Nav.Home }
 
+    var voiceMode by remember { mutableStateOf("task") }
     val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val txt = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        if (!txt.isNullOrBlank()) nav = Nav.Choose(txt)
+        if (!txt.isNullOrBlank()) when (voiceMode) {
+            "note" -> { WatchBridge.send(ctx, "/note/create", JSONObject().put("text", txt).toString()); toast(ctx, "הפתק נשמר בטלפון") }
+            "event" -> { WatchBridge.send(ctx, "/event/create", JSONObject().put("text", txt).toString()); toast(ctx, "האירוע נשלח לטלפון") }
+            else -> nav = Nav.Choose(txt)
+        }
     }
-    fun startSpeech() {
+    fun startSpeech(mode: String = "task") {
+        voiceMode = mode
         try {
             speech.launch(
                 Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
-                    .putExtra(RecognizerIntent.EXTRA_PROMPT, "מה להזכיר?")
+                    .putExtra(RecognizerIntent.EXTRA_PROMPT, when (mode) { "note" -> "מה לרשום?"; "event" -> "איזה אירוע?"; else -> "מה להזכיר?" })
             )
         } catch (e: Exception) {
             toast(ctx, "אין הכתבה קולית בשעון")
@@ -145,7 +156,11 @@ private fun WatchRoot() {
     }
 
     when (val n = nav) {
-        Nav.Home -> TaskListScreen(onOpen = { nav = Nav.Menu(it) }, onNew = { startSpeech() })
+        Nav.Home -> TaskListScreen(onOpen = { nav = Nav.Menu(it) }, onNew = { startSpeech() }, onAgenda = { nav = Nav.Agenda }, onNotes = { nav = Nav.Notes })
+        Nav.Agenda -> AgendaScreen(onOpen = { nav = Nav.EventView(it) }, onNew = { startSpeech("event") }, onBack = { nav = Nav.Home })
+        is Nav.EventView -> EventScreen(n.e) { nav = Nav.Agenda }
+        Nav.Notes -> NotesScreen(onOpen = { nav = Nav.NoteView(it) }, onNew = { startSpeech("note") }, onBack = { nav = Nav.Home })
+        is Nav.NoteView -> NoteScreen(n.n) { nav = Nav.Notes }
         is Nav.Menu -> MenuScreen(n.t, onSnooze = { nav = Nav.Snooze(n.t) }, onSetTime = { nav = Nav.SetTime(n.t) }, onDone = { nav = Nav.Home })
         is Nav.Snooze -> SnoozeScreen(n.t) { nav = Nav.Home }
         is Nav.SetTime -> TimeScreen(n.t.title, n.t.at.takeIf { it > 0 } ?: (System.currentTimeMillis() + 3_600_000)) { at ->
@@ -163,7 +178,7 @@ private fun WatchRoot() {
 }
 
 @Composable
-private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit) {
+private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit, onAgenda: () -> Unit, onNotes: () -> Unit) {
     val ctx = LocalContext.current
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
@@ -173,7 +188,7 @@ private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit) {
     Screen {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("תזכורות v40", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("תזכורות v41", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
                     if (tasks.isEmpty()) "אין תזכורות פעילות" else "${tasks.size} תזכורות פעילות",
                     color = Color.Gray, fontSize = 13.sp
@@ -181,6 +196,8 @@ private fun TaskListScreen(onOpen: (WatchTask) -> Unit, onNew: () -> Unit) {
             }
         }
         item { Pill("＋ תזכורת חדשה (הכתבה)", Color(0xFF6D4AFF)) { onNew() } }
+        item { Pill("📅 יומן", Color(0xFF2F4A60)) { onAgenda() } }
+        item { Pill("📝 פתקים", Color(0xFF4A4A2F)) { onNotes() } }
         items(tasks, key = { it.id }) { t ->
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
@@ -278,6 +295,83 @@ private fun SnoozeScreen(t: WatchTask, onDone: () -> Unit) {
             }
         }
         item { Pill("← חזרה", Color(0xFF1E1E26)) { onDone() } }
+    }
+}
+
+private fun hm(ms: Long): String {
+    val z = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()); return "%02d:%02d".format(z.hour, z.minute)
+}
+
+@Composable
+private fun AgendaScreen(onOpen: (WatchEvent) -> Unit, onNew: () -> Unit, onBack: () -> Unit) {
+    val zone = ZoneId.systemDefault()
+    val now = System.currentTimeMillis()
+    val byDay = WatchData.events.value.groupBy { Instant.ofEpochMilli(if (it.allDay) it.begin else it.begin).atZone(if (it.allDay) ZoneId.of("UTC") else zone).toLocalDate() }.toSortedMap()
+    Screen {
+        item { Text("📅 יומן", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+        item { Pill("🎤 אירוע חדש בקול", Color(0xFF2F4A60)) { onNew() } }
+        if (byDay.isEmpty()) item { Text("אין אירועים בימים הקרובים", color = Color.Gray, fontSize = 14.sp) }
+        byDay.forEach { (d, list) ->
+            item { Text(dayText(d), color = Color(0xFFB9B2FF), fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) }
+            items(list.sortedWith(compareBy({ !it.allDay }, { it.begin })), key = { "${it.id}_${it.begin}" }) { e ->
+                val past = !e.allDay && e.end < now
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1E1E26)).clickable { onOpen(e) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(if (e.allDay) "כל היום" else "${hm(e.begin)}–${hm(e.end)}", fontSize = 13.sp,
+                        color = if (past) Color(0xFF707080) else Color(0xFFFFC857), fontWeight = FontWeight.SemiBold)
+                    Text(e.title, color = if (past) Color(0xFF9A9AAA) else Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (e.loc.isNotBlank()) Text(e.loc, color = Color(0xFFB8BBC9), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        item { Pill("← חזרה", Color(0xFF1E1E26)) { onBack() } }
+    }
+}
+
+@Composable
+private fun EventScreen(e: WatchEvent, onBack: () -> Unit) {
+    Screen {
+        item { Text(e.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) }
+        item {
+            Text(if (e.allDay) "כל היום" else "${hm(e.begin)}–${hm(e.end)}", color = Color(0xFFFFC857), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+        if (e.rep) item { Text("↻ אירוע חוזר", color = Color(0xFFB3A6FF), fontSize = 13.sp) }
+        if (e.loc.isNotBlank()) item { Text("📍 " + e.loc, color = Color(0xFFB8BBC9), fontSize = 14.sp, textAlign = TextAlign.Center) }
+        item { Pill("← חזרה", Color(0xFF1E1E26)) { onBack() } }
+    }
+}
+
+@Composable
+private fun NotesScreen(onOpen: (WatchNote) -> Unit, onNew: () -> Unit, onBack: () -> Unit) {
+    val notes = WatchData.notes.value
+    Screen {
+        item { Text("📝 פתקים", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+        item { Pill("🎤 פתק חדש בהכתבה", Color(0xFF4A4A2F)) { onNew() } }
+        if (notes.isEmpty()) item { Text("אין פתקים", color = Color.Gray, fontSize = 14.sp) }
+        items(notes, key = { it.id }) { n ->
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1E1E26)).clickable { onOpen(n) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text((if (n.pinned) "📌 " else "") + n.heading, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val sub = if (n.title.isNotBlank()) n.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty() else ""
+                if (sub.isNotBlank()) Text(sub, color = Color(0xFFB8BBC9), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        item { Pill("← חזרה", Color(0xFF1E1E26)) { onBack() } }
+    }
+}
+
+@Composable
+private fun NoteScreen(n: WatchNote, onBack: () -> Unit) {
+    Screen {
+        if (n.title.isNotBlank()) item { Text(n.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center) }
+        item { Text(n.text.ifBlank { "(ריק)" }, color = Color(0xFFE0E0EA), fontSize = 15.sp) }
+        item { Pill("← חזרה", Color(0xFF1E1E26)) { onBack() } }
     }
 }
 

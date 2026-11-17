@@ -19,12 +19,58 @@ class ReminderListenerService : WearableListenerService() {
         when (e.path) {
             "/reminder/fire" -> fire(j)
             "/reminder/dismiss" -> dismiss(j.optLong("id"), j.optBoolean("done"))
+            "/event/fire" -> fireEvent(j)
+            "/event/dismiss" -> getSystemService(NotificationManager::class.java).cancel(j.optInt("nid"))
         }
+    }
+
+    /** A calendar event alert from the phone: a notification with snooze / close, answered back to the phone. */
+    private fun fireEvent(j: JSONObject) {
+        val nid = j.optInt("nid")
+        val nm = getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(EV_CH) == null) {
+            val ch = NotificationChannel(EV_CH, "אירועי יומן", NotificationManager.IMPORTANCE_HIGH)
+            ch.enableVibration(true)
+            ch.vibrationPattern = longArrayOf(0, 500, 200, 500, 200, 500)
+            ch.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            nm.createNotificationChannel(ch)
+        }
+        fun act(a: String, code: Int): PendingIntent = PendingIntent.getBroadcast(
+            this, nid + code,
+            Intent(this, EventActionReceiver::class.java).setAction(a).putExtra("nid", nid).putExtra("key", j.optString("key"))
+                .putExtra("title", j.optString("title")).putExtra("text", j.optString("text")),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val open = PendingIntent.getActivity(this, nid, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val n = NotificationCompat.Builder(this, EV_CH)
+            .setSmallIcon(R.drawable.ic_stat)
+            .setColor(0xFF4A7391.toInt())
+            .setContentTitle("📅 " + j.optString("title"))
+            .setContentText(j.optString("text"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(j.optString("text")))
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .addAction(0, "נודניק ${j.optInt("snooze", 10)} דק׳", act("SNOOZE", 1))
+            .addAction(0, "סגור", act("DISMISS", 2))
+            .build()
+        nm.notify(nid, n)
     }
 
     override fun onDataChanged(events: DataEventBuffer) {
         for (ev in events) {
-            if (ev.type == DataEvent.TYPE_CHANGED && ev.dataItem.uri.path == "/tasks") {
+            val path = ev.dataItem.uri.path
+            if (ev.type == DataEvent.TYPE_CHANGED && path == "/agenda") {
+                DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json")?.let { WatchData.updateAgenda(this, it) }
+                runCatching { androidx.wear.tiles.TileService.getUpdater(this).requestUpdate(NextEventTileService::class.java) }
+                continue
+            }
+            if (ev.type == DataEvent.TYPE_CHANGED && path == "/notes") {
+                DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json")?.let { WatchData.updateNotes(this, it) }
+                continue
+            }
+            if (ev.type == DataEvent.TYPE_CHANGED && path == "/tasks") {
                 val json = DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
                 TaskStore.update(this, json)
                 stopStaleAlerts()
@@ -36,6 +82,7 @@ class ReminderListenerService : WearableListenerService() {
     private fun fire(j: JSONObject) {
         val id = j.optLong("id")
         markFiring(this, id, true)
+        getSharedPreferences("watch", MODE_PRIVATE).edit().putInt("snoozeMin", j.optInt("snooze", 10)).apply()
         getSystemService(NotificationManager::class.java).cancel(snoozeNoteId(id))
         val intent = Intent(this, ReminderActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -142,6 +189,7 @@ class ReminderListenerService : WearableListenerService() {
         }
 
         private const val CH = "watch_reminders2"
+        private const val EV_CH = "watch_events1"
         fun snoozeNoteId(id: Long) = id.toInt() xor 0x40000000
     }
 }

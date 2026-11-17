@@ -54,3 +54,16 @@ class SnoozeActionReceiver : BroadcastReceiver() {
         android.widget.Toast.makeText(c.applicationContext, "הנודניק בוטל", android.widget.Toast.LENGTH_SHORT).show()
     }
 }
+
+/** Snooze / close buttons on the watch's calendar-event notification: answered back to the phone, which owns the event alert. */
+class EventActionReceiver : BroadcastReceiver() {
+    override fun onReceive(c: Context, i: Intent) {
+        val nid = i.getIntExtra("nid", 0)
+        WatchBridge.send(
+            c, "/event/action",
+            JSONObject().put("act", i.action ?: "DISMISS").put("nid", nid).put("key", i.getStringExtra("key") ?: "")
+                .put("title", i.getStringExtra("title") ?: "").put("text", i.getStringExtra("text") ?: "").toString()
+        )
+        c.getSystemService(NotificationManager::class.java).cancel(nid)
+    }
+}

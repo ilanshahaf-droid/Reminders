@@ -47,6 +47,7 @@ object WearBridge {
     /** Sends the active task list to the watch as a Data Layer item (delivered even if the watch is offline now). */
     fun pushList(c: Context) {
         val app = c.applicationContext
+        pushAgenda(app); pushNotes(app)
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val now = System.currentTimeMillis()
@@ -67,6 +68,56 @@ object WearBridge {
             }
         }
     }
+
+    /** Events of today and the next two days, for the watch's diary screen and tile. */
+    fun pushAgenda(c: Context) {
+        val app = c.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                if (!CalRepo.hasRead(app)) return@runCatching
+                val z = java.time.ZoneId.systemDefault()
+                val from = java.time.LocalDate.now().atStartOfDay(z).toInstant().toEpochMilli()
+                val to = from + 3L * 86_400_000L
+                val all = CalRepo.calendars(app).map { it.id }.toSet()
+                val vis = app.getSharedPreferences("app", Context.MODE_PRIVATE).getStringSet("diaryVis", null)?.mapNotNull { it.toLongOrNull() }?.toSet()?.intersect(all) ?: all
+                val arr = JSONArray()
+                CalRepo.events(app, from, to, vis).sortedWith(compareBy({ !it.allDay }, { it.begin })).take(40).forEach { e ->
+                    arr.put(JSONObject().put("id", e.id).put("title", e.title).put("b", e.begin).put("e", e.end).put("ad", e.allDay)
+                        .put("loc", e.location).put("col", e.color).put("rep", e.repeat))
+                }
+                val req = PutDataMapRequest.create("/agenda").apply {
+                    dataMap.putString("json", arr.toString()); dataMap.putLong("ts", System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Wearable.getDataClient(app).putDataItem(req)
+            }
+        }
+    }
+
+    /** The newest notes (plain text only; locked notes are never sent) for reading on the watch. */
+    fun pushNotes(c: Context) {
+        val app = c.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val arr = JSONArray()
+                AppDb.get(app).notes().allNow().filter { it.deletedAt == 0L && !it.locked && !it.isBlank() }
+                    .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt }).take(20).forEach { n ->
+                        arr.put(JSONObject().put("id", n.id).put("title", n.title).put("text", n.plain.take(1500)).put("pin", n.pinned))
+                    }
+                val req = PutDataMapRequest.create("/notes").apply {
+                    dataMap.putString("json", arr.toString()); dataMap.putLong("ts", System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Wearable.getDataClient(app).putDataItem(req)
+            }
+        }
+    }
+
+    /** A calendar event alert, shown on the watch with snooze / close buttons. */
+    fun fireEvent(c: Context, nid: Int, key: String, title: String, text: String) {
+        send(c, "/event/fire", JSONObject().put("nid", nid).put("key", key).put("title", title).put("text", text)
+            .put("snooze", EventNotify.snooze(c)).toString())
+    }
+
+    fun eventDismiss(c: Context, nid: Int) = send(c, "/event/dismiss", JSONObject().put("nid", nid).toString())
 
     /** A message is fire-and-forget, so repeat it: a watch that is briefly out of reach (locked phone, Doze) would otherwise keep buzzing. */
     fun dismiss(c: Context, id: Long, done: Boolean = false) {
@@ -90,6 +141,52 @@ class WearActionService : WearableListenerService() {
         when (e.path) {
             "/reminder/create", "/reminder/delete", "/reminder/settime" -> { edit(e.path, j); return }
             "/reminder/action" -> action(j)
+            "/event/action" -> eventAction(j)
+            "/note/create" -> addNote(j.optString("text"))
+            "/event/create" -> newEvent(j.optString("text"))
+        }
+    }
+
+    private fun eventAction(j: JSONObject) {
+        val nid = j.optInt("nid")
+        if (j.optString("act") == "SNOOZE") EventNotify.snoozeNow(this, nid, j.optString("key"), j.optString("title"), j.optString("text"))
+        else { EventNotify.cancelRepeat(this, nid); androidx.core.app.NotificationManagerCompat.from(this).cancel(nid) }
+        WearBridge.eventDismiss(this, nid)
+    }
+
+    /** A dictated note from the watch becomes a normal note on the phone. */
+    private fun addNote(text: String) {
+        if (text.isBlank()) return
+        val app = applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val esc = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                Notes.save(app, newNote(app).copy(html = esc, plain = text))
+                WearBridge.pushNotes(app)
+            }
+        }
+    }
+
+    /** A dictated event ("פגישה עם דנה מחר ב-10") becomes a diary event with the default calendar, length and reminder. */
+    private fun newEvent(text: String) {
+        if (text.isBlank()) return
+        val app = applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                if (!CalRepo.hasWrite(app)) return@runCatching
+                val ds = DS.defStart(app)
+                val v = VoiceParse.parse(text, java.time.ZonedDateTime.now(), if (ds >= 0) LocalTime.of(ds / 60, ds % 60) else LocalTime.of(9, 0))
+                val start = v.at ?: java.time.ZonedDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0)
+                val end = start.plusMinutes(DS.defDur(app).toLong())
+                val writable = CalRepo.calendars(app).filter { it.writable }
+                val defId = app.getSharedPreferences("app", Context.MODE_PRIVATE).getLong("diaryDef", -1L)
+                val cal = writable.firstOrNull { it.id == defId } ?: writable.firstOrNull { it.account.contains("@") } ?: writable.firstOrNull() ?: return@runCatching
+                val r = DS.defRem(app)
+                CalRepo.save(app, null, 0L, EdState(v.title.ifBlank { text }, cal.id, start.toLocalDate(), start.toLocalTime(), end.toLocalDate(), end.toLocalTime(),
+                    false, "", "", if (r != -2) listOf(r) else emptyList(), ""))
+                runCatching { EventNotify.run(app) }
+                WearBridge.pushAgenda(app)
+            }
         }
     }
 
