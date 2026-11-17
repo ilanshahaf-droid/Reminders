@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -125,7 +126,7 @@ private fun taskOcc(t: Task, from: Long, to: Long): List<Long> {
     return out
 }
 
-class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?, val copyOf: Ev? = null)
+class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?, val copyOf: Ev? = null, val pre: String? = null)
 
 @Composable
 fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, onTask: (Task) -> Unit = {}) {
@@ -275,6 +276,26 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     val onCellEv: (Ev, LocalDate) -> Unit = { e, d -> dayEvSel = e.id to e.begin; dayDlg = d }
     val onEvent: (Ev) -> Unit = { e -> if (e.id < 0) remTask = taskList.firstOrNull { it.id == -e.id } else editing = EditTarget(e, e.days(zone).first, null) }
     val onNew: (LocalDate, LocalTime?) -> Unit = { d, t -> editing = EditTarget(null, d, t) }
+    var weekCell by remember { mutableStateOf(prefs.getString("weekCell", "chart") ?: "chart") }
+    var showWeekCell by remember { mutableStateOf(false) }
+    val voiceLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == android.app.Activity.RESULT_OK && !text.isNullOrBlank()) {
+            val ds = DS.defStart(ctx)
+            val v = VoiceParse.parse(text, java.time.ZonedDateTime.now(), if (ds >= 0) LocalTime.of(ds / 60, ds % 60) else LocalTime.of(9, 0))
+            val at = v.at?.withZoneSameInstant(zone)
+            editing = EditTarget(null, at?.toLocalDate() ?: date, at?.toLocalTime(), null, v.title)
+        }
+    }
+    val startVoice = {
+        runCatching {
+            voiceLauncher.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "he-IL")
+                .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "למשל: פגישה עם דנה מחר ב-10"))
+        }.onFailure { Toast.makeText(ctx, "זיהוי קולי לא זמין במכשיר", Toast.LENGTH_SHORT).show() }
+        Unit
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(Color.White)) {
@@ -292,6 +313,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                             DropdownMenuItem({ Text("🔔 התראות אירועים") }, { menuNav = false; showNotif = true })
                             DropdownMenuItem({ Text("🔤 תצוגה: פונט וצבעים") }, { menuNav = false; showFont = true })
                             DropdownMenuItem({ Text("⚙ ברירות מחדל לאירוע") }, { menuNav = false; showDefs = true })
+                            DropdownMenuItem({ Text("🧩 משבצת בתצוגת שבוע") }, { menuNav = false; showWeekCell = true })
                         }
                     }
                     val page = pager.currentPage
@@ -315,6 +337,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 10.dp, vertical = 12.dp))
                     Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 10.dp, vertical = 6.dp))
+                    IconButton({ startVoice() }) { Icon(Icons.Default.Mic, "הוספה בקול", tint = Color.White) }
                     IconButton({ onNew(date, null) }) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
                     Box {
                         IconButton({ menuMore = true }) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
@@ -336,7 +359,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                         when (page) {
                             2 -> VPager(date, { it }, { d, n -> d.plusDays(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> DayView(d, events, zone, today, onNew, onEvent, onDay, {}) }
-                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onCellEv, onNew, {}) }
+                            1 -> VPager(date, { wkStart(it) }, { d, n -> d.plusWeeks(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> WeekView(d, events, zone, today, onDay, onCellEv, onNew, cals, taskList, weekCell) }
                             else -> VPager(date, { it.year * 12 + it.monthValue }, { d, n -> d.plusMonths(n.toLong()) }, { dayNum = it.toEpochDay() }) { d -> MonthView(d, events, zone, today, onDay, onCellEv, {}) }
                         }
                     }
@@ -385,6 +408,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         }
         if (showFont) FontSettings { showFont = false }
         if (showDefs) EventDefaults { showDefs = false }
+        if (showWeekCell) WeekCellSettings(weekCell, { showWeekCell = false }) { weekCell = it; prefs.edit().putString("weekCell", it).apply(); showWeekCell = false }
         if (showNotif) NotifSettings(onDismiss = { showNotif = false; tick++ })
         if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false; tick++ }) { vis, def ->
             visPref = vis; defCal = def; tick++
@@ -703,7 +727,7 @@ private fun MiniWeek(start: LocalDate, all: List<Ev>, z: ZoneId, selected: Local
 }
 
 @Composable
-private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, onShift: (Int) -> Unit) {
+private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit, cals: List<Cal>, tasks: List<Task>, cellMode: String) {
     val start = wkStart(date)
     Row(Modifier.fillMaxSize().background(Color.White)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -712,7 +736,115 @@ private fun WeekView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
         Box(Modifier.width(1.dp).fillMaxHeight().background(GRID))
         Column(Modifier.weight(1f).fillMaxHeight()) {
             for (i in 4..6) WeekDayCell(start.plusDays(i.toLong()), all, z, today, Modifier.weight(1f).fillMaxWidth(), onDay, onEvent, onNew)
-            MiniWeek(start, all, z, date, today, Modifier.weight(1f).fillMaxWidth(), onDay)
+            if (cellMode == "chart") MiniWeek(start, all, z, date, today, Modifier.weight(1f).fillMaxWidth(), onDay)
+            else WeekExtraCell(cellMode, start, all, z, today, cals, tasks, Modifier.weight(1f).fillMaxWidth())
+        }
+    }
+}
+
+
+private val WEEK_CELL_OPTIONS = listOf(
+    "chart" to "גרף עומס השבוע",
+    "hours" to "סיכום שעות לפי יומן",
+    "tasks" to "משימות ותזכורות פתוחות השבוע",
+    "next" to "האירוע הבא",
+    "free" to "חלונות פנויים",
+    "note" to "פתק חופשי לשבוע"
+)
+
+@Composable
+private fun WeekCellSettings(cur: String, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("משבצת בתצוגת שבוע") },
+        text = {
+            Column {
+                WEEK_CELL_OPTIONS.forEach { (k, l) ->
+                    Row(Modifier.fillMaxWidth().clickable { onPick(k) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(cur == k, { onPick(k) }); Spacer(Modifier.width(6.dp)); Text(l, fontSize = 16.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {}, dismissButton = { TextButton(onDismiss) { Text("סגירה") } })
+}
+
+@Composable
+private fun WeekExtraCell(mode: String, start: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, cals: List<Cal>, tasks: List<Task>, modifier: Modifier) {
+    val ctx = LocalContext.current
+    val endD = start.plusDays(6)
+    val weekMs0 = start.atStartOfDay(z).toInstant().toEpochMilli()
+    val weekMs1 = endD.plusDays(1).atStartOfDay(z).toInstant().toEpochMilli()
+    val head = { t: String -> Text(t, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = BAR) }
+    Column(modifier.background(Color(0xFFF3F6F9)).padding(horizontal = 8.dp, vertical = 6.dp).verticalScroll(rememberScrollState())) {
+        when (mode) {
+            "hours" -> {
+                head("שעות פגישות השבוע")
+                val per = remember(all, start) {
+                    all.filter { !it.allDay }.groupBy { it.calId }.mapValues { (_, l) -> l.sumOf { (minOf(it.end, weekMs1) - maxOf(it.begin, weekMs0)).coerceAtLeast(0L) } / 60000 }
+                        .filter { it.value > 0 }.toList().sortedByDescending { it.second }
+                }
+                if (per.isEmpty()) Text("אין פגישות", fontSize = 12.sp, color = Color.Gray)
+                per.forEach { (id, m) ->
+                    val c = cals.firstOrNull { it.id == id }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
+                        Box(Modifier.size(9.dp).clip(RoundedCornerShape(5.dp)).background(Color((c?.color ?: 0xFF4A7391.toInt()) or 0xFF000000.toInt())))
+                        Text(c?.name.orEmpty(), Modifier.weight(1f).padding(horizontal = 5.dp), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${m / 60}:%02d".format(m % 60), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+                if (per.size > 1) Text("סה״כ ${per.sumOf { it.second } / 60}:%02d".format(per.sumOf { it.second } % 60), fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp))
+            }
+            "tasks" -> {
+                head("משימות השבוע")
+                val l = remember(tasks, start) { tasks.filter { !it.done && it.deletedAt == 0L && it.triggerAt in weekMs0 until weekMs1 }.sortedBy { it.triggerAt } }
+                if (l.isEmpty()) Text("אין משימות פתוחות", fontSize = 12.sp, color = Color.Gray)
+                l.take(12).forEach { t ->
+                    val dt = Instant.ofEpochMilli(t.triggerAt).atZone(z)
+                    Text("${HE_DAYS[dayIdx(dt.toLocalDate())]} ${hm(dt.toLocalTime())} ${t.title}", fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 1.dp))
+                }
+                if (l.size > 12) Text("+${l.size - 12}", fontSize = 12.sp, color = ORANGE)
+            }
+            "next" -> {
+                head("האירוע הבא")
+                val nowMs = System.currentTimeMillis()
+                val n = all.filter { !it.allDay && it.end > nowMs }.minByOrNull { it.begin }
+                if (n == null) Text("אין אירועים קרובים", fontSize = 12.sp, color = Color.Gray)
+                else {
+                    val dt = Instant.ofEpochMilli(n.begin).atZone(z)
+                    val mins = ((n.begin - nowMs) / 60000).coerceAtLeast(0)
+                    Text(n.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text("${if (dt.toLocalDate() == today) "היום" else "${HE_DAYS[dayIdx(dt.toLocalDate())]} ${dt.dayOfMonth}/${dt.monthValue}"} ${hm(dt.toLocalTime())}", fontSize = 12.sp)
+                    Text(if (n.begin <= nowMs) "מתקיים עכשיו" else if (mins >= 1440) "בעוד ${mins / 1440} ימים" else if (mins >= 60) "בעוד ${mins / 60}:%02d ש׳".format(mins % 60) else "בעוד $mins דק׳", fontSize = 13.sp, color = ORANGE, fontWeight = FontWeight.Bold)
+                }
+            }
+            "free" -> {
+                head("חלונות פנויים (8–18)")
+                val slots = remember(all, start) {
+                    val out = ArrayList<Triple<LocalDate, Int, Int>>()
+                    val nowMs = System.currentTimeMillis()
+                    for (i in 0..5) {
+                        val d = start.plusDays(i.toLong())
+                        if (d.isBefore(today)) continue
+                        var from = 480
+                        if (d == today) { val nm = Instant.ofEpochMilli(nowMs).atZone(z); from = maxOf(from, nm.hour * 60 + nm.minute) }
+                        val busy = dayEvs(all, d, z).filter { !it.allDay }.map { spanOn(it, d, z) }.sortedBy { it.first }
+                        var cur = from
+                        for ((a, b) in busy) { if (a - cur >= 60 && cur < 1080) out.add(Triple(d, cur, minOf(a, 1080))); cur = maxOf(cur, b) }
+                        if (1080 - cur >= 60) out.add(Triple(d, cur, 1080))
+                    }
+                    out.sortedByDescending { it.third - it.second }.take(5).sortedWith(compareBy({ it.first }, { it.second }))
+                }
+                if (slots.isEmpty()) Text("אין חלונות של שעה ומעלה", fontSize = 12.sp, color = Color.Gray)
+                slots.forEach { (d, a, b) -> Text("${HE_DAYS[dayIdx(d)]} ${d.dayOfMonth}/${d.monthValue}  ${hm(LocalTime.of(a / 60, a % 60))}–${hm(LocalTime.of(b / 60, b % 60))}", fontSize = 12.sp, modifier = Modifier.padding(vertical = 1.dp)) }
+            }
+            else -> {
+                val key = "weekNote_${start.toEpochDay()}"
+                val p = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
+                var t by remember(key) { mutableStateOf(p.getString(key, "") ?: "") }
+                head("פתק לשבוע")
+                androidx.compose.foundation.text.BasicTextField(t, { t = it; p.edit().putString(key, it).apply() }, Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 60.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = INK))
+                if (t.isEmpty()) Text("לחץ והקלד…", fontSize = 12.sp, color = Color.Gray)
+            }
         }
     }
 }
@@ -885,7 +1017,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     val src = ev ?: target.copyOf
     var loaded by remember { mutableStateOf(src == null) }
     val firstCal = writable.firstOrNull { it.id == defaultCal } ?: writable.firstOrNull { it.account.contains("@") } ?: writable.firstOrNull()
-    var title by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(target.pre.orEmpty()) }
     var calId by remember { mutableStateOf(firstCal?.id ?: -1L) }
     val now = LocalTime.now()
     val dStart = remember { DS.defStart(ctx) }
