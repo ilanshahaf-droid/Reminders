@@ -73,6 +73,7 @@ private val RED = Color(0xFFE53935)
 private val DAY_FULL = listOf("יום ראשון", "יום שני", "יום שלישי", "יום רביעי", "יום חמישי", "יום שישי", "יום שבת")
 private val MON_SHORT = listOf("ינו׳", "פבר׳", "מרץ", "אפר׳", "מאי", "יוני", "יולי", "אוג׳", "ספט׳", "אוק׳", "נוב׳", "דצמ׳")
 
+private val HE_MON_SHORT = listOf("ינו׳", "פבר׳", "מרץ", "אפר׳", "מאי", "יוני", "יולי", "אוג׳", "ספט׳", "אוק׳", "נוב׳", "דצמ׳")
 private fun wkStart(d: LocalDate): LocalDate = d.minusDays((d.dayOfWeek.value % 7).toLong())
 private fun wkNo(d: LocalDate): Int = wkStart(d).plusDays(1).get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
 private fun hm(t: LocalTime) = "%02d:%02d".format(t.hour, t.minute)
@@ -298,8 +299,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                         val mon = HE_MONTHS[date.monthValue - 1]
                         val title = when (page) { 2 -> "${date.dayOfMonth} ב$mon ${date.year}"; 1 -> { val a = wkStart(date); val b = a.plusDays(6)
-                            if (a.month == b.month) "$mon ${date.year}" else if (a.year == b.year) "${HE_MONTHS[a.monthValue - 1]} / ${HE_MONTHS[b.monthValue - 1]} ${b.year}"
-                            else "${HE_MONTHS[a.monthValue - 1]} ${a.year} / ${HE_MONTHS[b.monthValue - 1]} ${b.year}" }; else -> mon }
+                            if (a.month == b.month) "$mon ${date.year}" else if (a.year == b.year) "${HE_MON_SHORT[a.monthValue - 1]} / ${HE_MON_SHORT[b.monthValue - 1]} ${b.year}"
+                            else "${HE_MON_SHORT[a.monthValue - 1]} ${a.year} / ${HE_MON_SHORT[b.monthValue - 1]} ${b.year}" }; else -> mon }
                         val sub = when (page) { 2 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "${date.year}" }
                         Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, maxLines = 1)
