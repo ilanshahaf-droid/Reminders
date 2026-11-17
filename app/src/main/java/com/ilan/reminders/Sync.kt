@@ -238,6 +238,48 @@ object Sync {
 
     private fun q(s: String) = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
+    /** One-way mirror of the phone's diary events (next ~4 months, last month) to rem_events for the web page. */
+    private fun syncDiary(c: Context, base: String, h: Map<String, String>): String? {
+        if (!CalRepo.hasRead(c)) return null
+        val p = prefs(c)
+        val zone = java.time.ZoneId.systemDefault()
+        val cals = CalRepo.calendars(c)
+        val all = cals.map { it.id }.toSet()
+        val vis = c.getSharedPreferences("app", Context.MODE_PRIVATE).getStringSet("diaryVis", null)?.mapNotNull { it.toLongOrNull() }?.toSet()?.intersect(all) ?: all
+        val today = java.time.LocalDate.now()
+        val from = today.minusDays(31).atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = today.plusDays(125).atStartOfDay(zone).toInstant().toEpochMilli()
+        val names = cals.associate { it.id to it.name }
+        val evs = CalRepo.events(c, from, to, vis).distinctBy { "${it.id}:${it.begin}" }
+        val rows = JSONArray()
+        evs.forEach { e ->
+            rows.put(JSONObject().put("key", "${e.id}:${e.begin}").put("title", e.title).put("start_ms", e.begin).put("end_ms", maxOf(e.end, e.begin))
+                .put("all_day", e.allDay).put("color", e.color).put("location", e.location).put("cal", names[e.calId].orEmpty()).put("rep", e.repeat))
+        }
+        val hash = rows.toString().hashCode().toString() + ":" + today.toEpochDay()
+        if (p.getString("diaryHash", "") == hash) return null
+        val chk = http("GET", "$base/rest/v1/rem_events?select=key&start_ms=gte.$from", h, null)
+        if (chk.first == 404 || (chk.first == 400 && chk.second.contains("rem_events"))) return "טבלת היומן חסרה בענן (צריך להריץ את diary.sql)"
+        if (chk.first !in 200..299) return "יומן: ${chk.first} ${chk.second.take(100)}"
+        val old = JSONArray(chk.second).let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("key") } }
+        var i = 0
+        while (i < rows.length()) {
+            val part = JSONArray(); for (k in i until minOf(i + 300, rows.length())) part.put(rows.get(k))
+            val r = http("POST", "$base/rest/v1/rem_events?on_conflict=user_id,key", h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), part.toString())
+            if (r.first !in 200..299) return "יומן: ${r.first} ${r.second.take(100)}"
+            i += 300
+        }
+        val keep = evs.map { "${it.id}:${it.begin}" }.toHashSet()
+        old.filter { it !in keep }.chunked(40).forEach { ch ->
+            val list = ch.joinToString(",") { "\"" + it + "\"" }
+            val r = http("DELETE", "$base/rest/v1/rem_events?key=in.(" + q(list) + ")", h, null)
+            if (r.first !in 200..299) return "יומן: ${r.first} ${r.second.take(100)}"
+        }
+        http("DELETE", "$base/rest/v1/rem_events?start_ms=lt.$from", h, null)
+        p.edit().putString("diaryHash", hash).apply()
+        return null
+    }
+
     /** Two-way document sync (Word / PDF files, up to ~6 MB each, stored as base64 in rem_docs). */
     private fun syncDocs(c: Context, base: String, h: Map<String, String>): String? {
         val p = prefs(c)
@@ -399,7 +441,8 @@ object Sync {
             // notes never make the reminders sync fail: a problem is only shown next to the status
             val notesMsg = try { syncNotes(c, base, h) } catch (e: Exception) { "פתקים: " + (e.message ?: e.javaClass.simpleName) }
             val docsMsg = try { syncDocs(c, base, h) } catch (e: Exception) { "מסמכים: " + (e.message ?: e.javaClass.simpleName) }
-            val warn = listOfNotNull(notesMsg, docsMsg).joinToString(" · ")
+            val diaryMsg = try { syncDiary(c, base, h) } catch (e: Exception) { "יומן: " + (e.message ?: e.javaClass.simpleName) }
+            val warn = listOfNotNull(notesMsg, docsMsg, diaryMsg).joinToString(" · ")
             "✅ סונכרן ב-" + LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")) + (if (warn.isNotEmpty()) " · ⚠ $warn" else "")
         } catch (e: Exception) {
             "❌ " + (e.message ?: e.javaClass.simpleName)

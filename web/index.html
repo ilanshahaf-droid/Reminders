@@ -121,6 +121,31 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 .ne.page .ne-ed table{table-layout:auto}
 
 /*NE-CSS-END*/
+
+/* diary (read-only mirror of the phone calendar) */
+.dnav{display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap}
+.dnav h2{margin:0;font-size:22px;flex:1;min-width:140px}
+.dnav button{padding:8px 14px}
+.dgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.dgrid .dh{background:var(--accent);color:#fff;text-align:center;padding:6px 0;font-size:14px;font-weight:600}
+.dc{background:var(--card);min-height:96px;padding:3px 4px;cursor:pointer;overflow:hidden}
+.dc.out{opacity:.5}.dc.we{background:color-mix(in srgb,var(--card) 92%,#888)}
+.dc .dn{font-size:14px;font-weight:700;display:inline-block;min-width:22px;text-align:center;border-radius:6px}
+.dc.today .dn{background:#fb8c00;color:#fff}
+.de{font-size:12px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.de.ad{border-radius:3px;padding:0 3px;color:var(--text)}
+.dmore{font-size:12px;font-weight:700;color:#fb8c00}
+.dwk{background:var(--card);border-radius:18px;margin:8px 0;padding:10px 14px;cursor:pointer}
+.dwk.today{outline:2px solid #fb8c00}
+.dwk .dt{font-weight:700;margin-bottom:4px}
+.dwk .de{font-size:16px;white-space:normal;margin:3px 0}
+.dcard{display:flex;gap:10px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin:8px 0;overflow:hidden}
+.dcard .bar{width:8px;flex:none;margin:0;display:block}
+.dcard .bd{padding:10px 8px;flex:1;min-width:0}
+.dcard .tt{font-size:19px;font-weight:700;word-break:break-word}
+#dayModal{position:fixed;inset:0;background:#0007;z-index:10;display:flex;align-items:center;justify-content:center;padding:14px}
+#dayModal.hide{display:none}
+#dayModal .panel{width:100%;max-width:520px;max-height:86vh;overflow:auto}
 .tabs{display:flex;gap:8px;margin:6px 0 4px}
 .tabs .chip{font-size:17px;padding:9px 22px}
 #nlist,#nlistPin{columns:2 240px;column-gap:12px}
@@ -164,7 +189,23 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 </div>
 
 <div id="app" class="hide">
-  <div class="tabs"><div class="chip" id="tabRem" onclick="setTab('rem')">תזכורות</div><div class="chip" id="tabNotes" onclick="setTab('notes')">פתקים</div><div class="chip" id="tabDocs" onclick="setTab('docs')">מסמכים</div></div>
+  <div class="tabs"><div class="chip" id="tabDiary" onclick="setTab('diary')">יומן</div><div class="chip" id="tabRem" onclick="setTab('rem')">תזכורות</div><div class="chip" id="tabNotes" onclick="setTab('notes')">פתקים</div><div class="chip" id="tabDocs" onclick="setTab('docs')">מסמכים</div></div>
+  <div id="diaryView" class="hide">
+    <div class="top">
+      <div><h1>יומן</h1><div class="sub" id="dyupd"></div></div>
+      <div class="bar" style="margin:0"><button class="ghost" onclick="logout()">התנתק</button></div>
+    </div>
+    <div class="dnav">
+      <button class="sec" onclick="dyStep(-1)">›</button>
+      <h2 id="dyTitle"></h2>
+      <button class="sec" onclick="dyStep(1)">‹</button>
+      <button class="sec" onclick="dyToday()">היום</button>
+      <button class="sec" id="dyMode" onclick="dyToggle()">שבוע</button>
+    </div>
+    <div id="dymsg" class="err"></div>
+    <div id="dybody"></div>
+    <div class="sub" style="text-align:center;margin-top:16px;font-size:13px">היומן מועתק מהטלפון (גוגל קלנדר). הצפייה כאן בלבד, העריכה באפליקציה.</div>
+  </div>
   <div id="remView">
   <div class="top">
     <div><h1>תזכורות</h1><div class="sub" id="count"></div></div>
@@ -193,7 +234,7 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
       <div><h1>מסמכים</h1><div class="sub" id="dcount"></div></div>
       <div class="bar" style="margin:0"><button onclick="$('dfile').click()">+ העלאה</button><button class="ghost" onclick="logout()">התנתק</button></div>
     </div>
-    <input id="dfile" type="file" accept=".pdf,.docx,.xlsx,application/pdf" class="hide" onchange="uploadDoc(this)">
+    <input id="dfile" type="file" accept=".pdf,.docx,application/pdf" class="hide" onchange="uploadDoc(this)">
     <input id="dq" placeholder="חיפוש במסמכים" oninput="renderDocs()">
     <div id="dmsg" class="err"></div>
     <div id="dlist"></div>
@@ -202,6 +243,8 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 </div>
 
 </div>
+
+<div id="dayModal" class="hide" onclick="if(event.target===this)$('dayModal').classList.add('hide')"><div class="panel" id="dayPanel"></div></div>
 
 <div id="modal" class="hide" onclick="if(event.target===this)closeEd()">
   <div class="panel">
@@ -316,38 +359,6 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
     var ed = document.createElement('div'); ed.className = 'ne-ed'; ed.contentEditable = 'true';
     ed.setAttribute('data-ph', opts.placeholder || 'כתוב כאן…'); ed.setAttribute('dir', 'rtl'); ed.spellcheck = true;
     body.appendChild(ed);
-    // two-finger pinch zoom in page view (like Word)
-    (function(){
-      var d0 = 0;
-      function dist(t){ var dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx*dx + dy*dy); }
-      body.addEventListener('touchstart', function(e){ d0 = e.touches.length === 2 ? dist(e.touches) : 0; }, {passive:true});
-      body.addEventListener('touchmove', function(e){
-        if(e.touches.length !== 2 || !d0) return;
-        var isPage = root.classList.contains('page');
-        if(!isPage && !root.classList.contains('doc')) return;
-        e.preventDefault();
-        var d = dist(e.touches), f = d / d0; d0 = d;
-        if(!isPage){   // phone view of a document: pinch changes the text size (text re-wraps to the screen)
-          var fs = Math.max(11, Math.min(44, (parseFloat(ed.style.fontSize) || 18) * f));
-          ed.style.fontSize = fs + 'px';
-          try{ localStorage.setItem('neDocFs', String(fs)); }catch(_){}
-          return;
-        }
-        var r = body.getBoundingClientRect();
-        var cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
-        var rx = (body.scrollLeft + cx) / Math.max(1, body.scrollWidth), ry = (body.scrollTop + cy) / Math.max(1, body.scrollHeight);
-        var cur = parseFloat(root.style.getPropertyValue('--pz')) || 0.5;
-        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2.5, cur * f))));
-        body.scrollLeft = rx * body.scrollWidth - cx; body.scrollTop = ry * body.scrollHeight - cy;
-      }, {passive:false});
-      body.addEventListener('touchend', function(e){ if(e.touches.length < 2) d0 = 0; }, {passive:true});
-    })();
-    ed.addEventListener('click', function(e){
-      var a = e.target && e.target.closest ? e.target.closest('a[href^="doc://"]') : null;
-      if(!a) return;
-      e.preventDefault();
-      if(window.Android && window.Android.openDoc) window.Android.openDoc(decodeURIComponent(a.getAttribute('href').slice(6)));
-    });
     var bar = document.createElement('div'); bar.className = 'ne-bar';
     var pal = document.createElement('div'); pal.className = 'ne-row ne-pal hide';
     var row = document.createElement('div'); row.className = 'ne-row';
@@ -616,17 +627,16 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
       focus: function(){ ed.focus(); },
       flush: flush,
       setTheme: function(t){ root.setAttribute('data-theme', t); },
-      setDoc: function(on){ root.classList.toggle('doc', !!on); if(on){ try{ var v = parseFloat(localStorage.getItem('neDocFs')); if(v) ed.style.fontSize = v + 'px'; }catch(_){} } },
+      setDoc: function(on){ root.classList.toggle('doc', !!on); },
       setView: function(mode){
         var page = mode === 'page';
         root.classList.toggle('page', page);
-        if(page) ed.style.fontSize = ''; else { try{ var v = parseFloat(localStorage.getItem('neDocFs')); if(v && root.classList.contains('doc')) ed.style.fontSize = v + 'px'; }catch(_){} }
         if(page){ var w = Math.max(200, body.clientWidth - 16); root.style.setProperty('--pz', String(Math.min(1.2, w / 794))); }
         else root.style.removeProperty('--pz');
       },
       pageZoom: function(f){
         var cur = parseFloat(root.style.getPropertyValue('--pz')) || 0.5;
-        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2.5, cur * f))));
+        root.style.setProperty('--pz', String(Math.max(0.25, Math.min(2, cur * f))));
       }
     };
   }
@@ -1083,17 +1093,19 @@ async function edDelete(){
 
 // ---------- notes ----------
 let notes = [], notesMissing = false, nCat = null, nd = null, nEd = null;
-let tab = ['notes', 'docs'].includes(LS.getItem('tab')) ? LS.getItem('tab') : 'rem';
+let tab = ['notes', 'docs', 'rem', 'diary'].includes(LS.getItem('tab')) ? LS.getItem('tab') : 'diary';
 const NOTE_COLORS = {red:['#F9D0CC','#5C2B29'], orange:['#FCDDB5','#614A19'], yellow:['#FFF2B3','#635D19'], green:['#D4EFC2','#345128'],
   teal:['#BFEBE4','#16504B'], blue:['#CBE3F8','#2D4F6B'], purple:['#E1D4F5','#4B3A6F'], pink:['#F8D1E6','#5F3150'], gray:['#E3E5EA','#3C3F44']};
 const isDark = () => window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
 const ncolor = k => NOTE_COLORS[k] ? NOTE_COLORS[k][isDark() ? 1 : 0] : '';
 function setTab(t){
   tab = t; LS.setItem('tab', t);
+  $('diaryView').classList.toggle('hide', t !== 'diary'); $('tabDiary').classList.toggle('on', t === 'diary');
   $('remView').classList.toggle('hide', t !== 'rem'); $('notesView').classList.toggle('hide', t !== 'notes'); $('docsView').classList.toggle('hide', t !== 'docs');
   $('tabRem').classList.toggle('on', t === 'rem'); $('tabNotes').classList.toggle('on', t === 'notes'); $('tabDocs').classList.toggle('on', t === 'docs');
   if(t === 'notes') renderNotes();
   if(t === 'docs') loadDocs();
+  if(t === 'diary') loadDiary();
 }
 
 // ---------- documents ----------
@@ -1112,9 +1124,9 @@ function renderDocs(){
   const q = ($('dq').value || '').trim().toLowerCase(), box = $('dlist'); box.innerHTML = '';
   docs.filter(d => !q || d.name.toLowerCase().includes(q)).forEach(d => {
     const pdf = /\.pdf$/i.test(d.name), row = el('div', 'card');
-    row.appendChild(el('div', '', pdf ? '📕' : /\.xlsx$/i.test(d.name) ? '📗' : '📄'));
+    row.appendChild(el('div', '', pdf ? '📕' : '📄'));
     const mid = el('div', ''); mid.style.flex = '1'; mid.style.minWidth = '0';
-    mid.appendChild(el('div', 'nt', d.name.replace(/\.(pdf|docx|xlsx)$/i, '')));
+    mid.appendChild(el('div', 'nt', d.name.replace(/\.(pdf|docx)$/i, '')));
     mid.appendChild(el('div', 'sub', fmtSize(d.size || 0) + ' · ' + new Date(d.updated_at).toLocaleDateString('he-IL')));
     row.appendChild(mid);
     const open = el('button', 'sec', pdf ? 'פתח' : 'הורד'); open.onclick = e => { e.stopPropagation(); openDoc(d, pdf); };
@@ -1130,7 +1142,7 @@ async function docBlob(d){
   if(!r.ok) throw new Error(r.status);
   const a = await r.json(); if(!a.length) throw new Error('missing');
   const bin = atob(a[0].data), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-  return new Blob([u], {type: /\.pdf$/i.test(d.name) ? 'application/pdf' : /\.xlsx$/i.test(d.name) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  return new Blob([u], {type: /\.pdf$/i.test(d.name) ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
 }
 async function openDoc(d, view){
   try{
@@ -1256,6 +1268,106 @@ function exportNote(){
   a.href = URL.createObjectURL(new Blob(['\ufeff' + text], {type:'text/plain;charset=utf-8'})); a.download = (title || 'פתק') + '.txt';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// ---------- diary (read-only copy of the phone calendar, table rem_events) ----------
+let dyEvents = [], dyMissing = false, dyMode = LS.getItem('dyMode') === 'week' ? 'week' : 'month', dyDate = new Date();
+dyDate.setHours(0, 0, 0, 0);
+const DY_DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const DY_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const dyAddDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const dyWeekStart = d => dyAddDays(d, -d.getDay());
+const dyKey = d => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+const dyCol = e => { const c = e.color ? (e.color >>> 0) & 0xFFFFFF : 0x4A7391; return '#' + c.toString(16).padStart(6, '0'); };
+const dyHM = ms => new Date(ms).toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit', hour12:false});
+function dyRange(){
+  if(dyMode === 'week'){ const a = dyWeekStart(dyDate); return [a, dyAddDays(a, 7)]; }
+  const first = new Date(dyDate.getFullYear(), dyDate.getMonth(), 1), a = dyWeekStart(first);
+  const last = new Date(dyDate.getFullYear(), dyDate.getMonth() + 1, 0);
+  return [a, dyAddDays(dyWeekStart(last), 7)];
+}
+// the local calendar days an event covers (all-day events are stored as UTC midnights, end exclusive)
+function dyDaysOf(e){
+  let a, b;
+  if(e.all_day){
+    const s = new Date(e.start_ms), en = new Date(Math.max(e.end_ms - 1, e.start_ms));
+    a = new Date(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()); b = new Date(en.getUTCFullYear(), en.getUTCMonth(), en.getUTCDate());
+  } else {
+    const s = new Date(e.start_ms), en = new Date(Math.max(e.end_ms - 1, e.start_ms));
+    a = new Date(s.getFullYear(), s.getMonth(), s.getDate()); b = new Date(en.getFullYear(), en.getMonth(), en.getDate());
+  }
+  return [a, b];
+}
+function dyOn(d){
+  const k = dyKey(d);
+  return dyEvents.filter(e => { const [a, b] = dyDaysOf(e); return dyKey(a) <= k && k <= dyKey(b); })
+    .sort((x, y) => (y.all_day - x.all_day) || (x.start_ms - y.start_ms));
+}
+async function loadDiary(){
+  const [a, b] = dyRange();
+  try{
+    const r = await api('/rest/v1/rem_events?select=*&start_ms=lt.' + (b.getTime() + 86400000) + '&end_ms=gte.' + (a.getTime() - 86400000) + '&order=start_ms&limit=2000');
+    if(r.ok){ dyEvents = await r.json(); dyMissing = false; $('dyupd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'}); }
+    else dyMissing = r.status === 404 || r.status === 400;
+  }catch(e){ $('dyupd').textContent = 'שגיאת רשת'; }
+  renderDiary();
+}
+function dyStep(n){ dyDate = dyMode === 'week' ? dyAddDays(dyDate, 7 * n) : new Date(dyDate.getFullYear(), dyDate.getMonth() + n, 1); loadDiary(); }
+function dyToday(){ dyDate = new Date(); dyDate.setHours(0, 0, 0, 0); loadDiary(); }
+function dyToggle(){ dyMode = dyMode === 'week' ? 'month' : 'week'; LS.setItem('dyMode', dyMode); loadDiary(); }
+function dyLine(e, withTime){
+  const ad = e.all_day, d = el('div', 'de' + (ad ? ' ad' : ''), (ad || !withTime ? '' : dyHM(e.start_ms) + ' ') + e.title + (e.rep ? ' ⇄' : ''));
+  if(ad) d.style.background = dyCol(e) + '55'; else d.style.color = dyCol(e);
+  return d;
+}
+function renderDiary(){
+  $('dymsg').textContent = dyMissing ? 'טבלת היומן עוד לא קיימת ב-Supabase. הרץ את הקובץ diary.sql ב-SQL Editor, ופתח את האפליקציה בטלפון.' : '';
+  $('dyMode').textContent = dyMode === 'week' ? 'חודש' : 'שבוע';
+  const box = $('dybody'); box.innerHTML = ''; const todayK = dyKey(new Date());
+  const [a, b] = dyRange();
+  if(dyMode === 'week'){
+    const e = dyAddDays(a, 6);
+    $('dyTitle').textContent = a.getDate() + ' ' + DY_MONTHS[a.getMonth()] + ' – ' + e.getDate() + ' ' + DY_MONTHS[e.getMonth()] + ' ' + e.getFullYear();
+    for(let d = new Date(a); d < b; d = dyAddDays(d, 1)){
+      const dd = new Date(d), card = el('div', 'dwk' + (dyKey(dd) === todayK ? ' today' : ''));
+      card.appendChild(el('div', 'dt', 'יום ' + DY_DAYS[dd.getDay()] + ', ' + dd.getDate() + ' ב' + DY_MONTHS[dd.getMonth()]));
+      const evs = dyOn(dd);
+      if(!evs.length) card.appendChild(el('div', 'sub', '—'));
+      evs.forEach(ev => card.appendChild(dyLine(ev, true)));
+      card.onclick = () => dayPop(dd); box.appendChild(card);
+    }
+  } else {
+    $('dyTitle').textContent = DY_MONTHS[dyDate.getMonth()] + ' ' + dyDate.getFullYear();
+    const g = el('div', 'dgrid');
+    DY_DAYS.forEach(n => g.appendChild(el('div', 'dh', n)));
+    for(let d = new Date(a); d < b; d = dyAddDays(d, 1)){
+      const dd = new Date(d), c = el('div', 'dc' + (dd.getMonth() !== dyDate.getMonth() ? ' out' : '') + (dd.getDay() >= 5 ? ' we' : '') + (dyKey(dd) === todayK ? ' today' : ''));
+      c.appendChild(el('span', 'dn', String(dd.getDate())));
+      const evs = dyOn(dd), cap = 3;
+      evs.slice(0, cap).forEach(ev => c.appendChild(dyLine(ev, false)));
+      if(evs.length > cap) c.appendChild(el('div', 'dmore', '+' + (evs.length - cap)));
+      c.onclick = () => dayPop(dd); g.appendChild(c);
+    }
+    box.appendChild(g);
+  }
+}
+function dayPop(d){
+  const p = $('dayPanel'); p.innerHTML = '';
+  p.appendChild(el('h1', '', 'יום ' + DY_DAYS[d.getDay()] + ', ' + d.getDate() + ' ב' + DY_MONTHS[d.getMonth()] + ' ' + d.getFullYear())).style.fontSize = '22px';
+  const evs = dyOn(d);
+  if(!evs.length) p.appendChild(el('div', 'sub', 'אין אירועים ביום הזה'));
+  evs.forEach(e => {
+    const c = el('div', 'dcard'), bar = el('div', 'bar'); bar.style.background = dyCol(e); c.appendChild(bar);
+    const bd = el('div', 'bd');
+    bd.appendChild(el('div', 'tt', e.title + (e.rep ? ' ⇄' : '')));
+    bd.appendChild(el('div', '', e.all_day ? 'כל היום' : '🕐 \u2066' + dyHM(e.start_ms) + ' – ' + dyHM(e.end_ms) + '\u2069'));
+    if(e.location) bd.appendChild(el('div', '', '📍 ' + e.location));
+    if(e.cal) bd.appendChild(el('div', 'sub', e.cal)).style.fontSize = '14px';
+    c.appendChild(bd); p.appendChild(c);
+  });
+  const x = el('button', 'ghost', 'סגירה'); x.onclick = () => $('dayModal').classList.add('hide'); p.appendChild(x);
+  $('dayModal').classList.remove('hide');
+}
+setInterval(() => { if(tab === 'diary' && !document.hidden && sess) loadDiary(); }, 60000);
 
 setTab(tab);
 start();
