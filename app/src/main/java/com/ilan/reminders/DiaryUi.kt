@@ -431,7 +431,7 @@ private fun DayDialog(
                                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(Color(0xFFFAFAFA)).border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(4.dp))) {
                                     Column(Modifier.fillMaxWidth().background(col).padding(14.dp)) {
                                         Text(if (isRem) "תזכורת" else cals.firstOrNull { it.id == e.calId }?.name.orEmpty(), color = Color.White.copy(alpha = 0.9f), fontSize = 15.sp)
-                                        Text(e.title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Medium)
+                                        Text(e.title + (if (e.repeat) " ⇄" else ""), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Medium)
                                     }
                                     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text("📅", fontSize = 22.sp); Spacer(Modifier.width(12.dp)); Text(dateOf(e), fontSize = 17.sp, color = INK)
@@ -1311,12 +1311,18 @@ private fun FontSettings(onDismiss: () -> Unit) {
     val textCols = listOf(0, 0xFF222222.toInt(), 0xFF000000.toInt(), 0xFF0D47A1.toInt(), 0xFFB71C1C.toInt(), 0xFF1B5E20.toInt(), 0xFF4A148C.toInt(), 0xFF6D4C41.toInt())
     val barCols = listOf(0xFF4A7391.toInt(), 0xFF1E3A5F.toInt(), 0xFF2E7D32.toInt(), 0xFF6A1B9A.toInt(), 0xFFC62828.toInt(), 0xFF37474F.toInt(), 0xFFE91E63.toInt(), 0xFF00796B.toInt())
     val todayCols = listOf(0xFFFB8C00.toInt(), 0xFFE53935.toInt(), 0xFF43A047.toInt(), 0xFF1E88E5.toInt(), 0xFF8E24AA.toInt(), 0xFFE91E63.toInt())
+    val cur = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(cur.density, cur.fontScale / DS.scale)) {
     AlertDialog(
         onDismissRequest = { DS.save(ctx); onDismiss() }, title = { Text("תצוגה: פונט וצבעים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("גודל גופן: ${(DS.scale * 100).toInt()}%", fontWeight = FontWeight.Bold)
-                Slider(DS.scale, { DS.scale = (Math.round(it * 20f) / 20f) }, valueRange = 0.8f..1.6f)
+                Text("גודל גופן", fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)) {
+                    Button({ DS.scale = (Math.round((DS.scale - 0.1f) * 10f) / 10f).coerceAtLeast(0.5f) }, enabled = DS.scale > 0.51f) { Text("−", fontSize = 22.sp) }
+                    Text("${Math.round(DS.scale * 100)}%", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Button({ DS.scale = (Math.round((DS.scale + 0.1f) * 10f) / 10f).coerceAtMost(2f) }, enabled = DS.scale < 1.99f) { Text("+", fontSize = 22.sp) }
+                }
                 Text("סוג גופן", fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     fams.forEach { (k, l) ->
@@ -1337,6 +1343,7 @@ private fun FontSettings(onDismiss: () -> Unit) {
         },
         confirmButton = { TextButton({ DS.save(ctx); onDismiss() }) { Text("סגירה") } }
     )
+    }
 }
 
 @Composable
