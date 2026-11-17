@@ -52,7 +52,35 @@ object CalRepo {
     fun hasRead(c: Context) = ContextCompat.checkSelfPermission(c, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
     fun hasWrite(c: Context) = ContextCompat.checkSelfPermission(c, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
-    fun calendars(c: Context): List<Cal> = runCatching {
+    private fun ap(c: Context) = c.getSharedPreferences("app", Context.MODE_PRIVATE)
+    /** calendars with the user's local name/colour overrides applied (stored in prefs only, the provider is untouched) */
+    fun calendars(c: Context): List<Cal> {
+        val p = ap(c)
+        return calendarsRaw(c).map { k ->
+            k.copy(name = p.getString("calName_${k.id}", null)?.takeIf { it.isNotBlank() } ?: k.name,
+                color = if (p.contains("calColor_${k.id}")) p.getInt("calColor_${k.id}", k.color) else k.color)
+        }
+    }
+    fun notifOff(c: Context): Set<Long> = ap(c).getStringSet("calNotifOff", emptySet())!!.mapNotNull { it.toLongOrNull() }.toSet()
+    fun setNotifOff(c: Context, id: Long, off: Boolean) {
+        val n = notifOff(c).let { if (off) it + id else it - id }
+        ap(c).edit().putStringSet("calNotifOff", n.map { it.toString() }.toSet()).apply()
+    }
+    fun setOverride(c: Context, id: Long, name: String?, color: Int?) {
+        val e = ap(c).edit()
+        if (name != null) { if (name.isBlank()) e.remove("calName_$id") else e.putString("calName_$id", name.trim()) }
+        if (color != null) { if (color == 0) e.remove("calColor_$id") else e.putInt("calColor_$id", color) }
+        e.apply()
+    }
+    fun syncOn(c: Context, id: Long): Boolean = runCatching {
+        c.contentResolver.query(ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, id), arrayOf(CalendarContract.Calendars.SYNC_EVENTS), null, null, null)?.use { it.moveToFirst() && it.getInt(0) == 1 } ?: true
+    }.getOrDefault(true)
+    fun setSync(c: Context, id: Long, on: Boolean): Boolean = runCatching {
+        c.contentResolver.update(ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, id),
+            android.content.ContentValues().apply { put(CalendarContract.Calendars.SYNC_EVENTS, if (on) 1 else 0) }, null, null) > 0
+    }.getOrDefault(false)
+
+    private fun calendarsRaw(c: Context): List<Cal> = runCatching {
         val out = ArrayList<Cal>()
         c.contentResolver.query(
             CalendarContract.Calendars.CONTENT_URI,
@@ -70,7 +98,15 @@ object CalRepo {
     fun events(c: Context, fromMs: Long, toMs: Long, calIds: Set<Long>): List<Ev> {
         if (calIds.isEmpty()) return emptyList()
         // an edited occurrence of a series is a separate "exception" event; it still counts as repeating (ORIGINAL_ID / ORIGINAL_SYNC_ID are set)
-        return runCatching { queryEvents(c, fromMs, toMs, calIds, true) }.getOrNull() ?: runCatching { queryEvents(c, fromMs, toMs, calIds, false) }.getOrDefault(emptyList())
+        val list = runCatching { queryEvents(c, fromMs, toMs, calIds, true) }.getOrNull() ?: runCatching { queryEvents(c, fromMs, toMs, calIds, false) }.getOrDefault(emptyList())
+        val p = ap(c)
+        if (p.all.keys.none { it.startsWith("calColor_") }) return list
+        val raw = calendarsRaw(c).associate { it.id to (it.color or 0xFF000000.toInt()) }
+        return list.map { e ->
+            val k = "calColor_${e.calId}"
+            // only events that use the calendar's own colour follow the override; events with their own colour keep it
+            if (p.contains(k) && (e.color or 0xFF000000.toInt()) == raw[e.calId]) e.copy(color = p.getInt(k, e.color)) else e
+        }
     }
 
     private fun queryEvents(c: Context, fromMs: Long, toMs: Long, calIds: Set<Long>, withOrig: Boolean): List<Ev> {

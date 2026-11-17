@@ -58,7 +58,7 @@ object EventNotify {
         if (!CalRepo.hasRead(c)) return emptyList()
         val zone = ZoneId.systemDefault()
         val cals = CalRepo.calendars(c).map { it.id }.toSet()
-        val vis = p(c).getStringSet("diaryVis", null)?.mapNotNull { it.toLongOrNull() }?.toSet()?.let { it.intersect(cals) } ?: cals
+        val vis = (p(c).getStringSet("diaryVis", null)?.mapNotNull { it.toLongOrNull() }?.toSet()?.let { it.intersect(cals) } ?: cals) - CalRepo.notifOff(c)
         val evs = CalRepo.events(c, from - 7 * 3600_000L, to + 14 * 86400_000L, vis)
         if (evs.isEmpty()) return emptyList()
         val ids = evs.map { it.id }.toSet()

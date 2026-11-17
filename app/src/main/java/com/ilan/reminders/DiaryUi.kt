@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
@@ -376,8 +377,8 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         if (showFont) FontSettings { showFont = false }
         if (showDefs) EventDefaults { showDefs = false }
         if (showNotif) NotifSettings(onDismiss = { showNotif = false; tick++ })
-        if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false }) { vis, def ->
-            visPref = vis; defCal = def
+        if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false; tick++ }) { vis, def ->
+            visPref = vis; defCal = def; tick++
             prefs.edit().putStringSet("diaryVis", vis.map { it.toString() }.toSet()).putLong("diaryDef", def).apply()
             showSettings = false
         }
@@ -545,23 +546,44 @@ private fun NotifSettings(onDismiss: () -> Unit) {
 
 @Composable
 private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, onDismiss: () -> Unit, onSave: (Set<Long>, Long) -> Unit) {
+    val ctx = LocalContext.current
     var vis by remember { mutableStateOf(visible) }
     var def by remember { mutableStateOf(defCal) }
+    var rev by remember { mutableStateOf(0) }
+    val list = remember(rev, cals) { CalRepo.calendars(ctx) }
+    var menu by remember { mutableStateOf<Long?>(null) }
+    var rename by remember { mutableStateOf<Cal?>(null) }
+    var recolor by remember { mutableStateOf<Cal?>(null) }
+    val palette = listOf(0, 0xFFD50000.toInt(), 0xFFE67C73.toInt(), 0xFFF4511E.toInt(), 0xFFF6BF26.toInt(), 0xFF33B679.toInt(), 0xFF0B8043.toInt(), 0xFF039BE5.toInt(), 0xFF3F51B5.toInt(), 0xFF7986CB.toInt(), 0xFF8E24AA.toInt(), 0xFF616161.toInt())
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("יומנים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("סמן יומנים להצגה. «קבע» בוחר את יומן ברירת המחדל לפגישות חדשות (אפשר גם לבחור יומן בעורך — הבחירה נשמרת).", fontSize = 13.sp)
+                Text("סמן יומנים להצגה. בתפריט ⋮: צבע, שם, ברירת מחדל, סנכרון והתראות לכל יומן (צבע ושם נשמרים באפליקציה בלבד).", fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
-                cals.groupBy { it.account }.forEach { (acc, list) ->
+                list.groupBy { it.account }.forEach { (acc, items) ->
                     Text(acc, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-                    list.forEach { c ->
+                    items.forEach { c ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(c.id in vis, { on -> vis = if (on) vis + c.id else vis - c.id })
                             Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(Color(c.color or 0xFF000000.toInt())))
-                            Text(c.name, Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (c.writable) { Text(if (def == c.id) "ברירת מחדל" else "קבע", fontSize = 12.sp, color = if (def == c.id) ORANGE else BAR, modifier = Modifier.clickable { def = c.id }.padding(6.dp)) }
+                            Text(c.name + if (def == c.id) " ★" else "", Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Box {
+                                IconButton({ menu = c.id }, Modifier.size(36.dp)) { Icon(Icons.Filled.MoreVert, "אפשרויות") }
+                                DropdownMenu(menu == c.id, { menu = null }) {
+                                    DropdownMenuItem({ Text("צבע היומן") }, { menu = null; recolor = c })
+                                    DropdownMenuItem({ Text("שינוי שם") }, { menu = null; rename = c })
+                                    if (c.writable) DropdownMenuItem({ Text(if (def == c.id) "✓ יומן ברירת מחדל" else "קבע כיומן ברירת מחדל") }, { def = c.id; menu = null })
+                                    val sy = remember(menu, rev) { CalRepo.syncOn(ctx, c.id) }
+                                    DropdownMenuItem({ Text((if (sy) "✓ " else "") + "סנכרון") }, {
+                                        if (!CalRepo.setSync(ctx, c.id, !sy)) Toast.makeText(ctx, "לא ניתן לשנות סנכרון ליומן זה", Toast.LENGTH_SHORT).show()
+                                        rev++; menu = null
+                                    })
+                                    val nOff = remember(menu, rev) { c.id in CalRepo.notifOff(ctx) }
+                                    DropdownMenuItem({ Text((if (!nOff) "✓ " else "") + "התראות לאירועים") }, { CalRepo.setNotifOff(ctx, c.id, !nOff); rev++; menu = null })
+                                }
+                            }
                         }
                     }
                 }
@@ -570,6 +592,18 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, on
         confirmButton = { TextButton({ onSave(vis, def) }) { Text("שמירה") } },
         dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
     )
+    rename?.let { c ->
+        var t by remember(c.id) { mutableStateOf(c.name) }
+        AlertDialog(onDismissRequest = { rename = null }, title = { Text("שינוי שם יומן") },
+            text = { OutlinedTextField(t, { t = it }, singleLine = true, supportingText = { Text("ריק = השם המקורי") }) },
+            confirmButton = { TextButton({ CalRepo.setOverride(ctx, c.id, t, null); rev++; rename = null }) { Text("אישור") } },
+            dismissButton = { TextButton({ rename = null }) { Text("ביטול") } })
+    }
+    recolor?.let { c ->
+        AlertDialog(onDismissRequest = { recolor = null }, title = { Text("צבע היומן") },
+            text = { Column { Text("«A» = הצבע המקורי", fontSize = 12.sp); Spacer(Modifier.height(8.dp)); SwatchRow(palette, c.color or 0xFF000000.toInt()) { col -> CalRepo.setOverride(ctx, c.id, null, if (col == 0) 0 else col); rev++; recolor = null } } },
+            confirmButton = {}, dismissButton = { TextButton({ recolor = null }) { Text("סגירה") } })
+    }
 }
 
 // ============================ WEEK ============================
