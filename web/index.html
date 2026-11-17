@@ -122,6 +122,18 @@ textarea{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--
 
 /*NE-CSS-END*/
 
+#evModal,#scopeModal{position:fixed;inset:0;background:#0007;z-index:12;display:flex;align-items:center;justify-content:center;padding:14px}
+#evModal.hide,#scopeModal.hide{display:none}
+#evModal .panel,#scopeModal .panel{width:100%;max-width:520px;max-height:90vh;overflow:auto}
+#evModal select,#evModal textarea,#evModal input[type=date],#evModal input[type=time]{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);margin:4px 0;font:inherit;box-sizing:border-box}
+#evModal textarea{min-height:70px}
+#evModal .row2{display:flex;gap:8px}#evModal .row2>*{flex:1}
+#evModal label.ck2{display:flex;align-items:center;gap:8px;margin:6px 0}
+#evModal label.ck2 input{width:20px;height:20px;margin:0}
+.remrow{display:flex;gap:6px;align-items:center}
+.rad{display:flex;gap:10px;align-items:center;padding:9px 0;font-size:18px;cursor:pointer}.rad input{width:20px;height:20px;margin:0}
+#dyConn{margin:4px 0 8px;font-size:15px}
+
 /* diary (read-only mirror of the phone calendar) */
 .dnav{display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap}
 .dnav h2{margin:0;font-size:22px;flex:1;min-width:140px}
@@ -210,6 +222,7 @@ button.sec.on{background:var(--accent);color:#fff;border-color:var(--accent)}
       <button class="sec" onclick="dyToday()">היום</button>
       <span id="dyModes" style="display:flex;gap:4px"><button class="sec" id="dyM_month" onclick="dySet('month')">חודש</button><button class="sec" id="dyM_week" onclick="dySet('week')">שבוע</button><button class="sec" id="dyM_day" onclick="dySet('day')">יום</button></span>
     </div>
+    <div id="dyConn"></div>
     <div id="dymsg" class="err"></div>
     <div id="dybody"></div>
     <div class="sub" style="text-align:center;margin-top:16px;font-size:13px">היומן מועתק מהטלפון (גוגל קלנדר). הצפייה כאן בלבד, העריכה באפליקציה.</div>
@@ -252,6 +265,8 @@ button.sec.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 </div>
 
+<div id="evModal" class="hide"><div class="panel" id="evPanel"></div></div>
+<div id="scopeModal" class="hide"><div class="panel" id="scopePanel"></div></div>
 <div id="dayModal" class="hide" onclick="if(event.target===this)$('dayModal').classList.add('hide')"><div class="panel" id="dayPanel"></div></div>
 
 <div id="modal" class="hide" onclick="if(event.target===this)closeEd()">
@@ -1313,6 +1328,10 @@ function dyOn(d){
 }
 async function loadDiary(){
   const [a, b] = dyRange();
+  if(gOn()){
+    try{ dyEvents = await gLoad(a, b); dyMissing = false; $('dyupd').textContent = 'יומן גוגל · עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'}); renderDiary(); return; }
+    catch(e){ $('dyupd').textContent = e.message; }
+  }
   try{
     const r = await api('/rest/v1/rem_events?select=*&start_ms=lt.' + (b.getTime() + 86400000) + '&end_ms=gte.' + (a.getTime() - 86400000) + '&order=start_ms&limit=2000');
     if(r.ok){ dyEvents = await r.json(); dyMissing = false; $('dyupd').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'}); }
@@ -1329,6 +1348,7 @@ function dyLine(e, withTime){
   return d;
 }
 function renderDiary(){
+  gConnBar();
   $('dymsg').textContent = dyMissing ? 'טבלת היומן עוד לא קיימת ב-Supabase. הרץ את הקובץ diary.sql ב-SQL Editor, ופתח את האפליקציה בטלפון.' : '';
   ['month', 'week', 'day'].forEach(m => $('dyM_' + m).classList.toggle('on', dyMode === m));
   const box = $('dybody'); box.innerHTML = ''; const todayK = dyKey(new Date());
@@ -1398,12 +1418,242 @@ function dayPop(d, only){
     bd.appendChild(el('div', '', e.all_day ? 'כל היום' : '🕐 \u2066' + dyHM(e.start_ms) + ' – ' + dyHM(e.end_ms) + '\u2069'));
     if(e.location) bd.appendChild(el('div', '', '📍 ' + e.location));
     if(e.cal) bd.appendChild(el('div', 'sub', e.cal)).style.fontSize = '14px';
+    if(gOn() && e.gid && e.writable){
+      const ac = el('div', 'bar'); ac.style.margin = '6px 0 0';
+      const ed = el('button', 'sec', '✏️ עריכה'); ed.onclick = ev => { ev.stopPropagation(); gOpenEd(e, d); };
+      const dl = el('button', 'ghost', '🗑'); dl.onclick = ev => { ev.stopPropagation(); $('dayModal').classList.add('hide'); gDelete(e); };
+      ac.appendChild(ed); ac.appendChild(dl); bd.appendChild(ac);
+    }
     c.appendChild(bd); p.appendChild(c);
   });
+  if(gOn()){ const nw = el('button', '', '+ אירוע'); nw.style.marginInlineEnd = '8px'; nw.onclick = () => gOpenEd(null, d); p.appendChild(nw); }
   if(!only && dyMode !== 'day'){ const v = el('button', 'sec', 'תצוגת יום'); v.style.marginInlineEnd = '8px'; v.onclick = () => { $('dayModal').classList.add('hide'); dyDate = new Date(d); dySet('day'); }; p.appendChild(v); }
   const x = el('button', 'ghost', 'סגירה'); x.onclick = () => $('dayModal').classList.add('hide'); p.appendChild(x);
   $('dayModal').classList.remove('hide');
 }
+
+
+// ---------- Google Calendar: live read + edit (option 3; needs an OAuth Web client ID, entered once) ----------
+let gTok = null, gExp = 0, gCals = [], gEd = null;
+try{ const t = JSON.parse(sessionStorage.getItem('gtok') || 'null'); if(t && t.exp > Date.now() + 60000){ gTok = t.t; gExp = t.exp; } }catch(e){}
+const gOn = () => !!gTok && Date.now() < gExp;
+const gTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const G_API = 'https://www.googleapis.com/calendar/v3';
+function gLoadLib(){
+  return new Promise((res, rej) => {
+    if(window.google && google.accounts && google.accounts.oauth2) return res();
+    const x = document.createElement('script'); x.src = 'https://accounts.google.com/gsi/client'; x.onload = res; x.onerror = () => rej(new Error('טעינת ספריית Google נכשלה'));
+    document.head.appendChild(x);
+  });
+}
+async function gConnect(){
+  const cid = LS.getItem('gcid');
+  if(!cid){ gSetup(); return; }
+  try{ await gLoadLib(); }catch(e){ toast(e.message); return; }
+  const tc = google.accounts.oauth2.initTokenClient({client_id:cid, scope:'https://www.googleapis.com/auth/calendar', callback: r => {
+    if(r.error){ toast('חיבור Google נכשל: ' + r.error); return; }
+    gTok = r.access_token; gExp = Date.now() + (r.expires_in || 3600) * 1000 - 60000;
+    try{ sessionStorage.setItem('gtok', JSON.stringify({t:gTok, exp:gExp})); }catch(e){}
+    LS.setItem('gconn', '1'); loadDiary();
+  }, error_callback: er => toast('חיבור Google נכשל: ' + (er && er.type || ''))});
+  tc.requestAccessToken({prompt: LS.getItem('gconn') ? '' : 'consent'});
+}
+function gDisconnect(){ gTok = null; gExp = 0; try{ sessionStorage.removeItem('gtok'); }catch(e){} LS.removeItem('gconn'); loadDiary(); }
+function gSetup(){
+  const p = $('evPanel'); p.innerHTML = '';
+  p.appendChild(el('h1', '', 'חיבור ליומן גוגל')).style.fontSize = '24px';
+  const ol = el('ol', ''); ol.style.lineHeight = '1.7'; ol.style.paddingInlineStart = '22px';
+  ['ב-console.cloud.google.com בוחרים את הפרויקט של ההתחברות עם Google (אותו אחד שמחובר ל-Supabase).',
+   'APIs & Services ← Library ← מחפשים Google Calendar API ולוחצים Enable.',
+   'Credentials ← פותחים את ה-OAuth Client ID מסוג Web ← בשדה Authorized JavaScript origins מוסיפים ' + location.origin + ' ושומרים.',
+   'OAuth consent screen (או Google Auth Platform) ← Data access ← Add scope: ‏.../auth/calendar. וב-Audience ← Test users מוסיפים את כתובת ה-Gmail שלך.',
+   'מעתיקים את ה-Client ID ומדביקים כאן:'].forEach(t => ol.appendChild(el('li', '', t)));
+  p.appendChild(ol);
+  const inp = el('input', ''); inp.placeholder = 'xxxx.apps.googleusercontent.com'; inp.dir = 'ltr'; inp.value = LS.getItem('gcid') || ''; p.appendChild(inp);
+  const row = el('div', 'bar');
+  const ok = el('button', '', 'שמירה והתחברות'); ok.onclick = () => { const v = inp.value.trim(); if(!/\.apps\.googleusercontent\.com$/.test(v)){ toast('ה-Client ID לא נראה תקין'); return; } LS.setItem('gcid', v); $('evModal').classList.add('hide'); gConnect(); };
+  const no = el('button', 'ghost', 'ביטול'); no.onclick = () => $('evModal').classList.add('hide');
+  row.appendChild(ok); row.appendChild(no); p.appendChild(row);
+  $('evModal').classList.remove('hide');
+}
+async function gApi(path, opt = {}){
+  const r = await fetch(G_API + path, {method:opt.method || 'GET', headers:{Authorization:'Bearer ' + gTok, 'Content-Type':'application/json'}, body:opt.body ? JSON.stringify(opt.body) : undefined});
+  if(r.status === 401){ gTok = null; try{ sessionStorage.removeItem('gtok'); }catch(e){} renderDiary(); throw new Error('החיבור ל-Google פג, צריך לחדש'); }
+  if(!r.ok){ let m = r.status; try{ m = (await r.json()).error.message; }catch(e){} throw new Error(String(m)); }
+  return r.status === 204 ? null : r.json();
+}
+const gDay = d => { const [y, m, dd] = d.split('-').map(Number); return Date.UTC(y, m - 1, dd); };
+function gMap(ev, cal){
+  const ad = !!ev.start.date;
+  return {gid:ev.id, calId:cal.id, rid:ev.recurringEventId || null, title:ev.summary || '(ללא כותרת)', all_day:ad,
+    start_ms: ad ? gDay(ev.start.date) : Date.parse(ev.start.dateTime), end_ms: ad ? gDay(ev.end.date) : Date.parse(ev.end.dateTime),
+    color: parseInt((cal.backgroundColor || '#4a7391').slice(1), 16), location:ev.location || '', cal:cal.summary || '', rep:!!(ev.recurringEventId || ev.recurrence),
+    writable: cal.accessRole === 'owner' || cal.accessRole === 'writer', raw:ev};
+}
+async function gLoad(a, b){
+  const cl = await gApi('/users/me/calendarList?minAccessRole=reader');
+  gCals = cl.items.filter(c => c.selected !== false);
+  const lo = new Date(a.getTime() - 86400000).toISOString(), hi = new Date(b.getTime() + 86400000).toISOString();
+  const all = await Promise.all(gCals.map(async c => {
+    try{
+      const r = await gApi('/calendars/' + encodeURIComponent(c.id) + '/events?singleEvents=true&orderBy=startTime&maxResults=2500&timeMin=' + encodeURIComponent(lo) + '&timeMax=' + encodeURIComponent(hi));
+      return r.items.filter(x => x.status !== 'cancelled' && x.start && x.end).map(x => gMap(x, c));
+    }catch(e){ if(/פג/.test(e.message)) throw e; return []; }
+  }));
+  return all.flat();
+}
+function gConnBar(){
+  const b = $('dyConn'); if(!b) return; b.innerHTML = '';
+  if(gOn()){
+    b.appendChild(el('span', 'sub', '🟢 מחובר ליומן גוגל, אפשר לערוך. '));
+    const add = el('button', '', '+ אירוע'); add.onclick = () => gOpenEd(null, dyDate); b.appendChild(add);
+    const out = el('button', 'ghost', 'נתק'); out.onclick = gDisconnect; b.appendChild(out);
+  } else {
+    const was = !!LS.getItem('gconn');
+    const c = el('button', 'sec', was ? '🔄 חידוש החיבור ליומן גוגל' : '✏️ חיבור ליומן גוגל לעריכה'); c.onclick = gConnect; b.appendChild(c);
+    if(!was) b.appendChild(el('span', 'sub', ' (בלי חיבור היומן מוצג לצפייה בלבד)'));
+  }
+}
+function gAskScope(title){
+  return new Promise(res => {
+    const p = $('scopePanel'); p.innerHTML = ''; let v = 1;
+    p.appendChild(el('h1', '', title)).style.fontSize = '24px';
+    [[1, 'רק האירוע הזה'], [2, 'האירוע הזה ואירועים עתידיים'], [0, 'כל האירועים']].forEach(([k, l]) => {
+      const r = el('label', 'rad'), i = document.createElement('input'); i.type = 'radio'; i.name = 'scp'; i.checked = k === 1; i.onchange = () => { v = k; };
+      r.appendChild(i); r.appendChild(el('span', '', l)); p.appendChild(r);
+    });
+    const row = el('div', 'bar'), ok = el('button', '', 'אישור'), no = el('button', 'ghost', 'ביטול');
+    ok.onclick = () => { $('scopeModal').classList.add('hide'); res(v); }; no.onclick = () => { $('scopeModal').classList.add('hide'); res(null); };
+    row.appendChild(ok); row.appendChild(no); p.appendChild(row); $('scopeModal').classList.remove('hide');
+  });
+}
+const G_REM = [0, 5, 10, 15, 30, 60, 120, 1440, 2880, 10080];
+const gRemLabel = m => m === 0 ? 'בזמן האירוע' : m % 10080 === 0 ? (m / 10080 === 1 ? 'שבוע' : m / 10080 + ' שבועות') + ' לפני' : m % 1440 === 0 ? (m / 1440 === 1 ? 'יום' : m / 1440 + ' ימים') + ' לפני' : m % 60 === 0 ? (m / 60 === 1 ? 'שעה' : m / 60 + ' שעות') + ' לפני' : m + ' דקות לפני';
+const G_DOW = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'], G_DOWN = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+function gPresets(d){
+  const dw = G_DOW[d.getDay()], nth = Math.floor((d.getDate() - 1) / 7) + 1;
+  return [['', 'לא חוזר'], ['FREQ=DAILY', 'כל יום'], ['FREQ=WEEKLY;BYDAY=' + dw, 'כל שבוע ביום ' + G_DOWN[d.getDay()]], ['FREQ=MONTHLY;BYMONTHDAY=' + d.getDate(), 'כל חודש ביום ' + d.getDate()],
+    ['FREQ=MONTHLY;BYDAY=' + nth + dw, 'כל חודש ביום ' + G_DOWN[d.getDay()] + ' ה-' + nth], ['FREQ=YEARLY', 'כל שנה ב-' + d.getDate() + ' ב' + DY_MONTHS[d.getMonth()]], ['FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH', 'כל יום חול (א׳–ה׳)']];
+}
+const pad2 = n => String(n).padStart(2, '0');
+const gYMD = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+const gHM = d => pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+function gOpenEd(e, date){
+  const writable = gCals.filter(c => c.accessRole === 'owner' || c.accessRole === 'writer');
+  if(!writable.length){ toast('אין יומן עם הרשאת כתיבה'); return; }
+  const p = $('evPanel'); p.innerHTML = ''; $('dayModal').classList.add('hide');
+  let s0, e0;
+  if(e){
+    if(e.all_day){ const a = new Date(e.start_ms), b = new Date(e.end_ms - 86400000); s0 = new Date(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()); e0 = new Date(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()); }
+    else { s0 = new Date(e.start_ms); e0 = new Date(e.end_ms); }
+  } else { const n = new Date(); s0 = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.min(n.getHours() + 1, 23), 0); e0 = new Date(s0.getTime() + 3600000); }
+  const calDef = e ? gCals.find(c => c.id === e.calId) : null;
+  const rem = e ? ((e.raw.reminders && !e.raw.reminders.useDefault) ? (e.raw.reminders.overrides || []).filter(x => x.method === 'popup').map(x => x.minutes) : (calDef && calDef.defaultReminders || []).map(x => x.minutes)) : [10];
+  gEd = {e, rem: rem.slice()};
+  p.appendChild(el('h1', '', e ? 'עריכת אירוע' : 'אירוע חדש')).style.fontSize = '26px';
+  const title = el('input', ''); title.placeholder = 'כותרת'; title.value = e ? e.title : ''; p.appendChild(title);
+  const cal = document.createElement('select'); writable.forEach(c => { const o = el('option', '', c.summary); o.value = c.id; cal.appendChild(o); });
+  cal.value = e ? e.calId : (writable.find(c => c.primary) || writable[0]).id; cal.disabled = !!e; p.appendChild(cal);
+  const adL = el('label', 'ck2'), ad = document.createElement('input'); ad.type = 'checkbox'; ad.checked = e ? e.all_day : false; adL.appendChild(ad); adL.appendChild(el('span', '', 'כל היום')); p.appendChild(adL);
+  const r1 = el('div', 'row2'), sd = el('input', ''), st = el('input', ''); sd.type = 'date'; st.type = 'time'; sd.value = gYMD(s0); st.value = gHM(s0); r1.appendChild(sd); r1.appendChild(st); p.appendChild(r1);
+  const r2 = el('div', 'row2'), ed = el('input', ''), et = el('input', ''); ed.type = 'date'; et.type = 'time'; ed.value = gYMD(e0); et.value = gHM(e0); r2.appendChild(ed); r2.appendChild(et); p.appendChild(r2);
+  const tog = () => { st.style.display = et.style.display = ad.checked ? 'none' : ''; }; ad.onchange = tog; tog();
+  sd.onchange = () => { if(ed.value < sd.value) ed.value = sd.value; };
+  const loc = el('input', ''); loc.placeholder = 'מיקום'; loc.value = e ? e.location : ''; p.appendChild(loc);
+  const desc = document.createElement('textarea'); desc.placeholder = 'תיאור'; desc.value = e && e.raw.description || ''; p.appendChild(desc);
+  p.appendChild(el('div', 'lbl', 'תזכורות'));
+  const rbox = el('div', ''); p.appendChild(rbox);
+  const drawRem = () => {
+    rbox.innerHTML = '';
+    gEd.rem.forEach((m, i) => {
+      const r = el('div', 'remrow'), sel = document.createElement('select'); const opts = G_REM.includes(m) ? G_REM : G_REM.concat([m]).sort((a, b) => a - b);
+      opts.forEach(v => { const o = el('option', '', gRemLabel(v)); o.value = v; sel.appendChild(o); }); sel.value = m; sel.onchange = () => { gEd.rem[i] = +sel.value; };
+      const x = el('button', 'ghost', '✕'); x.onclick = () => { gEd.rem.splice(i, 1); drawRem(); }; r.appendChild(sel); r.appendChild(x); rbox.appendChild(r);
+    });
+    const add = el('button', 'ghost', '+ הוסף תזכורת'); add.onclick = () => { gEd.rem.push(10); drawRem(); }; rbox.appendChild(add);
+  };
+  drawRem();
+  let rep = null;
+  if(!e || !e.rep){
+    p.appendChild(el('div', 'lbl', 'חזרה'));
+    rep = document.createElement('select'); gPresets(s0).forEach(([v, l]) => { const o = el('option', '', l); o.value = v; rep.appendChild(o); });
+    sd.onchange = () => { if(ed.value < sd.value) ed.value = sd.value; const d = new Date(sd.value + 'T12:00'), cur = rep.value; rep.innerHTML = ''; gPresets(d).forEach(([v, l]) => { const o = el('option', '', l); o.value = v; rep.appendChild(o); }); rep.value = cur && [...rep.options].some(o => o.value === cur) ? cur : ''; };
+    p.appendChild(rep);
+  } else p.appendChild(el('div', 'sub', '🔁 אירוע חוזר (הגדרות החזרה נערכות ביומן גוגל)'));
+  const msg = el('div', 'err'); p.appendChild(msg);
+  const row = el('div', 'bar'), ok = el('button', '', 'שמירה'), no = el('button', 'ghost', 'ביטול');
+  no.onclick = () => $('evModal').classList.add('hide');
+  ok.onclick = async () => {
+    const t = title.value.trim() || '(ללא כותרת)';
+    let start, end, ms0, ms1;
+    if(ad.checked){
+      const ex = new Date(ed.value + 'T12:00'); ex.setDate(ex.getDate() + 1);
+      start = {date: sd.value}; end = {date: gYMD(ex)}; ms0 = gDay(sd.value); ms1 = gDay(gYMD(ex));
+    } else {
+      const a = new Date(sd.value + 'T' + st.value), b = new Date(ed.value + 'T' + et.value);
+      if(!(b > a)){ msg.textContent = 'סיום האירוע חייב להיות אחרי ההתחלה'; return; }
+      start = {dateTime: a.toISOString(), timeZone: gTZ}; end = {dateTime: b.toISOString(), timeZone: gTZ}; ms0 = a.getTime(); ms1 = b.getTime();
+    }
+    const body = {summary: t, location: loc.value.trim(), description: desc.value, start, end, reminders: {useDefault: false, overrides: gEd.rem.map(m => ({method: 'popup', minutes: m}))}};
+    ok.disabled = true; msg.textContent = '';
+    try{ await gSaveEv(e, cal.value, body, rep && rep.value, ms0, ms1, ad.checked); $('evModal').classList.add('hide'); loadDiary(); }
+    catch(er){ msg.textContent = er.message === 'cancel' ? '' : 'השמירה נכשלה: ' + er.message; ok.disabled = false; }
+  };
+  row.appendChild(ok); row.appendChild(no);
+  if(e && e.writable){ const del = el('button', 'ghost', '🗑 מחיקה'); del.style.color = 'var(--err)'; del.onclick = () => { $('evModal').classList.add('hide'); gDelete(e); }; row.appendChild(del); }
+  p.appendChild(row); $('evModal').classList.remove('hide');
+}
+const gUntil = (ms, allDay) => { const d = new Date(allDay ? ms - 86400000 : ms - 1000); return allDay ? d.toISOString().slice(0, 10).replace(/-/g, '') : d.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z'); };
+const gStrip = r => r.split(';').filter(x => !/^(UNTIL|COUNT)=/.test(x)).join(';');
+async function gTruncate(cal, master, instMs, allDay){
+  const rec = (master.recurrence || []).map(r => /^RRULE:/.test(r) ? 'RRULE:' + gStrip(r.slice(6)) + ';UNTIL=' + gUntil(instMs, allDay) : r);
+  await gApi('/calendars/' + encodeURIComponent(cal) + '/events/' + master.id, {method:'PATCH', body:{recurrence: rec}});
+}
+async function gSaveEv(e, calId, body, repRule, ms0, ms1, allDay){
+  const cal = encodeURIComponent(calId);
+  if(!e){ if(repRule) body.recurrence = ['RRULE:' + repRule]; await gApi('/calendars/' + cal + '/events', {method:'POST', body}); return; }
+  if(!e.rep){ await gApi('/calendars/' + cal + '/events/' + e.gid, {method:'PATCH', body}); return; }
+  const sc = await gAskScope('עריכת אירוע חוזר'); if(sc === null) throw new Error('cancel');
+  if(sc === 1){ await gApi('/calendars/' + cal + '/events/' + e.gid, {method:'PATCH', body}); return; }
+  const master = await gApi('/calendars/' + cal + '/events/' + e.rid);
+  const mStart = master.start.date ? gDay(master.start.date) : Date.parse(master.start.dateTime);
+  if(sc === 2 && e.start_ms > mStart){
+    const rule = (master.recurrence || []).filter(r => /^RRULE:/.test(r)).map(r => 'RRULE:' + gStrip(r.slice(6)));
+    await gTruncate(calId, master, e.start_ms, e.all_day);
+    await gApi('/calendars/' + cal + '/events', {method:'POST', body: Object.assign({}, body, {recurrence: rule})});
+    return;
+  }
+  // whole series: shift the master by the same amount the occurrence moved
+  const delta = ms0 - e.start_ms, mb = {summary: body.summary, location: body.location, description: body.description, reminders: body.reminders};
+  if(allDay){
+    const a = new Date(mStart + delta), b = new Date(mStart + delta + (ms1 - ms0));
+    mb.start = {date: a.toISOString().slice(0, 10)}; mb.end = {date: b.toISOString().slice(0, 10)};
+  } else {
+    const ns = (master.start.date ? mStart : Date.parse(master.start.dateTime)) + delta;
+    mb.start = {dateTime: new Date(ns).toISOString(), timeZone: master.start.timeZone || gTZ}; mb.end = {dateTime: new Date(ns + (ms1 - ms0)).toISOString(), timeZone: master.end.timeZone || gTZ};
+  }
+  await gApi('/calendars/' + cal + '/events/' + e.rid, {method:'PATCH', body: mb});
+}
+async function gDelete(e){
+  try{
+    const cal = encodeURIComponent(e.calId);
+    if(!e.rep){
+      if(!confirm('למחוק את האירוע?')) return;
+      await gApi('/calendars/' + cal + '/events/' + e.gid, {method:'DELETE'});
+    } else {
+      const sc = await gAskScope('מחיקה'); if(sc === null) return;
+      if(sc === 1) await gApi('/calendars/' + cal + '/events/' + e.gid, {method:'DELETE'});
+      else {
+        const master = await gApi('/calendars/' + cal + '/events/' + e.rid);
+        const mStart = master.start.date ? gDay(master.start.date) : Date.parse(master.start.dateTime);
+        if(sc === 0 || e.start_ms <= mStart) await gApi('/calendars/' + cal + '/events/' + e.rid, {method:'DELETE'});
+        else await gTruncate(e.calId, master, e.start_ms, e.all_day);
+      }
+    }
+    toast('האירוע נמחק'); loadDiary();
+  }catch(er){ toast('המחיקה נכשלה: ' + er.message); }
+}
+
 setInterval(() => { if(tab === 'diary' && !document.hidden && sess) loadDiary(); }, 60000);
 
 setTab(tab);
