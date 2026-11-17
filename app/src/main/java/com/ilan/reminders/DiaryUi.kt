@@ -75,7 +75,6 @@ private val MON_SHORT = listOf("ינו׳", "פבר׳", "מרץ", "אפר׳", "מ
 
 private val HE_MON_SHORT = listOf("ינו׳", "פבר׳", "מרץ", "אפר׳", "מאי", "יוני", "יולי", "אוג׳", "ספט׳", "אוק׳", "נוב׳", "דצמ׳")
 private fun wkStart(d: LocalDate): LocalDate = d.minusDays((d.dayOfWeek.value % 7).toLong())
-private fun wkNo(d: LocalDate): Int = wkStart(d).plusDays(1).get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
 private fun hm(t: LocalTime) = "%02d:%02d".format(t.hour, t.minute)
 private fun evColor(e: Ev) = Color((if (e.color == 0) 0xFF4A7391.toInt() else e.color) or 0xFF000000.toInt())
 private fun dayEvs(all: List<Ev>, d: LocalDate, z: ZoneId) = all.filter { it.on(d, z) }.sortedWith(compareBy({ !it.allDay }, { it.begin }))
@@ -298,10 +297,17 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     val page = pager.currentPage
                     Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                         val mon = HE_MONTHS[date.monthValue - 1]
-                        val title = when (page) { 2 -> "${date.dayOfMonth} ב$mon ${date.year}"; 1 -> { val a = wkStart(date); val b = a.plusDays(6)
-                            if (a.month == b.month) "$mon ${date.year}" else if (a.year == b.year) "${HE_MON_SHORT[a.monthValue - 1]} / ${HE_MON_SHORT[b.monthValue - 1]} ${b.year}"
-                            else "${HE_MON_SHORT[a.monthValue - 1]} ${a.year} / ${HE_MON_SHORT[b.monthValue - 1]} ${b.year}" }; else -> mon }
-                        val sub = when (page) { 2 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "${date.year}" }
+                        val wa = wkStart(date); val wb = wa.plusDays(6)
+                        val title = when (page) {
+                            2 -> "${date.dayOfMonth} ב$mon ${date.year}"
+                            1 -> if (wa.month == wb.month) mon else if (wa.year == wb.year) "${HE_MON_SHORT[wa.monthValue - 1]} / ${HE_MON_SHORT[wb.monthValue - 1]}" else "${HE_MON_SHORT[wa.monthValue - 1]} ${wa.year}"
+                            else -> mon
+                        }
+                        val sub = when (page) {
+                            2 -> DAY_FULL[dayIdx(date)]
+                            1 -> if (wa.year == wb.year) "${wb.year}" else "${HE_MON_SHORT[wb.monthValue - 1]} ${wb.year}"
+                            else -> "${date.year}"
+                        }
                         Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, maxLines = 1)
                     }
@@ -744,10 +750,6 @@ private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, 
                 Text("${d.dayOfMonth}", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isToday) Color.White else if (idx == 6) RED else INK,
                     modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(if (isToday) ORANGE else Color.Transparent).padding(horizontal = 3.dp))
                 if (hidden > 0) Text(" +$hidden", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = ORANGE)
-                if (idx == 0) {
-                    Spacer(Modifier.width(4.dp))
-                    Text("${wkNo(d)}", fontSize = 11.sp, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(BAR.copy(alpha = 0.65f)).padding(horizontal = 3.dp))
-                }
             }
             shown.forEach { e -> EvLine(e, z, 12.sp, false) { onEvent(e, d) } }
         }
