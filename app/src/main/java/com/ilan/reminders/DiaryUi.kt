@@ -297,7 +297,9 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     val page = pager.currentPage
                     Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                         val mon = HE_MONTHS[date.monthValue - 1]
-                        val title = when (page) { 2 -> "${date.dayOfMonth} ב$mon ${date.year}"; 1 -> "$mon ${date.year}"; else -> mon }
+                        val title = when (page) { 2 -> "${date.dayOfMonth} ב$mon ${date.year}"; 1 -> { val a = wkStart(date); val b = a.plusDays(6)
+                            if (a.month == b.month) "$mon ${date.year}" else if (a.year == b.year) "${HE_MONTHS[a.monthValue - 1]} / ${HE_MONTHS[b.monthValue - 1]} ${b.year}"
+                            else "${HE_MONTHS[a.monthValue - 1]} ${a.year} / ${HE_MONTHS[b.monthValue - 1]} ${b.year}" }; else -> mon }
                         val sub = when (page) { 2 -> "שב׳ ${wkNo(date)}, ${DAY_FULL[dayIdx(date)]}"; 1 -> "שב׳ ${wkNo(date)}"; else -> "${date.year}" }
                         Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, maxLines = 1)
