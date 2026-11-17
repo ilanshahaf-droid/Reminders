@@ -491,7 +491,7 @@ private fun DayDialog(
             }
         }
     }
-    delAsk?.let { e -> DeleteDialog(e, { delAsk = null }) { sel = 0; onChanged() } }
+    delAsk?.let { e -> DeleteDialog(e, { delAsk = null }) { delAsk = null; sel = 0; onChanged() } }
 }
 
 @Composable
