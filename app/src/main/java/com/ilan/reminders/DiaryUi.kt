@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -337,7 +336,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 10.dp, vertical = 12.dp))
                     Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 10.dp, vertical = 6.dp))
-                    IconButton({ startVoice() }) { Icon(Icons.Default.Mic, "הוספה בקול", tint = Color.White) }
+                    IconButton({ startVoice() }) { Text("🎤", fontSize = 20.sp) }
                     IconButton({ onNew(date, null) }) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
                     Box {
                         IconButton({ menuMore = true }) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
@@ -773,7 +772,7 @@ private fun WeekExtraCell(mode: String, start: LocalDate, all: List<Ev>, z: Zone
     val endD = start.plusDays(6)
     val weekMs0 = start.atStartOfDay(z).toInstant().toEpochMilli()
     val weekMs1 = endD.plusDays(1).atStartOfDay(z).toInstant().toEpochMilli()
-    val head = { t: String -> Text(t, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = BAR) }
+    val head: @Composable (String) -> Unit = { t -> Text(t, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = BAR) }
     Column(modifier.background(Color(0xFFF3F6F9)).padding(horizontal = 8.dp, vertical = 6.dp).verticalScroll(rememberScrollState())) {
         when (mode) {
             "hours" -> {
