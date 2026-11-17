@@ -1057,7 +1057,6 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
         }, confirmButton = {}, dismissButton = { TextButton({ pickCal = false }) { Text("סגירה") } }
     )
     if (confirmDel && ev != null) DeleteDialog(ev.copy(repeat = ev.repeat || !full?.rrule.isNullOrEmpty()), { confirmDel = false }) { confirmDel = false; onChanged() }
-)
 }
 
 @Composable
