@@ -14,6 +14,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -564,7 +567,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
                     )
                 }
                 Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     if (searching) {
                         OutlinedTextField(
                             query, { query = it }, singleLine = true, placeholder = { Text("חיפוש מסמך") },
@@ -572,11 +575,11 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
                             trailingIcon = { IconButton({ query = ""; searching = false }) { Icon(Icons.Default.Close, "סגור") } }
                         )
                     } else {
-                        FilterChip(typeFilter == "all", { typeFilter = "all" }, { Text("הכול") })
-                        FilterChip(typeFilter == "docx", { typeFilter = "docx" }, { Text("Word") })
-                        FilterChip(typeFilter == "xlsx", { typeFilter = "xlsx" }, { Text("Excel") })
-                        FilterChip(typeFilter == "pptx", { typeFilter = "pptx" }, { Text("PowerPoint") })
-                        FilterChip(typeFilter == "pdf", { typeFilter = "pdf" }, { Text("PDF") })
+                        TypeChip("הכול", typeFilter == "all", Color(0xFF3F4A6B)) { typeFilter = "all" }
+                        TypeChip("Word", typeFilter == "docx", Color(0xFF1E5BB8)) { typeFilter = "docx" }
+                        TypeChip("Excel", typeFilter == "xlsx", Color(0xFF1E8E3E)) { typeFilter = "xlsx" }
+                        TypeChip("PowerPoint", typeFilter == "pptx", Color(0xFFD32F2F)) { typeFilter = "pptx" }
+                        TypeChip("PDF", typeFilter == "pdf", Color(0xFF6A1B9A)) { typeFilter = "pdf" }
                         Spacer(Modifier.weight(1f))
                         IconButton({ searching = true }) { Icon(Icons.Default.Search, "חיפוש") }
                     }
@@ -1749,4 +1752,13 @@ fun PdfOrganizerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
             }
         }
     )
+}
+
+
+@Composable
+private fun TypeChip(label: String, on: Boolean, col: Color, onClick: () -> Unit) {
+    val sh = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    Text(label, Modifier.clip(sh).background(if (on) col else col.copy(alpha = 0.08f))
+        .border(1.5.dp, col, sh).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 7.dp),
+        color = if (on) Color.White else col, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 }
