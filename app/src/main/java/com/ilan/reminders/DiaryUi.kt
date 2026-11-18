@@ -308,11 +308,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                             DropdownMenuItem({ Text("📝 פתקים") }, { menuNav = false; onNotes() })
                             DropdownMenuItem({ Text("📄 מסמכים") }, { menuNav = false; onDocs() })
                             HorizontalDivider()
-                            DropdownMenuItem({ Text("🗓 הגדרות יומנים") }, { menuNav = false; showSettings = true })
-                            DropdownMenuItem({ Text("🔔 התראות אירועים") }, { menuNav = false; showNotif = true })
-                            DropdownMenuItem({ Text("🔤 תצוגה: פונט וצבעים") }, { menuNav = false; showFont = true })
-                            DropdownMenuItem({ Text("⚙ ברירות מחדל לאירוע") }, { menuNav = false; showDefs = true })
-                            DropdownMenuItem({ Text("🧩 משבצת בתצוגת שבוע") }, { menuNav = false; showWeekCell = true })
+                            DropdownMenuItem({ Text("⚙ הגדרות") }, { menuNav = false; showSettings = true })
                         }
                     }
                     val page = pager.currentPage
@@ -345,7 +341,6 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                                 menuMore = false
                                 DatePickerDialog(ctx, { _, y, m, d -> dayNum = LocalDate.of(y, m + 1, d).toEpochDay() }, date.year, date.monthValue - 1, date.dayOfMonth).show()
                             })
-                            DropdownMenuItem({ Text("הגדרות יומנים") }, { menuMore = false; showSettings = true })
                             DropdownMenuItem({ Text("רענון") }, { menuMore = false; tick++ })
                             DropdownMenuItem({ Text("אבחון היום הנוכחי") }, { menuMore = false; showDiag = true })
                         }
@@ -405,15 +400,11 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 text = { Text(txt, Modifier.verticalScroll(rememberScrollState()), fontSize = 13.sp) },
                 confirmButton = { TextButton({ showDiag = false }) { Text("סגירה") } })
         }
-        if (showFont) FontSettings { showFont = false }
-        if (showDefs) EventDefaults { showDefs = false }
-        if (showWeekCell) WeekCellSettings(weekCell, { showWeekCell = false }) { weekCell = it; prefs.edit().putString("weekCell", it).apply(); showWeekCell = false }
-        if (showNotif) NotifSettings(onDismiss = { showNotif = false; tick++ })
-        if (showSettings) SettingsDialog(cals, visible, defCal, onDismiss = { showSettings = false; tick++ }) { vis, def ->
-            visPref = vis; defCal = def; tick++
-            prefs.edit().putStringSet("diaryVis", vis.map { it.toString() }.toSet()).putLong("diaryDef", def).apply()
-            showSettings = false
-        }
+        if (showSettings) DiarySettingsHost(cals, visible, defCal, weekCell, onWeekCell = { weekCell = it; prefs.edit().putString("weekCell", it).apply() },
+            onSaveCals = { vis, def ->
+                visPref = vis; defCal = def; tick++
+                prefs.edit().putStringSet("diaryVis", vis.map { it.toString() }.toSet()).putLong("diaryDef", def).apply()
+            }, onClose = { DS.save(ctx); showSettings = false; tick++ })
     }
 }
 
@@ -529,7 +520,7 @@ private fun DayDialog(
 }
 
 @Composable
-private fun NotifSettings(onDismiss: () -> Unit) {
+private fun NotifSettings(tab: Boolean = false, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
     var on by remember { mutableStateOf(EventNotify.enabled(ctx)) }
@@ -549,7 +540,7 @@ private fun NotifSettings(onDismiss: () -> Unit) {
     val vibs = listOf("ANDROID" to "Android", "STRONG" to "חזק", "SHORT" to "קצר", "PULSE" to "פעימות", "NONE" to "ללא")
     val snzs = listOf(5, 10, 15, 30, 60)
     val rens = listOf(0, 5, 10, 15, 30)
-    AlertDialog(
+    DlgOrTab(tab, 
         onDismissRequest = onDismiss, title = { Text("התראות אירועים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -579,17 +570,18 @@ private fun NotifSettings(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, onDismiss: () -> Unit, onSave: (Set<Long>, Long) -> Unit) {
+private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, tab: Boolean = false, onDismiss: () -> Unit, onSave: (Set<Long>, Long) -> Unit) {
     val ctx = LocalContext.current
     var vis by remember { mutableStateOf(visible) }
     var def by remember { mutableStateOf(defCal) }
     var rev by remember { mutableStateOf(0) }
+    if (tab) LaunchedEffect(vis, def) { onSave(vis, def) }
     val list = remember(rev, cals) { CalRepo.calendars(ctx) }
     var menu by remember { mutableStateOf<Long?>(null) }
     var rename by remember { mutableStateOf<Cal?>(null) }
     var recolor by remember { mutableStateOf<Cal?>(null) }
     val palette = listOf(0, 0xFFD50000.toInt(), 0xFFE67C73.toInt(), 0xFFF4511E.toInt(), 0xFFF6BF26.toInt(), 0xFF33B679.toInt(), 0xFF0B8043.toInt(), 0xFF039BE5.toInt(), 0xFF3F51B5.toInt(), 0xFF7986CB.toInt(), 0xFF8E24AA.toInt(), 0xFF616161.toInt())
-    AlertDialog(
+    DlgOrTab(tab, 
         onDismissRequest = onDismiss,
         title = { Text("יומנים") },
         text = {
@@ -755,8 +747,8 @@ private val WEEK_CELL_OPTIONS = listOf(
 )
 
 @Composable
-private fun WeekCellSettings(cur: String, onDismiss: () -> Unit, onPick: (String) -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("משבצת בתצוגת שבוע") },
+private fun WeekCellSettings(cur: String, tab: Boolean = false, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    DlgOrTab(tab, onDismissRequest = onDismiss, title = { Text("משבצת בתצוגת שבוע") },
         text = {
             Column {
                 WEEK_CELL_OPTIONS.forEach { (k, l) ->
@@ -1489,7 +1481,7 @@ private fun SwatchRow(options: List<Int>, sel: Int, onPick: (Int) -> Unit) {
 }
 
 @Composable
-private fun FontSettings(onDismiss: () -> Unit) {
+private fun FontSettings(tab: Boolean = false, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val fams = listOf("default" to "ברירת מחדל", "sans" to "Sans", "serif" to "Serif", "mono" to "Mono", "cursive" to "כתב יד")
     val textCols = listOf(0, 0xFF222222.toInt(), 0xFF000000.toInt(), 0xFF0D47A1.toInt(), 0xFFB71C1C.toInt(), 0xFF1B5E20.toInt(), 0xFF4A148C.toInt(), 0xFF6D4C41.toInt())
@@ -1497,7 +1489,7 @@ private fun FontSettings(onDismiss: () -> Unit) {
     val todayCols = listOf(0xFFFB8C00.toInt(), 0xFFE53935.toInt(), 0xFF43A047.toInt(), 0xFF1E88E5.toInt(), 0xFF8E24AA.toInt(), 0xFFE91E63.toInt())
     val cur = androidx.compose.ui.platform.LocalDensity.current
     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(cur.density, cur.fontScale / DS.scale)) {
-    AlertDialog(
+    DlgOrTab(tab, 
         onDismissRequest = { DS.save(ctx); onDismiss() }, title = { Text("תצוגה: פונט וצבעים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1531,7 +1523,7 @@ private fun FontSettings(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun EventDefaults(onDismiss: () -> Unit) {
+private fun EventDefaults(tab: Boolean = false, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var start by remember { mutableStateOf(DS.defStart(ctx)) }
     var dur by remember { mutableStateOf(DS.defDur(ctx)) }
@@ -1541,7 +1533,7 @@ private fun EventDefaults(onDismiss: () -> Unit) {
     var access by remember { mutableStateOf(DS.defAccess(ctx)) }
     val durs = listOf(15, 30, 45, 60, 90, 120, 180)
     val allOpts = listOf(-540, 900, 2340, 9540)
-    AlertDialog(
+    DlgOrTab(tab, 
         onDismissRequest = onDismiss, title = { Text("ברירות מחדל לאירוע חדש") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1565,5 +1557,39 @@ private fun EventDefaults(onDismiss: () -> Unit) {
             }
         },
         confirmButton = { TextButton(onDismiss) { Text("סגירה") } }
+    )
+}
+
+
+@Composable
+private fun DlgOrTab(tab: Boolean, onDismissRequest: () -> Unit, title: @Composable () -> Unit, text: @Composable () -> Unit, confirmButton: @Composable () -> Unit, dismissButton: @Composable (() -> Unit)? = null) {
+    if (tab) text() else AlertDialog(onDismissRequest = onDismissRequest, title = title, text = text, confirmButton = confirmButton, dismissButton = dismissButton)
+}
+
+@Composable
+private fun DiarySettingsHost(cals: List<Cal>, visible: Set<Long>, defCal: Long, weekCell: String, onWeekCell: (String) -> Unit, onSaveCals: (Set<Long>, Long) -> Unit, onClose: () -> Unit) {
+    var tabI by remember { mutableStateOf(0) }
+    val tabs = listOf("יומנים", "התראות", "תצוגה", "ברירות מחדל", "משבצת")
+    var wc by remember { mutableStateOf(weekCell) }
+    AlertDialog(
+        onDismissRequest = onClose, title = { Text("הגדרות") },
+        text = {
+            Column {
+                ScrollableTabRow(tabI, edgePadding = 0.dp) {
+                    tabs.forEachIndexed { i, t -> Tab(tabI == i, { tabI = i }, text = { Text(t, fontSize = 14.sp, maxLines = 1) }) }
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.heightIn(max = 420.dp)) {
+                    when (tabI) {
+                        0 -> SettingsDialog(cals, visible, defCal, true, onClose, onSaveCals)
+                        1 -> NotifSettings(true, onClose)
+                        2 -> FontSettings(true, onClose)
+                        3 -> EventDefaults(true, onClose)
+                        else -> Box(Modifier.verticalScroll(rememberScrollState())) { WeekCellSettings(wc, true, onClose) { wc = it; onWeekCell(it) } }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClose) { Text("סגירה") } }
     )
 }
