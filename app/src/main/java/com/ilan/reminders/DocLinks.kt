@@ -66,6 +66,7 @@ object DocLinks {
         if (e.isEmpty()) o.remove(id.toString()) else o.put(id.toString(), e)
         p(c).edit().putString("evDocs", o.toString()).apply()
     }
+    fun eventIds(c: Context): Set<Long> = idx(c).keys().asSequence().mapNotNull { it.toLongOrNull() }.filter { forEvent(c, it).isNotEmpty() }.toSet()
     fun eventRaw(c: Context, id: Long): String = idx(c).optString(id.toString(), "")
 
     /** Opens a linked document: an app document in the Documents tab, a web link in the browser / Drive / OneDrive app. */

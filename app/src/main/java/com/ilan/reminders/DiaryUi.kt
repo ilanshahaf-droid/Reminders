@@ -241,7 +241,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             }
             (CalRepo.events(ctx, from, to, visible) + rem)
                 .distinctBy { Triple(it.title.removePrefix("⏰ ").trim(), it.begin, it.allDay) }
-                .let { l -> val ai = EventAtt.ids(ctx); if (ai.isEmpty()) l else l.map { if (it.id in ai) it.copy(att = true) else it } }
+                .let { l -> val ai = EventAtt.ids(ctx) + DocLinks.eventIds(ctx); if (ai.isEmpty()) l else l.map { if (it.id in ai) it.copy(att = true) else it } }
                 .sortedBy { it.begin }
         }
     }
@@ -503,6 +503,7 @@ private fun DayDialog(
                                         Text(e.title + (if (e.repeat) " ⇄" else ""), fontSize = 18.sp, color = INK)
                                         Text(timeOf(e), fontSize = 16.sp, color = Color.Gray)
                                     }
+                                    if (e.att && !isRem) Text("📎", fontSize = 20.sp)
                                     if (e.alarm || isRem) Text("🔔", fontSize = 20.sp)
                                 }
                             }
