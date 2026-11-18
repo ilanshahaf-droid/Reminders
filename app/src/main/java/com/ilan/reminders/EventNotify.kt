@@ -218,7 +218,7 @@ object EventOverlay {
                     orientation = android.widget.LinearLayout.VERTICAL
                     layoutDirection = android.view.View.LAYOUT_DIRECTION_RTL
                     setPadding(d(16), d(12), d(16), d(6))
-                    background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFFFFFFFF.toInt()); cornerRadius = d(16).toFloat(); setStroke(d(2), 0xFFFB8C00.toInt()) }
+                    background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFFFFFFFF.toInt()); cornerRadius = d(16).toFloat() }
                     elevation = d(8).toFloat()
                 }
                 root.addView(android.widget.TextView(ctx).apply { this.text = "📅 $title"; textSize = 18f; setTextColor(0xFF222222.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD) })
@@ -245,7 +245,7 @@ object EventOverlay {
                     android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
                     android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                     android.graphics.PixelFormat.TRANSLUCENT
-                ).apply { gravity = android.view.Gravity.TOP; y = d(28); horizontalMargin = 0.03f }
+                ).apply { gravity = android.view.Gravity.TOP; y = d(2); horizontalMargin = 0.03f }
                 wm.addView(root, lp); view = root
                 h.postDelayed({ hide(ctx) }, secs * 1000L)
             }
