@@ -38,6 +38,9 @@ data class DocLink(val kind: String, val name: String, val url: String = "") {
     val icon: String get() = if (kind == "doc") (when (name.substringAfterLast('.', "").lowercase()) { "pdf" -> "📕"; "xlsx" -> "📗"; "pptx" -> "📙"; else -> "📘" }) else "🔗"
 }
 
+private val DOC_MIMES = arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
 object DocLinks {
     const val MAX = 3
 
@@ -137,6 +140,21 @@ private fun AddDocLinkDialog(onDismiss: () -> Unit, onPick: (DocLink) -> Unit) {
             if (n != null) onPick(DocLink("doc", n)) else Toast.makeText(ctx, "אפשר לצרף קובצי Word, PDF, Excel ו-PowerPoint", Toast.LENGTH_LONG).show()
         }
     }
+    // the cloud apps' own pickers (Drive / OneDrive): the file is chosen inside the app and copied here
+    val appPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val u = r.data?.data
+        if (r.resultCode == android.app.Activity.RESULT_OK && u != null) {
+            val n = DocLinks.importPicked(ctx, u)
+            if (n != null) onPick(DocLink("doc", n)) else Toast.makeText(ctx, "אפשר לצרף קובצי Word, PDF, Excel ו-PowerPoint", Toast.LENGTH_LONG).show()
+        }
+    }
+    fun installed(pkg: String) = runCatching { ctx.packageManager.getPackageInfo(pkg, 0); true }.getOrDefault(false)
+    fun fromApp(pkg: String) {
+        runCatching {
+            appPicker.launch(Intent(Intent.ACTION_GET_CONTENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE)
+                .putExtra(Intent.EXTRA_MIME_TYPES, DOC_MIMES).setPackage(pkg))
+        }.onFailure { Toast.makeText(ctx, "האפליקציה לא מאפשרת בחירת קובץ מכאן. נסה את הבחירה דרך בוחר המערכת", Toast.LENGTH_LONG).show() }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(when (mode) { "app" -> "מסמך מהאפליקציה"; "url" -> "קישור (Drive / OneDrive)"; else -> "צירוף מסמך" }) },
@@ -158,11 +176,21 @@ private fun AddDocLinkDialog(onDismiss: () -> Unit, onPick: (DocLink) -> Unit) {
                     OutlinedTextField(label, { label = it }, label = { Text("שם להצגה (לא חובה)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
                 else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("📂 מסמך מהאפליקציה" to "app", "☁️ בחירת קובץ מ-Google Drive / OneDrive / הטלפון" to "file", "🔗 הדבקת קישור (פתיחה בדפדפן)" to "url").forEach { (t, m) ->
+                    val opts = buildList {
+                        add("📂 מסמך מהאפליקציה" to "app")
+                        if (installed("com.google.android.apps.docs")) add("🟢 מאפליקציית Google Drive" to "gdrive")
+                        if (installed("com.microsoft.skydrive")) add("🔵 מאפליקציית OneDrive" to "onedrive")
+                        add("📱 בוחר המערכת (הטלפון / Drive / OneDrive)" to "file")
+                        add("🔗 הדבקת קישור (פתיחה בדפדפן)" to "url")
+                    }
+                    opts.forEach { (t, m) ->
                         Text(t, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF1F3F6)).clickable {
-                            if (m == "file") picker.launch(arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/octet-stream"))
-                            else mode = m
+                            when (m) {
+                                "file" -> picker.launch(DOC_MIMES + "application/octet-stream")
+                                "gdrive" -> fromApp("com.google.android.apps.docs")
+                                "onedrive" -> fromApp("com.microsoft.skydrive")
+                                else -> mode = m
+                            }
                         }.padding(14.dp), fontSize = 16.sp)
                     }
                 }
