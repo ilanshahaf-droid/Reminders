@@ -152,7 +152,7 @@ object Sync {
         done = r.optBoolean("done"), fired = r.optBoolean("fired"), snoozeUntil = r.optLong("snooze_until"),
         slots = r.optString("slots"), updatedAt = r.optLong("updated_at"),
         alertMode = r.optString("alert_mode", "ONCE"), important = r.optBoolean("important", false),
-        every = r.optInt("every_n", 1).coerceAtLeast(1), anchor = r.optLong("anchor", 0), listName = r.optString("list_name", "")
+        every = r.optInt("every_n", 1).coerceAtLeast(1), anchor = r.optLong("anchor", 0), listName = r.optString("list_name", ""), docs = r.optString("docs", "")
     )
 
     internal fun toJson(it: Task) = JSONObject().put("id", it.id).put("title", it.title).put("notes", it.notes)
@@ -162,7 +162,7 @@ object Sync {
         .put("done", it.done).put("fired", it.fired).put("snooze_until", it.snoozeUntil)
         .put("updated_at", it.updatedAt).put("deleted", false)
         .put("alert_mode", it.alertMode).put("important", it.important)
-        .put("every_n", it.every).put("anchor", it.anchor).put("list_name", it.listName)
+        .put("every_n", it.every).put("anchor", it.anchor).put("list_name", it.listName).put("docs", it.docs)
 
     /** Notes deleted for good on the phone; the cloud copy is marked deleted on the next sync. */
     fun markNotePurged(c: Context, id: Long) {
@@ -254,7 +254,7 @@ object Sync {
         val rows = JSONArray()
         evs.forEach { e ->
             rows.put(JSONObject().put("key", "${e.id}:${e.begin}").put("title", e.title).put("start_ms", e.begin).put("end_ms", maxOf(e.end, e.begin))
-                .put("all_day", e.allDay).put("color", e.color).put("location", e.location).put("cal", names[e.calId].orEmpty()).put("rep", e.repeat))
+                .put("all_day", e.allDay).put("color", e.color).put("location", e.location).put("cal", names[e.calId].orEmpty()).put("rep", e.repeat).put("docs", DocLinks.eventRaw(c, e.id)))
         }
         val hash = rows.toString().hashCode().toString() + ":" + today.toEpochDay()
         if (p.getString("diaryHash", "") == hash) return null
@@ -265,7 +265,12 @@ object Sync {
         var i = 0
         while (i < rows.length()) {
             val part = JSONArray(); for (k in i until minOf(i + 300, rows.length())) part.put(rows.get(k))
-            val r = http("POST", "$base/rest/v1/rem_events?on_conflict=user_id,key", h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), part.toString())
+            var r = http("POST", "$base/rest/v1/rem_events?on_conflict=user_id,key", h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), part.toString())
+            if (r.first == 400 && r.second.contains("docs")) {
+                // the SQL update that adds the docs column was not run yet: sync the diary without it
+                for (k in 0 until part.length()) part.getJSONObject(k).remove("docs")
+                r = http("POST", "$base/rest/v1/rem_events?on_conflict=user_id,key", h + ("Prefer" to "resolution=merge-duplicates,return=minimal"), part.toString())
+            }
             if (r.first !in 200..299) return "יומן: ${r.first} ${r.second.take(100)}"
             i += 300
         }
@@ -374,7 +379,7 @@ object Sync {
                 if (arr.length() == 0) return
                 val hh = h + ("Prefer" to "resolution=merge-duplicates,return=minimal")
                 var r = http("POST", "$base/rest/v1/$table?on_conflict=id", hh, arr.toString())
-                for (col in listOf("list_name", "every_n", "anchor", "important", "alert_mode")) {
+                for (col in listOf("list_name", "every_n", "anchor", "important", "alert_mode", "docs")) {
                     if (r.first == 400 && r.second.contains(col)) {
                         // the SQL update that adds this column was not run yet: sync without it
                         for (i in 0 until arr.length()) arr.getJSONObject(i).remove(col)

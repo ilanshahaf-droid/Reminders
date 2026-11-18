@@ -809,6 +809,7 @@ private fun TaskCard(
                         maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (t.docs.isNotBlank()) DocLinkChips(remember(t.docs) { DocLinks.parse(t.docs) }, Modifier.padding(top = 6.dp))
             }
             if (cat != null) {
                 Row(
@@ -834,7 +835,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v132") },
+        title = { Text("הגדרות · v133") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

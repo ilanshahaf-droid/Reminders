@@ -43,7 +43,9 @@ data class Task(
     // for "every N weeks": any moment inside the first week of the cycle
     @ColumnInfo(defaultValue = "0") val anchor: Long = 0,
     // for list-only (no alert) reminders: the sub-list they belong to, e.g. "קניות"; blank = general
-    @ColumnInfo(defaultValue = "''") val listName: String = ""
+    @ColumnInfo(defaultValue = "''") val listName: String = "",
+    // linked documents (JSON, up to 3): files from the Documents tab or Drive / OneDrive links
+    @ColumnInfo(defaultValue = "''") val docs: String = ""
 )
 
 fun Task.touch() = copy(updatedAt = System.currentTimeMillis())
@@ -87,7 +89,7 @@ interface TaskDao {
     suspend fun clearCategory(id: Long)
 }
 
-@Database(entities = [Task::class, Category::class, Note::class], version = 10, exportSchema = false)
+@Database(entities = [Task::class, Category::class, Note::class], version = 11, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): TaskDao
     abstract fun notes(): NoteDao
@@ -96,7 +98,7 @@ abstract class AppDb : RoomDatabase() {
         @Volatile private var inst: AppDb? = null
         fun get(c: Context): AppDb = inst ?: synchronized(this) {
             inst ?: Room.databaseBuilder(c.applicationContext, AppDb::class.java, "reminders.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 .fallbackToDestructiveMigration()
                 .build().also { inst = it }
         }
@@ -118,6 +120,12 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE tasks ADD COLUMN alertMode TEXT NOT NULL DEFAULT 'ONCE'")
+    }
+}
+
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tasks ADD COLUMN docs TEXT NOT NULL DEFAULT ''")
     }
 }
 

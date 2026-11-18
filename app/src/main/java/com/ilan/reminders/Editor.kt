@@ -147,6 +147,7 @@ fun Editor(
     val ctx = LocalContext.current
     var title by remember { mutableStateOf(initial.title) }
     var notes by remember { mutableStateOf(initial.notes) }
+    val docLinks = remember { mutableStateListOf<DocLink>().also { it.addAll(DocLinks.parse(initial.docs)) } }
     var repeat by remember { mutableStateOf(initial.repeat) }
     var at by remember { mutableLongStateOf(initial.triggerAt.takeIf { it > 0 } ?: System.currentTimeMillis() + 3_600_000) }
     val sch = remember { ScheduleState(initial.schedule()) }
@@ -222,7 +223,8 @@ fun Editor(
                             },
                             sound = sound, vibration = vibration,
                             alertMode = alertMode, important = important,
-                            listName = if (noAlert) listName.trim() else ""
+                            listName = if (noAlert) listName.trim() else "",
+                            docs = DocLinks.encode(docLinks.toList())
                         )
                     )
                 }) { Text("שמור") }
@@ -314,6 +316,8 @@ fun Editor(
                 }
             }
             }
+
+            Section { DocLinksField(docLinks) }
 
             Section("קטגוריה") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

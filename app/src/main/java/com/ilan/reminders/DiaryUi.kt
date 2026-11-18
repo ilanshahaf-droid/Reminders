@@ -476,6 +476,7 @@ private fun DayDialog(
                                     if (e.location.isNotBlank()) Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
                                         Text("📍", fontSize = 20.sp); Spacer(Modifier.width(12.dp)); Text(e.location, fontSize = 16.sp, color = INK)
                                     }
+                                    if (!isRem) DocLinkChips(remember(e.id) { DocLinks.forEvent(ctx, e.id) }, Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
                                     if (!isRem && e.att) {
                                         val al = remember(e.id) { EventAtt.list(ctx, e.id) }
                                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1050,6 +1051,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
     var confirmDel by remember { mutableStateOf(false) }
     var scope0 by remember { mutableStateOf(1) }
     val atts = remember { mutableStateListOf<EventAtt.Item>() }
+    val docLinks = remember { mutableStateListOf<DocLink>() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
         us.forEach { u -> atts.add(EventAtt.Item(null, u, EventAtt.nameOf(ctx, u), false)) }
     }
@@ -1069,6 +1071,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             loc = f?.location ?: src.location; desc = f?.desc.orEmpty()
             rems.clear(); rems.addAll(f?.reminders.orEmpty())
             atts.clear(); EventAtt.list(ctx, src.id).forEach { atts.add(EventAtt.Item(it.file, null, it.name, it.del)) }
+            docLinks.clear(); docLinks.addAll(DocLinks.forEvent(ctx, src.id))
             avail = f?.availability ?: 0; access = f?.access ?: 0
             guests.clear(); guests.addAll(f?.guests.orEmpty())
             rep = if (ev == null) "" else f?.rrule.orEmpty()
@@ -1085,6 +1088,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
             if (id >= 0) withContext(Dispatchers.IO) {
                 val endZ = if (allDay) ed.plusDays(1).atStartOfDay(zone) else ed.atTime(enT).atZone(zone)
                 runCatching { EventAtt.commit(ctx, id, atts.toList(), endZ.toInstant().toEpochMilli()) }
+                runCatching { DocLinks.setEvent(ctx, id, docLinks.toList()) }
             }
             if (id < 0) android.widget.Toast.makeText(ctx, "השמירה נכשלה: " + CalRepo.lastError.take(160), android.widget.Toast.LENGTH_LONG).show() else onChanged()
         }
@@ -1159,6 +1163,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, z
                 TextButton({ rems.add(REM_OPTS.firstOrNull { it !in rems } ?: 10) }) { Text("＋ הוסף תזכורת", color = Color(0xFFE91E63)) }
                 OutlinedButton({ repDlg = true }, Modifier.fillMaxWidth()) { Text("🔁 " + repText(rep, sd), Modifier.fillMaxWidth(), textAlign = TextAlign.Start) }
                 if (full != null && full!!.rrule.isNotEmpty()) Text("שינוי בפגישה חוזרת חל על כל הסדרה.", fontSize = 12.sp, color = Color.Gray)
+                DocLinksField(docLinks)
                 Text("📎 קבצים מצורפים (תמונות)", fontWeight = FontWeight.Bold, color = INK)
                 atts.toList().forEachIndexed { i, a ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
