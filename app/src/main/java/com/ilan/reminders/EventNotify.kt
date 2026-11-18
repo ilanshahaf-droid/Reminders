@@ -103,12 +103,7 @@ object EventNotify {
         if (!NotificationManagerCompat.from(c).areNotificationsEnabled()) return
         val nid = 900000 + abs(key.hashCode() % 90000)
         NotificationManagerCompat.from(c).notify(nid, build(c, nid, key, title, text, false))
-        showSecs(c).let { sec -> if (sec > 0) {
-            val am = c.getSystemService(AlarmManager::class.java)
-            val q = pi(c, nid + 6, "QUIET") { it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text) }
-            val at = System.currentTimeMillis() + sec * 1000L
-            runCatching { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, q) }.onFailure { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, q) }
-        } }
+        showSecs(c).let { sec -> if (sec > 0) EventOverlay.show(c, nid, key, title, text, sec) }
         WearBridge.fireEvent(c, nid, key, title, text)
         val rn = renotify(c)
         if (rn > 0 && count < 5) setClock(c, System.currentTimeMillis() + rn * 60_000L, pi(c, nid + 4, "REPOST") {
@@ -189,6 +184,68 @@ class EventReceiver : BroadcastReceiver() {
             else -> {
                 val p = goAsync()
                 Thread { try { EventNotify.run(c) } finally { p.finish() } }.start()
+            }
+        }
+    }
+}
+
+
+/** own pop-up window drawn over other apps for the user-chosen number of seconds (the system heads-up hides itself after ~5s) */
+object EventOverlay {
+    private var view: android.view.View? = null
+    private val h = android.os.Handler(android.os.Looper.getMainLooper())
+
+    fun can(c: Context) = android.provider.Settings.canDrawOverlays(c)
+
+    fun hide(c: Context) {
+        h.removeCallbacksAndMessages(null)
+        view?.let { v -> runCatching { c.applicationContext.getSystemService(android.view.WindowManager::class.java).removeView(v) } }
+        view = null
+    }
+
+    fun show(c: Context, nid: Int, key: String, title: String, text: String, secs: Int) {
+        if (!can(c)) return
+        val ctx = c.applicationContext
+        h.post {
+            hide(ctx)
+            runCatching {
+                val wm = ctx.getSystemService(android.view.WindowManager::class.java)
+                val dp = ctx.resources.displayMetrics.density
+                fun d(x: Int) = (x * dp).toInt()
+                val root = android.widget.LinearLayout(ctx).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    layoutDirection = android.view.View.LAYOUT_DIRECTION_RTL
+                    setPadding(d(16), d(12), d(16), d(6))
+                    background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFFFFFFFF.toInt()); cornerRadius = d(16).toFloat(); setStroke(d(2), 0xFFFB8C00.toInt()) }
+                    elevation = d(8).toFloat()
+                }
+                root.addView(android.widget.TextView(ctx).apply { this.text = "📅 $title"; textSize = 18f; setTextColor(0xFF222222.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD) })
+                root.addView(android.widget.TextView(ctx).apply { this.text = text; textSize = 15f; setTextColor(0xFF555555.toInt()) })
+                val row = android.widget.LinearLayout(ctx).apply { layoutDirection = android.view.View.LAYOUT_DIRECTION_RTL; gravity = android.view.Gravity.START }
+                fun btn(t: String, f: () -> Unit) = android.widget.TextView(ctx).apply {
+                    this.text = t; textSize = 15f; setTextColor(0xFFFB8C00.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setPadding(d(12), d(10), d(12), d(10)); setOnClickListener { f() }
+                }
+                row.addView(btn("סגור") {
+                    EventNotify.cancelRepeat(ctx, nid); NotificationManagerCompat.from(ctx).cancel(nid); WearBridge.eventDismiss(ctx, nid); hide(ctx)
+                })
+                row.addView(btn("נודניק ${EventNotify.snooze(ctx)} דק׳") {
+                    EventNotify.snoozeNow(ctx, nid, key, title, text); WearBridge.eventDismiss(ctx, nid); hide(ctx)
+                })
+                root.addView(row)
+                root.setOnClickListener {
+                    hide(ctx)
+                    ctx.startActivity(Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP).also { i ->
+                        val p = key.split(":"); if (p.size >= 2) { i.putExtra("evId", p[0].toLongOrNull() ?: -1L); i.putExtra("evBegin", p[1].toLongOrNull() ?: 0L); i.putExtra("evNid", nid) }
+                    })
+                }
+                val lp = android.view.WindowManager.LayoutParams(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                    android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    android.graphics.PixelFormat.TRANSLUCENT
+                ).apply { gravity = android.view.Gravity.TOP; y = d(28); horizontalMargin = 0.03f }
+                wm.addView(root, lp); view = root
+                h.postDelayed({ hide(ctx) }, secs * 1000L)
             }
         }
     }

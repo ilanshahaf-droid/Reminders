@@ -564,7 +564,13 @@ private fun NotifSettings(tab: Boolean = false, onDismiss: () -> Unit) {
                 }
                 Choice("רטט", vibs.first { it.first == vib }.second, vibs.map { it.second }) { vib = vibs[it].first; prefs.edit().putString("evVib", vib).apply() }
                 Choice("נודניק", "$snz דקות", snzs.map { "$it דקות" }) { snz = snzs[it]; prefs.edit().putInt("evSnooze", snz).apply() }
-                Choice("משך הופעת חלון ההתראה", if (shw == 0) "עד לסגירה" else if (shw == 60) "דקה" else "$shw שניות", shws.map { if (it == 0) "עד לסגירה" else if (it == 60) "דקה" else "$it שניות" }) { shw = shws[it]; prefs.edit().putInt("evShowSecs", shw).apply() }
+                Choice("חלון התראה על המסך (מעל אפליקציות)", if (shw == 0) "עד לסגירה" else if (shw == 60) "דקה" else "$shw שניות", shws.map { if (it == 0) "עד לסגירה" else if (it == 60) "דקה" else "$it שניות" }) {
+                    shw = shws[it]; prefs.edit().putInt("evShowSecs", shw).apply()
+                    if (shw > 0 && !EventOverlay.can(ctx)) {
+                        Toast.makeText(ctx, "יש לאשר \"הצגה מעל אפליקציות אחרות\" לסדר יום", Toast.LENGTH_LONG).show()
+                        ctx.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + ctx.packageName)))
+                    }
+                }
                 Choice("Re-Notify", if (ren == 0) "כבוי" else "כל $ren דקות", rens.map { if (it == 0) "כבוי" else "כל $it דקות" }) { ren = rens[it]; prefs.edit().putInt("evRenotify", ren).apply() }
             }
         },
