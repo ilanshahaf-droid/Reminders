@@ -72,7 +72,15 @@ object DocLinks {
             if (f.exists()) PendingOpen.file = f
             else Toast.makeText(c, "המסמך \"${l.name}\" לא נמצא באפליקציה", Toast.LENGTH_LONG).show()
         } else {
-            runCatching { c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(l.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            val uri = Uri.parse(l.url)
+            val host = (uri.host ?: "").lowercase()
+            // The OneDrive app often fails to download a shared link ("problem downloading the file"); the browser opens it reliably.
+            val oneDrive = host == "1drv.ms" || host.endsWith("onedrive.live.com") || host.endsWith("sharepoint.com") || host.endsWith("onedrive.com")
+            val ok = oneDrive && runCatching {
+                val i = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER).setData(uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                c.startActivity(i)
+            }.isSuccess
+            if (!ok) runCatching { c.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 .onFailure { Toast.makeText(c, "לא ניתן לפתוח את הקישור", Toast.LENGTH_SHORT).show() }
         }
     }
