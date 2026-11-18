@@ -102,6 +102,21 @@ object EventNotify {
     fun post(c: Context, key: String, title: String, text: String, count: Int) {
         if (!NotificationManagerCompat.from(c).areNotificationsEnabled()) return
         val nid = 900000 + abs(key.hashCode() % 90000)
+        NotificationManagerCompat.from(c).notify(nid, build(c, nid, key, title, text, false))
+        showSecs(c).let { sec -> if (sec > 0) {
+            val am = c.getSystemService(AlarmManager::class.java)
+            val q = pi(c, nid + 6, "QUIET") { it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text) }
+            val at = System.currentTimeMillis() + sec * 1000L
+            runCatching { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, q) }.onFailure { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, q) }
+        } }
+        WearBridge.fireEvent(c, nid, key, title, text)
+        val rn = renotify(c)
+        if (rn > 0 && count < 5) setClock(c, System.currentTimeMillis() + rn * 60_000L, pi(c, nid + 4, "REPOST") {
+            it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text).putExtra("count", count + 1)
+        })
+    }
+
+    private fun build(c: Context, nid: Int, key: String, title: String, text: String, silent: Boolean): android.app.Notification {
         val open = PendingIntent.getActivity(c, nid, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP).also { i -> val p = key.split(":"); if (p.size >= 2) { i.putExtra("evId", p[0].toLongOrNull() ?: -1L); i.putExtra("evBegin", p[1].toLongOrNull() ?: 0L); i.putExtra("evNid", nid) } }, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val snz = snooze(c)
         val b = NotificationCompat.Builder(c, channel(c))
@@ -112,19 +127,23 @@ object EventNotify {
             .setDeleteIntent(pi(c, nid + 1, "DISMISS") { it.putExtra("nid", nid) })
             .addAction(0, "נודניק $snz דק׳", pi(c, nid + 2, "SNOOZE") { it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text) })
             .addAction(0, "סגור", pi(c, nid + 3, "DISMISS") { it.putExtra("nid", nid) })
-        if (led(c)) b.setLights(0xFFFB8C00.toInt(), 600, 600)
-        showSecs(c).let { if (it > 0) b.setTimeoutAfter(it * 1000L) }
-        NotificationManagerCompat.from(c).notify(nid, b.build())
-        WearBridge.fireEvent(c, nid, key, title, text)
-        val rn = renotify(c)
-        if (rn > 0 && count < 5) setClock(c, System.currentTimeMillis() + rn * 60_000L, pi(c, nid + 4, "REPOST") {
-            it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text).putExtra("count", count + 1)
-        })
+        if (silent) b.setSilent(true).setOnlyAlertOnce(true).setPriority(NotificationCompat.PRIORITY_LOW)
+        else if (led(c)) b.setLights(0xFFFB8C00.toInt(), 600, 600)
+        return b.build()
+    }
+
+    /** after the display time: hide the pop-up but keep the notification in the shade (silent copy) */
+    fun quiet(c: Context, nid: Int, key: String, title: String, text: String) {
+        val nm = c.getSystemService(android.app.NotificationManager::class.java)
+        if (nm.activeNotifications.none { it.id == nid }) return
+        val n = build(c, nid, key, title, text, true)
+        NotificationManagerCompat.from(c).cancel(nid)
+        runCatching { NotificationManagerCompat.from(c).notify(nid, n) }
     }
 
     fun cancelRepeat(c: Context, nid: Int) {
         val am = c.getSystemService(AlarmManager::class.java)
-        am.cancel(pi(c, nid + 4, "REPOST")); am.cancel(pi(c, nid + 5, "SNOOZE_FIRE"))
+        am.cancel(pi(c, nid + 4, "REPOST")); am.cancel(pi(c, nid + 5, "SNOOZE_FIRE")); am.cancel(pi(c, nid + 6, "QUIET"))
     }
 
     fun snoozeNow(c: Context, nid: Int, key: String, title: String, text: String) {
@@ -165,6 +184,7 @@ class EventReceiver : BroadcastReceiver() {
         when (i.action) {
             "DISMISS" -> { EventNotify.cancelRepeat(c, nid); NotificationManagerCompat.from(c).cancel(nid); WearBridge.eventDismiss(c, nid) }
             "SNOOZE" -> { EventNotify.snoozeNow(c, nid, i.getStringExtra("key").orEmpty(), i.getStringExtra("title").orEmpty(), i.getStringExtra("text").orEmpty()); WearBridge.eventDismiss(c, nid) }
+            "QUIET" -> EventNotify.quiet(c, nid, i.getStringExtra("key").orEmpty(), i.getStringExtra("title").orEmpty(), i.getStringExtra("text").orEmpty())
             "REPOST", "SNOOZE_FIRE" -> EventNotify.post(c, i.getStringExtra("key").orEmpty(), i.getStringExtra("title").orEmpty(), i.getStringExtra("text").orEmpty(), i.getIntExtra("count", 0))
             else -> {
                 val p = goAsync()
