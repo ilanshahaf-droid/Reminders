@@ -143,10 +143,10 @@ object EventNotify {
         am.cancel(pi(c, nid + 4, "REPOST")); am.cancel(pi(c, nid + 5, "SNOOZE_FIRE")); am.cancel(pi(c, nid + 6, "QUIET"))
     }
 
-    fun snoozeNow(c: Context, nid: Int, key: String, title: String, text: String) {
+    fun snoozeNow(c: Context, nid: Int, key: String, title: String, text: String, minutes: Int = snooze(c)) {
         NotificationManagerCompat.from(c).cancel(nid)
         cancelRepeat(c, nid)
-        setClock(c, System.currentTimeMillis() + snooze(c) * 60_000L, pi(c, nid + 5, "SNOOZE_FIRE") {
+        setClock(c, System.currentTimeMillis() + minutes * 60_000L, pi(c, nid + 5, "SNOOZE_FIRE") {
             it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text).putExtra("count", 0)
         })
     }
@@ -221,11 +221,11 @@ object EventOverlay {
                     background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFFFFFFFF.toInt()); cornerRadius = d(16).toFloat() }
                     elevation = d(8).toFloat()
                 }
-                root.addView(android.widget.TextView(ctx).apply { this.text = "📅 $title"; textSize = 18f; setTextColor(0xFF222222.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD) })
-                root.addView(android.widget.TextView(ctx).apply { this.text = text; textSize = 15f; setTextColor(0xFF555555.toInt()) })
+                root.addView(android.widget.TextView(ctx).apply { this.text = "📅 $title"; textSize = 18f; setTextColor(0xFF000000.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD) })
+                root.addView(android.widget.TextView(ctx).apply { this.text = text; textSize = 15f; setTextColor(0xFF000000.toInt()) })
                 val row = android.widget.LinearLayout(ctx).apply { layoutDirection = android.view.View.LAYOUT_DIRECTION_RTL; gravity = android.view.Gravity.START }
                 fun btn(t: String, f: () -> Unit) = android.widget.TextView(ctx).apply {
-                    this.text = t; textSize = 15f; setTextColor(0xFFFB8C00.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    this.text = t; textSize = 15f; setTextColor(0xFF000000.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD)
                     setPadding(d(12), d(10), d(12), d(10)); setOnClickListener { f() }
                 }
                 row.addView(btn("סגור") {
@@ -233,6 +233,11 @@ object EventOverlay {
                 })
                 row.addView(btn("נודניק ${EventNotify.snooze(ctx)} דק׳") {
                     EventNotify.snoozeNow(ctx, nid, key, title, text); WearBridge.eventDismiss(ctx, nid); hide(ctx)
+                })
+                row.addView(btn("בחר זמן") {
+                    hide(ctx)
+                    ctx.startActivity(Intent(ctx, SnoozePickActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        .putExtra("evNid", nid).putExtra("evKey", key).putExtra("evTitle", title).putExtra("evText", text))
                 })
                 root.addView(row)
                 root.setOnClickListener {

@@ -34,7 +34,11 @@ class SnoozePickActivity : ComponentActivity() {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 (5..60 step 5).forEach { m ->
                                     FilterChip(false, {
-                                        sendBroadcast(
+                                        if (intent.hasExtra("evKey")) {
+                                            val nid = intent.getIntExtra("evNid", 0)
+                                            EventNotify.snoozeNow(applicationContext, nid, intent.getStringExtra("evKey").orEmpty(), intent.getStringExtra("evTitle").orEmpty(), intent.getStringExtra("evText").orEmpty(), m)
+                                            WearBridge.eventDismiss(applicationContext, nid)
+                                        } else sendBroadcast(
                                             Intent(this@SnoozePickActivity, ActionReceiver::class.java)
                                                 .setAction(if (add) "SNOOZE_ADD" else "SNOOZE").putExtra("id", id).putExtra("minutes", m)
                                         )
