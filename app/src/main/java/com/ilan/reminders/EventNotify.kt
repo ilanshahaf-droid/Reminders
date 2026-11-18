@@ -26,6 +26,7 @@ object EventNotify {
     fun vib(c: Context) = p(c).getString("evVib", "ANDROID") ?: "ANDROID" // ANDROID, STRONG, SHORT, PULSE, NONE
     fun led(c: Context) = p(c).getBoolean("evLed", false)
     fun snooze(c: Context) = p(c).getInt("evSnooze", 10)
+    fun showSecs(c: Context) = p(c).getInt("evShowSecs", 0)               // 0 = until dismissed
     fun renotify(c: Context) = p(c).getInt("evRenotify", 0)               // minutes, 0 = off
 
     private class Al(val evId: Long, val title: String, val begin: Long, val end: Long, val loc: String, val fire: Long, val key: String)
@@ -112,6 +113,7 @@ object EventNotify {
             .addAction(0, "נודניק $snz דק׳", pi(c, nid + 2, "SNOOZE") { it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text) })
             .addAction(0, "סגור", pi(c, nid + 3, "DISMISS") { it.putExtra("nid", nid) })
         if (led(c)) b.setLights(0xFFFB8C00.toInt(), 600, 600)
+        showSecs(c).let { if (it > 0) b.setTimeoutAfter(it * 1000L) }
         NotificationManagerCompat.from(c).notify(nid, b.build())
         WearBridge.fireEvent(c, nid, key, title, text)
         val rn = renotify(c)

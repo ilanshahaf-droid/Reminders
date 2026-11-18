@@ -529,6 +529,8 @@ private fun NotifSettings(tab: Boolean = false, onDismiss: () -> Unit) {
     var led by remember { mutableStateOf(EventNotify.led(ctx)) }
     var snz by remember { mutableStateOf(EventNotify.snooze(ctx)) }
     var ren by remember { mutableStateOf(EventNotify.renotify(ctx)) }
+    var shw by remember { mutableStateOf(EventNotify.showSecs(ctx)) }
+    val shws = listOf(0) + (1..12).map { it * 5 }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val u: Uri? = r.data?.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
         if (r.resultCode == android.app.Activity.RESULT_OK) { snd = if (u == null) "silent" else u.toString(); prefs.edit().putString("evSound", snd).apply() }
@@ -562,6 +564,7 @@ private fun NotifSettings(tab: Boolean = false, onDismiss: () -> Unit) {
                 }
                 Choice("רטט", vibs.first { it.first == vib }.second, vibs.map { it.second }) { vib = vibs[it].first; prefs.edit().putString("evVib", vib).apply() }
                 Choice("נודניק", "$snz דקות", snzs.map { "$it דקות" }) { snz = snzs[it]; prefs.edit().putInt("evSnooze", snz).apply() }
+                Choice("משך הצגת ההתראה", if (shw == 0) "עד לסגירה" else if (shw == 60) "דקה" else "$shw שניות", shws.map { if (it == 0) "עד לסגירה" else if (it == 60) "דקה" else "$it שניות" }) { shw = shws[it]; prefs.edit().putInt("evShowSecs", shw).apply() }
                 Choice("Re-Notify", if (ren == 0) "כבוי" else "כל $ren דקות", rens.map { if (it == 0) "כבוי" else "כל $it דקות" }) { ren = rens[it]; prefs.edit().putInt("evRenotify", ren).apply() }
             }
         },
