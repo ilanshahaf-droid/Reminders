@@ -158,7 +158,7 @@ private fun AddDocLinkDialog(onDismiss: () -> Unit, onPick: (DocLink) -> Unit) {
                     OutlinedTextField(label, { label = it }, label = { Text("שם להצגה (לא חובה)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
                 else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("📂 מסמך מהאפליקציה" to "app", "📱 קובץ חדש מהטלפון" to "file", "🔗 קישור Drive / OneDrive" to "url").forEach { (t, m) ->
+                    listOf("📂 מסמך מהאפליקציה" to "app", "☁️ בחירת קובץ מ-Google Drive / OneDrive / הטלפון" to "file", "🔗 הדבקת קישור (פתיחה בדפדפן)" to "url").forEach { (t, m) ->
                         Text(t, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF1F3F6)).clickable {
                             if (m == "file") picker.launch(arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/octet-stream"))
