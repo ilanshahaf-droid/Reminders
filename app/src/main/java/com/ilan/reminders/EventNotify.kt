@@ -31,12 +31,14 @@ object EventNotify {
 
     private class Al(val evId: Long, val title: String, val begin: Long, val end: Long, val loc: String, val fire: Long, val key: String)
 
+    fun useOverlay(c: Context) = showSecs(c) > 0 && EventOverlay.can(c)
+
     private fun channel(c: Context): String {
-        val snd = sound(c); val v = vib(c); val l = led(c)
-        val id = "ev1_${v}_${if (l) 1 else 0}_${if (snd.isBlank()) "def" else abs(snd.hashCode()).toString()}"
+        val snd = sound(c); val v = vib(c); val l = led(c); val ov = useOverlay(c)
+        val id = "ev1${if (ov) "p" else ""}_${v}_${if (l) 1 else 0}_${if (snd.isBlank()) "def" else abs(snd.hashCode()).toString()}"
         val nm = c.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(id) == null) {
-            val ch = NotificationChannel(id, "התראות אירועי יומן", NotificationManager.IMPORTANCE_HIGH)
+            val ch = NotificationChannel(id, "התראות אירועי יומן", if (ov) NotificationManager.IMPORTANCE_DEFAULT else NotificationManager.IMPORTANCE_HIGH)
             when (v) {
                 "NONE" -> ch.enableVibration(false)
                 "ANDROID" -> ch.enableVibration(true)
@@ -117,7 +119,7 @@ object EventNotify {
         val b = NotificationCompat.Builder(c, channel(c))
             .setSmallIcon(android.R.drawable.ic_menu_my_calendar)
             .setContentTitle("📅 $title").setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_HIGH).setCategory(NotificationCompat.CATEGORY_EVENT)
+            .setPriority(if (useOverlay(c)) NotificationCompat.PRIORITY_DEFAULT else NotificationCompat.PRIORITY_HIGH).setCategory(NotificationCompat.CATEGORY_EVENT)
             .setContentIntent(open).setAutoCancel(true)
             .setDeleteIntent(pi(c, nid + 1, "DISMISS") { it.putExtra("nid", nid) })
             .addAction(0, "נודניק $snz דק׳", pi(c, nid + 2, "SNOOZE") { it.putExtra("nid", nid).putExtra("key", key).putExtra("title", title).putExtra("text", text) })
