@@ -383,7 +383,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
         }
         val t = editing
         if (t != null) EventEditor(
-            target = t, cals = cals, defaultCal = defCal, zone = zone,
+            target = t, cals = cals, visible = visible, defaultCal = defCal, zone = zone,
             onClose = { editing = null },
             onDefault = { defCal = it; prefs.edit().putLong("diaryDef", it).apply() },
             onChanged = { editing = null; tick++ }
@@ -595,7 +595,7 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, ta
         title = { Text("יומנים") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Text("סמן יומנים להצגה. בתפריט ⋮: צבע, שם, ברירת מחדל, סנכרון והתראות לכל יומן (צבע ושם נשמרים באפליקציה בלבד).", fontSize = 13.sp)
+                Text("סמן יומנים להצגה (רק יומנים מסומנים ניתנים לבחירה ביצירת אירוע; 🔒 = קריאה בלבד). בתפריט ⋮: צבע, שם, ברירת מחדל, סנכרון והתראות לכל יומן (צבע ושם נשמרים באפליקציה בלבד).", fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
                 list.groupBy { it.account }.forEach { (acc, items) ->
                     Text(acc, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
@@ -603,7 +603,7 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, ta
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(c.id in vis, { on -> vis = if (on) vis + c.id else vis - c.id })
                             Box(Modifier.size(12.dp).clip(RoundedCornerShape(6.dp)).background(Color(c.color or 0xFF000000.toInt())))
-                            Text(c.name + if (def == c.id) " ★" else "", Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(c.name + (if (def == c.id) " ★" else "") + (if (!c.writable) " 🔒" else ""), Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Box {
                                 IconButton({ menu = c.id }, Modifier.size(36.dp)) { Icon(Icons.Filled.MoreVert, "אפשרויות") }
                                 DropdownMenu(menu == c.id, { menu = null }) {
@@ -1019,10 +1019,10 @@ private fun durText(mins: Long): String = when {
 }
 
 @Composable
-private fun EventEditor(target: EditTarget, cals: List<Cal>, defaultCal: Long, zone: ZoneId, onClose: () -> Unit, onDefault: (Long) -> Unit, onChanged: () -> Unit) {
+private fun EventEditor(target: EditTarget, cals: List<Cal>, visible: Set<Long>, defaultCal: Long, zone: ZoneId, onClose: () -> Unit, onDefault: (Long) -> Unit, onChanged: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val writable = cals.filter { it.writable }
+    val writable = cals.filter { it.writable && (it.id in visible || it.id == target.ev?.calId || it.id == target.copyOf?.calId) }.ifEmpty { cals.filter { it.writable } }
     val ev = target.ev
     var full by remember { mutableStateOf<EvFull?>(null) }
     val src = ev ?: target.copyOf
