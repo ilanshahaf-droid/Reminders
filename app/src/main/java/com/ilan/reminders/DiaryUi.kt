@@ -589,7 +589,13 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, ta
     var menu by remember { mutableStateOf<Long?>(null) }
     var rename by remember { mutableStateOf<Cal?>(null) }
     var recolor by remember { mutableStateOf<Cal?>(null) }
-    val palette = listOf(0, 0xFFD50000.toInt(), 0xFFE67C73.toInt(), 0xFFF4511E.toInt(), 0xFFF6BF26.toInt(), 0xFF33B679.toInt(), 0xFF0B8043.toInt(), 0xFF039BE5.toInt(), 0xFF3F51B5.toInt(), 0xFF7986CB.toInt(), 0xFF8E24AA.toInt(), 0xFF616161.toInt())
+    val palette = listOf(0, 0xFF000000.toInt(), 0xFF424242.toInt(), 0xFF616161.toInt(), 0xFF9E9E9E.toInt(), 0xFFFFFFFF.toInt(),
+        0xFFB71C1C.toInt(), 0xFFD50000.toInt(), 0xFFE53935.toInt(), 0xFFE67C73.toInt(), 0xFFF06292.toInt(), 0xFFE91E63.toInt(),
+        0xFFAD1457.toInt(), 0xFF880E4F.toInt(), 0xFF8E24AA.toInt(), 0xFF6A1B9A.toInt(), 0xFF4A148C.toInt(), 0xFF7986CB.toInt(),
+        0xFF3F51B5.toInt(), 0xFF283593.toInt(), 0xFF1A237E.toInt(), 0xFF1E88E5.toInt(), 0xFF039BE5.toInt(), 0xFF00ACC1.toInt(),
+        0xFF00838F.toInt(), 0xFF009688.toInt(), 0xFF00796B.toInt(), 0xFF33B679.toInt(), 0xFF0B8043.toInt(), 0xFF2E7D32.toInt(),
+        0xFF7CB342.toInt(), 0xFFC0CA33.toInt(), 0xFFF6BF26.toInt(), 0xFFFFB300.toInt(), 0xFFFB8C00.toInt(), 0xFFF4511E.toInt(),
+        0xFFBF360C.toInt(), 0xFF8D6E63.toInt(), 0xFF6D4C41.toInt(), 0xFF4E342E.toInt())
     DlgOrTab(tab, 
         onDismissRequest = onDismiss,
         title = { Text("יומנים") },
@@ -636,7 +642,7 @@ private fun SettingsDialog(cals: List<Cal>, visible: Set<Long>, defCal: Long, ta
     }
     recolor?.let { c ->
         AlertDialog(onDismissRequest = { recolor = null }, title = { Text("צבע היומן") },
-            text = { Column { Text("«A» = הצבע המקורי", fontSize = 12.sp); Spacer(Modifier.height(8.dp)); SwatchRow(palette, c.color or 0xFF000000.toInt()) { col -> CalRepo.setOverride(ctx, c.id, null, if (col == 0) 0 else col); rev++; recolor = null } } },
+            text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text("«A» = הצבע המקורי", fontSize = 12.sp); Spacer(Modifier.height(8.dp)); SwatchRow(palette, c.color or 0xFF000000.toInt(), wrap = true) { col -> CalRepo.setOverride(ctx, c.id, null, if (col == 0) 0 else col); rev++; recolor = null } } },
             confirmButton = {}, dismissButton = { TextButton({ recolor = null }) { Text("סגירה") } })
     }
 }
@@ -1477,17 +1483,18 @@ private fun DeleteDialog(e: Ev, onClose: () -> Unit, onDone: () -> Unit) {
     )
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun SwatchRow(options: List<Int>, sel: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { c ->
-            Box(
-                Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(if (c == 0) Color(0xFFE0E0E0) else Color(c))
-                    .border(if (c == sel) 3.dp else 1.dp, if (c == sel) Color.Black else Color(0xFFBDBDBD), RoundedCornerShape(17.dp)).clickable { onPick(c) },
-                contentAlignment = Alignment.Center
-            ) { if (c == 0) Text("A", fontSize = 13.sp, color = Color.DarkGray) }
-        }
+private fun SwatchRow(options: List<Int>, sel: Int, wrap: Boolean = false, onPick: (Int) -> Unit) {
+    val item: @Composable (Int) -> Unit = { c ->
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(17.dp)).background(if (c == 0) Color(0xFFE0E0E0) else Color(c))
+                .border(if (c == sel) 3.dp else 1.dp, if (c == sel) Color.Black else Color(0xFFBDBDBD), RoundedCornerShape(17.dp)).clickable { onPick(c) },
+            contentAlignment = Alignment.Center
+        ) { if (c == 0) Text("A", fontSize = 13.sp, color = Color.DarkGray) }
     }
+    if (wrap) androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { options.forEach { item(it) } }
+    else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { options.forEach { item(it) } }
 }
 
 @Composable
