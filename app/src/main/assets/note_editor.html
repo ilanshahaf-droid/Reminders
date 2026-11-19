@@ -9,7 +9,7 @@ html,body{margin:0;height:100%;background:transparent;font-family:system-ui,-app
 @media print{#app{position:static}.ne{height:auto!important;display:block!important}.ne-bar,.ne-draw,.ne-cfg{display:none!important}.ne-body,.ne-ed{overflow:visible!important;height:auto!important;min-height:0!important}}
 .ne{display:flex;flex-direction:column;height:100%;min-height:0;background:transparent;color:var(--ne-fg,#14161f)}
 .ne-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.ne-ed{min-height:100%;box-sizing:border-box;padding:6px 16px 90px;outline:none;font-size:18px;line-height:1.6;direction:rtl;text-align:start;word-break:break-word;caret-color:var(--ne-accent,#4f46e5)}
+.ne-ed{min-height:100%;box-sizing:border-box;padding:6px 16px 90px;outline:none;font-size:calc(18px * var(--ne-fs,1));line-height:1.6;direction:rtl;text-align:start;word-break:break-word;caret-color:var(--ne-accent,#4f46e5)}
 .ne-ed:empty::before{content:attr(data-ph);color:var(--ne-mute,#8a8fa3);pointer-events:none}
 .ne-ed ul,.ne-ed ol{margin:4px 0;padding-inline-start:26px}
 .ne-ed font[size="1"]{font-size:13px}.ne-ed font[size="2"]{font-size:15px}.ne-ed font[size="3"]{font-size:18px}
@@ -470,6 +470,7 @@ var editor = createNoteEditor(document.getElementById('app'), {
   onChange: function(html, text){ if(window.Android) Android.changed(html, text); }
 });
 window.NE = {
+  scale: function(f){ document.documentElement.style.setProperty('--ne-fs', String(f)); },
   load: function(html, dark){ document.documentElement.className = dark ? 'dark' : ''; editor.setHtml(html || ''); },
   theme: function(dark){ document.documentElement.className = dark ? 'dark' : ''; },
   focus: function(){ editor.focus(); },

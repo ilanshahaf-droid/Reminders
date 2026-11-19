@@ -110,10 +110,10 @@ fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onD
                     shadowElevation = if (sel) 4.dp else 0.dp
                 ) {
                     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        Text(icon, fontSize = 14.sp)
+                        Text(icon, fontSize = 17.sp)
                         Spacer(Modifier.width(3.dp))
                         Text(
-                            label, style = MaterialTheme.typography.labelLarge, fontSize = 13.sp, maxLines = 1, softWrap = false,
+                            label, style = MaterialTheme.typography.labelLarge, fontSize = 16.sp, maxLines = 1, softWrap = false,
                             fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
                             color = if (sel) cs.onPrimary else cs.onSurfaceVariant
                         )
@@ -796,7 +796,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                         EditorBridge(
                             c,
                             onReady = {
-                                evaluateJavascript("NE.load(${JSONObject.quote(html)}, $dark)", null)
+                                evaluateJavascript("NE.scale(${ThemePrefs.scale}); NE.load(${JSONObject.quote(html)}, $dark)", null)
                             },
                             onChanged = { h, t -> html = h; plain = t },
                             onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() },
