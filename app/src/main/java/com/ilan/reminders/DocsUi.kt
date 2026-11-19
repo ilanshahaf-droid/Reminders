@@ -472,7 +472,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
     var newDlg by remember { mutableStateOf(false) }
     var openDlg by remember { mutableStateOf(false) }
     val shown = files.filter { f ->
-        (typeFilter == "all" || Docs.ext(f) == typeFilter) && (query.isBlank() || f.nameWithoutExtension.contains(query.trim(), ignoreCase = true))
+        (typeFilter == "all" || Docs.ext(f) == typeFilter) && (query.isBlank() || f.shownName.contains(query.trim(), ignoreCase = true))
     }
     fun pickedUri(r: androidx.activity.result.ActivityResult): Uri? {
         val d = r.data ?: return null
@@ -612,7 +612,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
                                     Text(when (Docs.ext(f)) { "pdf" -> "📕"; "xlsx" -> "📗"; "pptx" -> "📙"; else -> "📝" }, fontSize = 28.sp)
                                     Spacer(Modifier.width(12.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text((if (Docs.isFav(ctx, f)) "⭐ " else "") + (if (Docs.isLinked(ctx, f)) "☁️ " else "") + f.nameWithoutExtension, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text((if (Docs.isFav(ctx, f)) "⭐ " else "") + (if (Docs.isLinked(ctx, f)) "☁️ " else "") + f.shownName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
                                             (when (Docs.ext(f)) { "pdf" -> "PDF"; "xlsx" -> "Excel"; "pptx" -> "PowerPoint"; else -> "Word" }) + (Docs.sourceOf(ctx, f).let { if (it.isBlank()) "" else " · $it" }) + " · " + SimpleDateFormat("d.M.yyyy HH:mm", Locale("he")).format(Date(f.lastModified())) +
                                                 " · " + (if (f.length() > 1_000_000) "%.1f MB".format(f.length() / 1e6) else "${f.length() / 1000 + 1} KB"),
@@ -644,7 +644,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
                                 DropdownMenuItem(text = { Text("פתח באפליקציה אחרת") }, onClick = { menuFor = null; Docs.openExternal(ctx, f) })
                                 DropdownMenuItem(text = { Text("שתף") }, onClick = { menuFor = null; Docs.share(ctx, f) })
                                 DropdownMenuItem(text = { Text("שמירה בשם…") }, onClick = { menuFor = null; saveAsFor = f })
-                                DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menuFor = null; renameText = f.nameWithoutExtension; renaming = f })
+                                DropdownMenuItem(text = { Text("שנה שם") }, onClick = { menuFor = null; renameText = f.shownName; renaming = f })
                                 DropdownMenuItem(text = { Text("מחק", color = cs.error) }, onClick = { menuFor = null; deleting = f })
                             }
                         }
@@ -798,7 +798,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val cf = compressFile
                 if (cf == null) files.filter { Docs.ext(it) == "pdf" }.forEach { f ->
-                    OutlinedButton({ compressFile = f }, Modifier.fillMaxWidth()) { Text(f.nameWithoutExtension + "  ·  " + f.length() / 1024 + " KB", maxLines = 1) }
+                    OutlinedButton({ compressFile = f }, Modifier.fillMaxWidth()) { Text(f.shownName + "  ·  " + f.length() / 1024 + " KB", maxLines = 1) }
                 } else {
                     Text("הדחיסה הופכת כל עמוד לתמונה, כך שהטקסט כבר לא ניתן לסימון או חיפוש. נוצר קובץ חדש והמקור נשמר.", style = MaterialTheme.typography.bodySmall)
                     listOf("medium" to "בינונית (איכות טובה)", "strong" to "חזקה (קטן יותר)").forEach { (lv, label) ->
@@ -870,7 +870,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(if (idx >= 0) "${idx + 1}" else "○", Modifier.width(28.dp), fontWeight = FontWeight.Bold, color = cs.primary)
-                            Text(f.nameWithoutExtension, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(f.shownName, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -936,7 +936,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
     deleting?.let { f ->
         AlertDialog(
             onDismissRequest = { deleting = null }, title = { Text("מחיקת קובץ") },
-            text = { Text("למחוק את \"${f.nameWithoutExtension}\" לצמיתות? אי אפשר לשחזר.") },
+            text = { Text("למחוק את \"${f.shownName}\" לצמיתות? אי אפשר לשחזר.") },
             confirmButton = { TextButton({ Docs.deleteDoc(ctx, f); deleting = null; tick++ }) { Text("העבר לסל", color = cs.error) } },
             dismissButton = { TextButton({ deleting = null }) { Text("ביטול") } }
         )
@@ -948,7 +948,7 @@ fun DeleteDocDialog(file: File, onDismiss: () -> Unit, onDeleted: () -> Unit) {
     val ctx = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss, title = { Text("מחיקת קובץ") },
-        text = { Text("להעביר את \"${file.nameWithoutExtension}\" לסל המחזור? אפשר לשחזר אותו במשך 30 יום.") },
+        text = { Text("להעביר את \"${file.shownName}\" לסל המחזור? אפשר לשחזר אותו במשך 30 יום.") },
         confirmButton = { TextButton({ Docs.deleteDoc(ctx, file); onDeleted() }) { Text("העבר לסל", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onDismiss) { Text("ביטול") } }
     )
@@ -1775,3 +1775,7 @@ private fun TypeChip(label: String, on: Boolean, col: Color, onClick: () -> Unit
         .border(1.5.dp, col, sh).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 7.dp),
         color = if (on) Color.White else col, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 }
+
+/** File name for display: names that arrived percent-encoded (e.g. from an email attachment) are shown decoded. */
+val File.shownName: String
+    get() = nameWithoutExtension.let { n -> if (Regex("%[0-9A-Fa-f]{2}").containsMatchIn(n)) runCatching { android.net.Uri.decode(n) }.getOrDefault(n) else n }
