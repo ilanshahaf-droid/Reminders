@@ -835,18 +835,19 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v150") },
+        title = { Text("הגדרות · v151") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
                 var snooze by remember { mutableIntStateOf(prefs.getInt("snoozeMin", 10)) }
                 Text("מראה", fontWeight = FontWeight.Bold)
                 val appCtx = LocalContext.current
-                Text("גודל טקסט", style = MaterialTheme.typography.bodySmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("קטן" to 0.9f, "רגיל" to 1f, "גדול" to 1.15f, "גדול מאוד" to 1.3f).forEach { (l, v) ->
-                        FilterChip(ThemePrefs.scale == v, { ThemePrefs.scale = v; ThemePrefs.save(appCtx) }, label = { Text(l) })
-                    }
+                Text("גודל טקסט (לא משפיע על סרגל הלשוניות העליון)", style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally)) {
+                    Button({ ThemePrefs.scale = (Math.round((ThemePrefs.scale - 0.05f) * 20f) / 20f).coerceAtLeast(0.7f); ThemePrefs.save(appCtx) }, enabled = ThemePrefs.scale > 0.71f) { Text("−", fontSize = 20.sp) }
+                    Text("${Math.round(ThemePrefs.scale * 100)}%", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Button({ ThemePrefs.scale = (Math.round((ThemePrefs.scale + 0.05f) * 20f) / 20f).coerceAtMost(2f); ThemePrefs.save(appCtx) }, enabled = ThemePrefs.scale < 1.99f) { Text("+", fontSize = 20.sp) }
+                    TextButton({ ThemePrefs.scale = 1f; ThemePrefs.save(appCtx) }) { Text("איפוס") }
                 }
                 Text("צבע ראשי", style = MaterialTheme.typography.bodySmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

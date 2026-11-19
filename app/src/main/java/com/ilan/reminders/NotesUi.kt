@@ -91,6 +91,9 @@ fun Home() {
 @Composable
 fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, hPad: Dp = 10.dp, onDiary: () -> Unit = {}) {
     val cs = MaterialTheme.colorScheme
+    val cur = androidx.compose.ui.platform.LocalDensity.current
+    // the top tab bar keeps its size regardless of the text-size setting
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(cur.density, cur.fontScale / ThemePrefs.scale)) {
     // segmented control: one rounded track, the selected tab is a filled, raised pill
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 6.dp),
@@ -118,6 +121,7 @@ fun TabSwitch(current: String, onReminders: () -> Unit, onNotes: () -> Unit, onD
                 }
             }
         }
+    }
     }
 }
 
