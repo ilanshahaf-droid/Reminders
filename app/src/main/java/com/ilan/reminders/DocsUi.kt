@@ -1201,7 +1201,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
 /** JS side of the PDF viewer (pdf_viewer.html). */
 internal class PdfBridge(
     val ctx: Context, val file: String, val data: () -> String, val onOpened: () -> Unit, val onSaved: (String) -> Unit, val onSaveFailed: () -> Unit,
-    val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit, val onReady: () -> Unit
+    val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit, val onReady: () -> Unit, val onPresent: (Boolean) -> Unit = {}
 ) {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
@@ -1212,6 +1212,7 @@ internal class PdfBridge(
     @android.webkit.JavascriptInterface fun dirty(v: Boolean) { main.post { onDirty(v) } }
     @android.webkit.JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
     @android.webkit.JavascriptInterface fun orient(land: Boolean) {
+        main.post { onPresent(land) }
         main.post { var cc: Context? = ctx; while (cc is android.content.ContextWrapper && cc !is android.app.Activity) cc = cc.baseContext; (cc as? android.app.Activity)?.requestedOrientation = if (land) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
     @android.webkit.JavascriptInterface fun getPos(): String =
@@ -1499,6 +1500,13 @@ fun SlideScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     var asCopy by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
+    var presenting by remember { mutableStateOf(false) }
+    val actv = remember { var cc: Context? = ctx; while (cc is android.content.ContextWrapper && cc !is android.app.Activity) cc = cc.baseContext; cc as? android.app.Activity }
+    LaunchedEffect(presenting) {
+        actv?.window?.let { w -> val ic = androidx.core.view.WindowCompat.getInsetsController(w, w.decorView)
+            if (presenting) { ic.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE; ic.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) } else ic.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+    }
+    DisposableEffect(Unit) { onDispose { actv?.window?.let { w -> androidx.core.view.WindowCompat.getInsetsController(w, w.decorView).show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) } } }
     val web = remember { mutableStateOf<WebView?>(null) }
     val initial = remember { if (file.exists()) Base64.encodeToString(file.readBytes(), Base64.NO_WRAP) else "" }
 
@@ -1509,6 +1517,7 @@ fun SlideScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     }
     fun finish() { if (dirty) confirm = true else onClose() }
     BackHandler { finish() }
+    BackHandler(enabled = presenting) { web.value?.evaluateJavascript("document.getElementById('pres')._go(0)", null) }
     val scope = rememberCoroutineScope()
     var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
@@ -1523,8 +1532,8 @@ fun SlideScreen(file: File, dark: Boolean, onClose: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxSize().background(if (presenting) androidx.compose.ui.graphics.Color.Black else cs.surface).then(if (presenting) Modifier else Modifier.statusBarsPadding().navigationBarsPadding().imePadding())) {
+        if (!presenting) Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton({ finish() }) { Icon(Icons.Default.Check, "סיום") }
             Column(Modifier.weight(1f)) {
                 Text(cur.nameWithoutExtension, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
@@ -1586,7 +1595,8 @@ fun SlideScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                             onSaveFailed = { saving = false; closeAfter = false },
                             onDirty = { dirty = it },
                             onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() },
-                            onReady = { evaluateJavascript("SL.open($dark)", null) }
+                            onReady = { evaluateJavascript("SL.open($dark)", null) },
+                            onPresent = { presenting = it }
                         ), "Android"
                     )
                     loadUrl("file:///android_asset/slides_editor.html")
