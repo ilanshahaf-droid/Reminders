@@ -54,6 +54,7 @@ class ActionReceiver : BroadcastReceiver() {
         val act = i.action
         if (act == "STOP") { Notifier.stopVibration(c); return }
         async(c) {
+            if (act != "CANCEL_SNOOZE") runCatching { Notifier.noteHandled(c, id); Notifier.dismissReminder(c, id) }
             val dao = AppDb.get(c).dao()
             val t = dao.get(id) ?: return@async
             val now = System.currentTimeMillis()

@@ -15,7 +15,7 @@ object WatchBridge {
     fun send(c: Context, path: String, payload: String, attempt: Int = 0) {
         val app = c.applicationContext
         var payload = payload
-        if (path == "/reminder/action" && attempt == 0) {
+        if ((path == "/reminder/action" || path == "/event/action") && attempt == 0) {
             // A message is lost if the phone is out of reach for more than the retries below, and the phone then keeps ringing.
             // So the same action also goes as a Data Layer item, which is kept and delivered the moment the phone is reachable again;
             // the phone ignores whichever copy comes second (same ts).

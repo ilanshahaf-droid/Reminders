@@ -148,6 +148,23 @@ class WearActionService : WearableListenerService() {
     }
 
     private fun eventAction(j: JSONObject) {
+        if (firstTime(j)) eventActionNow(j)
+    }
+
+    /** True the first time this ts is seen (the message and the stored copy both arrive; only one may act). */
+    private fun firstTime(j: JSONObject): Boolean {
+        val ts = j.optLong("ts", 0)
+        if (ts <= 0) return true
+        val p = getSharedPreferences("alerts", Context.MODE_PRIVATE)
+        synchronized(WearActionService::class.java) {
+            if (p.getLong("wa$ts", 0) > 0) return false
+            if (System.currentTimeMillis() - ts > 6 * 3600_000L) return false
+            p.edit().putLong("wa$ts", System.currentTimeMillis()).apply()
+        }
+        return true
+    }
+
+    private fun eventActionNow(j: JSONObject) {
         val nid = j.optInt("nid")
         if (j.optString("act") == "SNOOZE") EventNotify.snoozeNow(this, nid, j.optString("key"), j.optString("title"), j.optString("text"))
         else { EventNotify.cancelRepeat(this, nid); androidx.core.app.NotificationManagerCompat.from(this).cancel(nid) }
@@ -196,7 +213,10 @@ class WearActionService : WearableListenerService() {
             val path = ev.dataItem.uri.path ?: continue
             if (ev.type != com.google.android.gms.wearable.DataEvent.TYPE_CHANGED || !path.startsWith("/act/")) continue
             val json = com.google.android.gms.wearable.DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
-            runCatching { action(JSONObject(json)) }
+            runCatching {
+                val j = JSONObject(json)
+                if (j.has("nid")) eventAction(j) else action(j)
+            }
             runCatching { Wearable.getDataClient(this).deleteDataItems(ev.dataItem.uri) }
         }
     }
@@ -214,6 +234,9 @@ class WearActionService : WearableListenerService() {
                 if (old.isNotEmpty()) p.edit().apply { old.forEach { remove(it) } }.apply()
             }
         }
+        // Silence the phone at once, before any database work, so a locked / sleeping phone stops beeping even if the rest is slow.
+        val rid = j.optLong("id", -1)
+        if (rid >= 0 && j.optString("action", "SNOOZE") != "CANCEL_SNOOZE") runCatching { Notifier.dismissReminder(this, rid) }
         val minutes = j.optInt("minutes", 0).takeIf { it > 0 }
             ?: getSharedPreferences("app", Context.MODE_PRIVATE).getInt("snoozeMin", 10)
         sendBroadcast(
