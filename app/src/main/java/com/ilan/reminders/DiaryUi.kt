@@ -681,12 +681,11 @@ private fun EvLine(e: Ev, z: ZoneId, size: TextUnit, showTime: Boolean = true, o
 private fun WeekDayCell(d: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate, modifier: Modifier, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit, onNew: (LocalDate, LocalTime?) -> Unit) {
     val idx = dayIdx(d); val isToday = d == today
     val evs = remember(all, d) { dayEvs(all, d, z) }
-    BoxWithConstraints(modifier.background(if (idx >= 5) WEEKEND_BG else Color.White)) {
-        val shown = packEvs(evs, maxHeight - 30.dp, maxWidth, 13f, 18f, true)
-        val hidden = evs.size - shown.size
-        Column(Modifier.fillMaxSize()) {
+    FitCell(
+        modifier.background(if (idx >= 5) WEEKEND_BG else Color.White), evs, 28.dp,
+        header = { hidden ->
             Row(
-                Modifier.fillMaxWidth().height(28.dp).background(if (isToday) ORANGE else Color.Transparent).clickable { onDay(d) }.padding(horizontal = 6.dp),
+                Modifier.fillMaxSize().background(if (isToday) ORANGE else Color.Transparent).clickable { onDay(d) }.padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val fg = if (isToday) Color.White else INK
@@ -696,11 +695,40 @@ private fun WeekDayCell(d: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDate
                 Spacer(Modifier.weight(1f))
                 if (hidden > 0) Text("+$hidden", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isToday) Color.White else ORANGE)
             }
-            Column(Modifier.weight(1f).fillMaxWidth().pointerInput(d) { detectTapGestures(onTap = { onDay(d) }, onLongPress = { onNew(d, null) }) }) {
-                shown.forEach { e -> EvLine(e, z, 13.sp) { onEvent(e, d) } }
-            }
+        },
+        backdrop = { Box(Modifier.fillMaxSize().pointerInput(d) { detectTapGestures(onTap = { onDay(d) }, onLongPress = { onNew(d, null) }) }) },
+        footer = { Box(Modifier.fillMaxWidth().height(1.dp).background(GRID)) },
+        item = { e -> EvLine(e, z, 13.sp) { onEvent(e, d) } }
+    )
+}
+
+/** day cell that shows as many events as really fit (measured, not estimated); the header gets the number of hidden ones */
+@Composable
+private fun FitCell(
+    modifier: Modifier, evs: List<Ev>, headH: androidx.compose.ui.unit.Dp,
+    header: @Composable (Int) -> Unit, item: @Composable (Ev) -> Unit,
+    backdrop: @Composable () -> Unit = {}, footer: @Composable () -> Unit = {}
+) {
+    androidx.compose.ui.layout.SubcomposeLayout(modifier) { c ->
+        val w = c.maxWidth; val h = c.maxHeight
+        val headPx = headH.roundToPx(); val avail = (h - headPx).coerceAtLeast(0)
+        val placed = ArrayList<androidx.compose.ui.layout.Placeable>(); var used = 0
+        for ((i, e) in evs.withIndex()) {
+            val p = subcompose("e$i") { item(e) }.first().measure(androidx.compose.ui.unit.Constraints(maxWidth = w))
+            if (used + p.height > avail) break
+            used += p.height; placed.add(p)
         }
-        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(GRID))
+        val hidden = evs.size - placed.size
+        val head = subcompose("head") { header(hidden) }.first().measure(androidx.compose.ui.unit.Constraints.fixed(w, headPx))
+        val back = subcompose("back") { backdrop() }.firstOrNull()?.measure(androidx.compose.ui.unit.Constraints.fixed(w, avail))
+        val foot = subcompose("foot") { footer() }.firstOrNull()?.measure(androidx.compose.ui.unit.Constraints(maxWidth = w))
+        layout(w, h) {
+            back?.place(0, headPx)
+            head.place(0, 0)
+            var y = headPx
+            placed.forEach { it.place(0, y); y += it.height }
+            foot?.place(0, h - foot.height)
+        }
     }
 }
 
@@ -890,18 +918,17 @@ private fun MonthView(date: LocalDate, all: List<Ev>, z: ZoneId, today: LocalDat
 private fun MonthCell(d: LocalDate, inMonth: Boolean, all: List<Ev>, z: ZoneId, today: LocalDate, modifier: Modifier, onDay: (LocalDate) -> Unit, onEvent: (Ev, LocalDate) -> Unit) {
     val idx = dayIdx(d); val isToday = d == today
     val evs = remember(all, d) { dayEvs(all, d, z) }
-    BoxWithConstraints(modifier.background(if (inMonth) Color.White else Color(0xFFE4E4E4)).border(0.5.dp, GRID).clickable { onDay(d) }) {
-        val shown = packEvs(evs, maxHeight - 24.dp, maxWidth, 12f, 15f, false)
-        val hidden = evs.size - shown.size
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+    FitCell(
+        modifier.background(if (inMonth) Color.White else Color(0xFFE4E4E4)).border(0.5.dp, GRID).clickable { onDay(d) }, evs, 24.dp,
+        header = { hidden ->
+            Row(Modifier.fillMaxSize().padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("${d.dayOfMonth}", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (isToday) Color.White else if (idx == 6) RED else INK,
                     modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(if (isToday) ORANGE else Color.Transparent).padding(horizontal = 3.dp))
                 if (hidden > 0) Text(" +$hidden", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = ORANGE)
             }
-            shown.forEach { e -> EvLine(e, z, 12.sp, false) { onEvent(e, d) } }
-        }
-    }
+        },
+        item = { e -> EvLine(e, z, 12.sp, false) { onEvent(e, d) } }
+    )
 }
 
 // ============================ DAY ============================
