@@ -1211,6 +1211,9 @@ internal class PdfBridge(
     @android.webkit.JavascriptInterface fun saveFailed() { main.post { onSaveFailed() } }
     @android.webkit.JavascriptInterface fun dirty(v: Boolean) { main.post { onDirty(v) } }
     @android.webkit.JavascriptInterface fun toast(m: String) { main.post { onToast(m) } }
+    @android.webkit.JavascriptInterface fun orient(land: Boolean) {
+        main.post { var cc: Context? = ctx; while (cc is android.content.ContextWrapper && cc !is android.app.Activity) cc = cc.baseContext; (cc as? android.app.Activity)?.requestedOrientation = if (land) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
     @android.webkit.JavascriptInterface fun getPos(): String =
         ctx.getSharedPreferences("docs", Context.MODE_PRIVATE).getString("pos_" + file, "") ?: ""
     @android.webkit.JavascriptInterface fun savePos(r: String) {

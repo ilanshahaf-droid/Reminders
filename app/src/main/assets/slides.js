@@ -11,7 +11,7 @@
   const $ = (id) => document.getElementById(id);
   const A = () => window.Android || { ready() {}, docData() { return ''; }, docSaved() {}, saveFailed() {}, dirty() {}, toast() {}, opened() {} };
   const parser = new DOMParser(), ser = new XMLSerializer();
-  const S = { zip: null, docs: {}, rels: {}, mod: new Set(), order: [], cur: 0, dark: false, dirty: false, zoom: 1, urls: {}, sz: { cx: 9144000, cy: 5143500 }, pres: null, ed: null, present: false };
+  const S = { zip: null, docs: {}, rels: {}, mod: new Set(), order: [], cur: 0, dark: false, dirty: false, zoom: 1, urls: {}, sz: { cx: 9144000, cy: 5143500 }, pres: null, ed: null, present: false, mode: 'list', sel: -1, listTop: 0 };
 
   /* ---------------- xml helpers ---------------- */
   const kids = (el, name) => (el ? Array.from(el.children).filter((c) => c.localName === name) : []);
@@ -506,7 +506,30 @@
     const fit = Math.max(120, Math.min(aw, ah * S.sz.cx / S.sz.cy));
     return Math.round(fit * S.zoom);
   }
+  function visibleIdx() {
+    const st = $('stage'), els = st.querySelectorAll('.sl'); const top = st.getBoundingClientRect().top;
+    for (let i = 0; i < els.length; i++) if (els[i].getBoundingClientRect().bottom > top + 60) return i;
+    return Math.max(0, els.length - 1);
+  }
+  function renderList() {
+    const st = $('stage'); st.innerHTML = ''; st.classList.add('list');
+    const wrap = document.createElement('div'); wrap.id = 'listwrap';
+    const W = Math.round(Math.max(120, st.clientWidth - 20) * Math.max(1, S.zoom));
+    S.order.forEach((o, i) => {
+      const box = document.createElement('div'); box.className = 'sl' + (i === S.sel ? ' sel' : '');
+      let s = null; try { s = renderSlide(i, W, false); box.appendChild(s); } catch (e) { console.error(e); }
+      box.onclick = () => { S.sel = i; st.querySelectorAll('.sl').forEach((b, j) => b.classList.toggle('sel', j === i)); };
+      wrap.appendChild(box); if (s) { try { fitText(s); } catch (_) {} }
+    });
+    st.appendChild(wrap); st.scrollTop = S.listTop || 0;
+    $('cnt').textContent = (S.cur + 1) + ' / ' + S.order.length;
+  }
+  function setMode(m) {
+    S.mode = m; document.body.classList.toggle('listmode', m === 'list'); $('stage').classList.toggle('list', m === 'list');
+    if (m === 'list') renderStage(); else { S.zoom = 1; renderAll(); }
+  }
   function renderStage() {
+    if (S.mode === 'list') return renderList();
     const st = $('stage'); st.innerHTML = '';
     if (!S.order.length) return;
     const wrap = document.createElement('div'); wrap.id = 'slidewrap'; const s = renderSlide(S.cur, stageWidth(), true);
@@ -525,7 +548,7 @@
     });
     const on = t.querySelector('.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
   }
-  function renderAll(strip) { renderStage(); if (strip !== false) renderStrip(); else { document.querySelectorAll('#strip .th').forEach((b, i) => b.classList.toggle('on', i === S.cur)); const on = document.querySelector('#strip .th.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); } }
+  function renderAll(strip) { renderStage(); if (S.mode === 'list') return; if (strip !== false) renderStrip(); else { document.querySelectorAll('#strip .th').forEach((b, i) => b.classList.toggle('on', i === S.cur)); const on = document.querySelector('#strip .th.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); } }
   function go(d) { const j = S.cur + d; if (j < 0 || j >= S.order.length) return; S.cur = j; renderAll(false); }
   function toast(m) { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => { t.style.display = 'none'; }, 2200); }
 
@@ -672,10 +695,10 @@
 
   /* ----- present mode ----- */
   function startPresent() {
-    S.present = true; let i = S.cur; const ov = $('pres'); ov.classList.add('show');
-    const draw = () => { ov.innerHTML = ''; const W = Math.min(innerWidth, innerHeight * S.sz.cx / S.sz.cy); const s = renderSlide(i, Math.floor(W), false); ov.appendChild(s); fitText(s); const c = document.createElement('div'); c.className = 'pc'; c.textContent = (i + 1) + ' / ' + S.order.length; ov.appendChild(c); const x = document.createElement('button'); x.className = 'px'; x.textContent = '✕'; ov.appendChild(x); const l = document.createElement('div'); l.className = 'pa pl'; l.textContent = '◀'; ov.appendChild(l); const r = document.createElement('div'); r.className = 'pa pr'; r.textContent = '▶'; ov.appendChild(r); };
-    ov._go = (d) => { if (d === 0) { ov.classList.remove('show'); S.present = false; S.cur = i; renderAll(false); return; } const j = i + d; if (j < 0) return; if (j >= S.order.length) { ov._go(0); return; } i = j; draw(); };
-    draw();
+    S.present = true; let i = S.mode === 'list' ? (S.sel >= 0 ? S.sel : 0) : S.cur; const ov = $('pres'); ov.classList.add('show'); try { A().orient(true); } catch (_) {}
+    const draw = () => { ov.innerHTML = ''; const W = Math.min(innerWidth, innerHeight * S.sz.cx / S.sz.cy); const s = renderSlide(i, Math.floor(W), false); ov.appendChild(s); fitText(s); const c = document.createElement('div'); c.className = 'pc'; c.textContent = (i + 1) + ' מתוך ' + S.order.length; ov.appendChild(c); const x = document.createElement('button'); x.className = 'px'; x.textContent = '✕'; ov.appendChild(x); const l = document.createElement('div'); l.className = 'pa pl'; l.textContent = '◀'; ov.appendChild(l); const r = document.createElement('div'); r.className = 'pa pr'; r.textContent = '▶'; ov.appendChild(r); };
+    ov._go = (d) => { if (d === 0) { ov.classList.remove('show'); S.present = false; try { A().orient(false); } catch (_) {} if (S.mode !== 'list') S.cur = i; else S.sel = i; renderAll(false); return; } const j = i + d; if (j < 0) return; if (j >= S.order.length) { ov._go(0); return; } i = j; draw(); };
+    ov._redraw = draw; draw();
   }
 
   /* ---------------- open / save ---------------- */
@@ -694,9 +717,9 @@
       const b64 = A().docData();
       await loadPackage(b64 ? b64ToBuf(b64) : await newDeck());
       if (!b64) markDirty(); else { S.dirty = false; }
-      S.cur = 0; renderAll(); A().opened();
+      S.cur = 0; S.mode = 'list'; document.body.classList.add('listmode'); renderAll(); A().opened();
       if (!b64) A().dirty(true);
-      toast('הקש על טקסט בשקף כדי לערוך');
+      toast('גלול לצפייה · ✏️ לעריכה · ▶ להצגה');
     } catch (e) { A().toast('לא הצלחתי לפתוח את המצגת: ' + (e && e.message || e)); }
   }
   async function save() {
@@ -709,13 +732,13 @@
 
   /* ---------------- bind ---------------- */
   function bind() {
-    $('stage').addEventListener('click', (e) => { const t = e.target.closest('.tx'); if (t && !S.pinching) openEdit(t); });
+    $('stage').addEventListener('click', (e) => { if (S.mode === 'list') return; const t = e.target.closest('.tx'); if (t && !S.pinching) openEdit(t); });
     $('dok').onclick = () => closeEdit(true); $('dno').onclick = () => closeEdit(false); $('ddel').onclick = deleteShape;
     document.querySelectorAll('#fmt [data-f]').forEach((b) => { b.onmousedown = (e) => e.preventDefault(); b.onclick = () => { const f = b.dataset.f; if (f === 'sz+') fmt('sz', 1); else if (f === 'sz-') fmt('sz', -1); else if (f === 'rtl') fmt('rtl', true); else if (f === 'ltr') fmt('rtl', false); else if (f.startsWith('al-')) fmt('algn', { 'al-l': 'l', 'al-c': 'ctr', 'al-r': 'r' }[f]); else fmt(f); }; });
     const pal = $('pal'); COLORS.forEach((c) => { const i = document.createElement('i'); i.style.background = c; i.onmousedown = (e) => e.preventDefault(); i.onclick = () => fmt('color', c); pal.appendChild(i); });
     document.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.a;
-      if (a === 'add') addSlide(); else if (a === 'dup') dupSlide(); else if (a === 'del') delSlide(); else if (a === 'right') moveSlide(-1); else if (a === 'left') moveSlide(1); else if (a === 'tbox') addTextBox(); else if (a === 'play') startPresent();
+      if (a === 'add') addSlide(); else if (a === 'dup') dupSlide(); else if (a === 'del') delSlide(); else if (a === 'right') moveSlide(-1); else if (a === 'left') moveSlide(1); else if (a === 'tbox') addTextBox(); else if (a === 'play') startPresent(); else if (a === 'list') { S.listTop = 0; setMode('list'); } else if (a === 'edit') { S.cur = S.sel >= 0 ? S.sel : visibleIdx(); S.mode = 'edit'; document.body.classList.remove('listmode'); $('stage').classList.remove('list'); S.zoom = 1; renderAll(); } else if (a === 'lplay') { if (S.sel < 0) S.sel = visibleIdx(); S.listTop = $('stage').scrollTop; startPresent(); }
       else if (a === 'zin') { S.zoom = Math.min(3, S.zoom * 1.25); renderStage(); } else if (a === 'zout') { S.zoom = Math.max(0.5, S.zoom / 1.25); renderStage(); } else if (a === 'prev') go(-1); else if (a === 'next') go(1);
     }));
     const pr = $('pres'); pr.addEventListener('click', (e) => { if (Date.now() - (pr._sw || 0) < 400) return; const r = pr.getBoundingClientRect(), x = e.clientX - r.left; if (e.target.closest('.px')) return pr._go(0); pr._go(x < r.width / 2 ? 1 : -1); });
@@ -725,15 +748,15 @@
     const st = $('stage'); let d0 = 0, z0 = 1, raf = 0;
     const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     st.addEventListener('touchstart', (e) => { if (e.touches.length === 2) { d0 = dist(e.touches); z0 = S.zoom; S.pinching = true; } else d0 = 0; }, { passive: true });
-    st.addEventListener('touchmove', (e) => { if (e.touches.length === 2 && d0) { e.preventDefault(); S.zoom = Math.max(0.5, Math.min(4, z0 * dist(e.touches) / d0)); if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderStage(); }); } }, { passive: false });
+    st.addEventListener('touchmove', (e) => { if (e.touches.length === 2 && d0) { e.preventDefault(); S.zoom = Math.max(0.5, Math.min(4, z0 * dist(e.touches) / d0)); if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (S.mode === 'list') S.listTop = st.scrollTop; renderStage(); }); } }, { passive: false });
     let sx = 0, sy = 0, one = false;
     st.addEventListener('touchstart', (e) => { one = e.touches.length === 1; if (one) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; } else one = false; }, { passive: true });
     st.addEventListener('touchend', (e) => {
       d0 = 0; setTimeout(() => { S.pinching = false; }, 250);
-      if (one && S.zoom <= 1.05 && e.changedTouches.length) { const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; if (Math.abs(dx) > 55 && Math.abs(dy) < 45) { S.pinching = true; setTimeout(() => { S.pinching = false; }, 300); go(dx > 0 ? 1 : -1); } }
+      if (one && S.mode !== 'list' && S.zoom <= 1.05 && e.changedTouches.length) { const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; if (Math.abs(dx) > 55 && Math.abs(dy) < 45) { S.pinching = true; setTimeout(() => { S.pinching = false; }, 300); go(dx > 0 ? 1 : -1); } }
       one = false;
     }, { passive: true });
-    addEventListener('resize', () => { if (S.order.length && !S.present) renderStage(); });
+    addEventListener('resize', () => { if (!S.order.length) return; if (S.present) { const o = $('pres'); if (o._redraw) o._redraw(); } else { if (S.mode === 'list') S.listTop = $('stage').scrollTop; renderStage(); } });
     addEventListener('error', (e) => { try { A().toast('שגיאה: ' + (e.message || e)); } catch (_) {} });
   }
   window.SL = { open, save, _S: S, _render: renderAll, _edit: (txt) => { const el = document.querySelector('#stage .tx'); openEdit(el); $('dtxt').value = txt; closeEdit(true); } };

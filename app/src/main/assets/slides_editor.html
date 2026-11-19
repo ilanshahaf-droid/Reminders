@@ -8,6 +8,15 @@ html.dark{--bg:#0e0f14;--bar:#1e202a;--fg:#f1f2f7;--sub:#a3a7b8;--grid:#33364a;-
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
 #app{position:fixed;inset:0;display:flex;flex-direction:column}
 #stage{flex:1;overflow:auto;display:flex;padding:8px;background:var(--bg);-webkit-overflow-scrolling:touch}
+#stage.list{display:block;overflow:auto;padding:10px 10px 90px}
+#listwrap{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:min-content}
+.sl{flex:none;box-shadow:0 1px 8px #0003;border:2px solid transparent;border-radius:3px;line-height:0}
+.sl.sel{border-color:#d9532c}
+.sl .slide{pointer-events:none}
+.listmode #info,.listmode #strip,.listmode #tb{display:none}
+#pill{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--bar);border-radius:34px;box-shadow:0 3px 14px #0005;padding:6px 14px;gap:6px;z-index:20}
+.listmode #pill{display:flex}
+#pill button{border:0;background:transparent;color:var(--fg);font-size:26px;width:64px;height:48px;border-radius:24px}
 #slidewrap{margin:auto;box-shadow:0 2px 14px #0004;flex:none}
 .slide{direction:ltr}
 .sh{direction:ltr}
@@ -43,13 +52,14 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:
 #pres .px{position:absolute;top:10px;right:10px;width:44px;height:44px;border:0;border-radius:50%;background:#fff3;color:#fff;font-size:20px}
 #pres .pa{position:absolute;top:50%;transform:translateY(-50%);color:#fff7;font-size:28px;padding:20px 8px}
 #pres .pl{left:0}#pres .pr{right:0}
-#pres .pc{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);color:#fff9;font-size:12px}
+#pres .pc{position:absolute;top:14px;left:50%;transform:translateX(-50%);color:#fff;font-size:15px;background:#0007;border-radius:14px;padding:2px 12px}
 #toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#222c;color:#fff;border-radius:18px;padding:8px 16px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center}
 </style></head><body>
 <div id="app">
 <div id="stage"></div>
-<div id="info" dir="ltr"><button data-a="zout">－</button><button data-a="zin">＋</button><span class="sp"></span><button class="pg" data-a="next">◀</button><b id="cnt" dir="ltr"></b><button class="pg" data-a="prev">▶</button><span class="sp"></span><span style="width:76px"></span></div>
+<div id="info" dir="ltr"><button data-a="zout">－</button><button data-a="zin">＋</button><span class="sp"></span><button class="pg" data-a="next">◀</button><b id="cnt" dir="ltr"></b><button class="pg" data-a="prev">▶</button><span class="sp"></span><button data-a="list" style="width:76px">☰ רשימה</button></div>
 <div id="strip"></div>
+<div id="pill" dir="ltr"><button data-a="lplay">▶</button><button data-a="edit">✏️</button></div>
 <div id="tb">
   <button data-a="add">＋ שקף</button><button data-a="dup">⧉</button><button data-a="del">🗑</button><span class="sep"></span>
   <button data-a="right">→</button><button data-a="left">←</button><span class="sep"></span>
