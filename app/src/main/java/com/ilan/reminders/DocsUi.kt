@@ -279,7 +279,7 @@ object Docs {
 
 /** "Save as": pick a name and where to save a copy (Google Drive / OneDrive / this device / inside the app). */
 @Composable
-fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
+fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit, onRenamed: (File) -> Unit = {}) {
     val ctx = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
@@ -287,6 +287,17 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
     var mode by remember { mutableStateOf("") }
     val ext = Docs.ext(file)
     fun fname() = Docs.clean(name) + "." + ext
+    /** Every "save as" renames the file in the list to the name it was saved under (one file, no copies). */
+    fun adopt(base: String): File {
+        val b = Docs.clean(base)
+        if (b.isBlank() || b == file.nameWithoutExtension) return file
+        val t = Docs.unique(ctx, b, ext)
+        if (!file.renameTo(t)) return file
+        Sync.markDocGone(ctx, file.name); Docs.renameFav(ctx, file.name, t.name)
+        Docs.renameLink(ctx, file.name, t.name); Docs.moveSource(ctx, file.name, t.name)
+        android.os.Handler(android.os.Looper.getMainLooper()).post { onRenamed(t) }
+        return t
+    }
 
     val create = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val uri = r.data?.data
@@ -297,24 +308,17 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
                         if (mode == "drive") {
                             // the name typed in the Drive picker wins over the one proposed in this dialog
                             val picked = Docs.displayName(ctx, uri)?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
-                            // one file only: the original is renamed to the saved name (no second copy left behind)
-                            val base = picked ?: name
-                            val target = if (Docs.clean(base) == file.nameWithoutExtension) file else Docs.unique(ctx, base, ext)
-                            if (target != file) {
-                                if (file.renameTo(target)) {
-                                    Sync.markDocGone(ctx, file.name); Docs.renameFav(ctx, file.name, target.name)
-                                    Docs.renameLink(ctx, file.name, target.name); Docs.moveSource(ctx, file.name, target.name)
-                                } else file.copyTo(target, overwrite = true)
-                            }
+                            val target = adopt(picked ?: name)
                             Docs.linkTo(ctx, target, uri)
                         } else {
                             ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(file.readBytes()) } ?: error("no stream")
+                            adopt(Docs.displayName(ctx, uri)?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: name)
                             true
                         }
                     }.getOrDefault(false)
                 }
                 Toast.makeText(
-                    ctx, if (!ok) "השמירה נכשלה" else if (mode == "drive") "נשמר ב-Drive ☁️ (הקובץ ברשימה מקושר ומשתמש באותו שם)" else "נשמר במכשיר", Toast.LENGTH_LONG
+                    ctx, if (!ok) "השמירה נכשלה" else if (mode == "drive") "נשמר ב-Drive ☁️ (הקובץ ברשימה מקושר ומשתמש באותו שם)" else "נשמר במכשיר (שם הקובץ ברשימה עודכן)", Toast.LENGTH_LONG
                 ).show()
                 if (ok) { onSavedLocal(); onDismiss() }
             }
@@ -338,6 +342,7 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
                 .putExtra(Intent.EXTRA_TITLE, fname()).putExtra(Intent.EXTRA_SUBJECT, fname())
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).setPackage(pkg)
             ctx.startActivity(i)
+            adopt(name); onSavedLocal()
             onDismiss()
         }.onFailure { Toast.makeText(ctx, "$label לא מותקן או לא מקבל קבצים", Toast.LENGTH_SHORT).show() }
     }
@@ -353,9 +358,8 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
                 OutlinedButton({ sendTo("com.microsoft.skydrive", "OneDrive") }, Modifier.fillMaxWidth()) { Text("☁️ OneDrive") }
                 OutlinedButton({ launchCreate("device", DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download")) }, Modifier.fillMaxWidth()) { Text("📱 במכשיר") }
                 OutlinedButton({
-                    val c = Docs.unique(ctx, name, ext)
-                    runCatching { file.copyTo(c, overwrite = true) }
-                    Toast.makeText(ctx, "נשמר עותק: ${c.nameWithoutExtension}", Toast.LENGTH_SHORT).show()
+                    val c = adopt(name)
+                    Toast.makeText(ctx, "שם הקובץ עודכן: ${c.nameWithoutExtension}", Toast.LENGTH_SHORT).show()
                     onSavedLocal(); onDismiss()
                 }, Modifier.fillMaxWidth()) { Text("📂 עותק באפליקציה") }
             }
@@ -1060,7 +1064,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
             edited = true
         }
     }
-    if (showSaveAs) cur?.let { SaveAsDialog(it, { showSaveAs = false }, {}) }
+    if (showSaveAs) cur?.let { SaveAsDialog(it, { showSaveAs = false }, {}, { f -> cur = f }) }
     LaunchedEffect(loaded, pageView) {
         if (loaded) {
             delay(150)
@@ -1365,7 +1369,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
         )
     }
 
-    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {})
+    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {}, { f -> cur = f })
 
     if (delAsk) DeleteDocDialog(cur, { delAsk = false }, { delAsk = false; onClose() })
     if (confirm) AlertDialog(
@@ -1495,7 +1499,7 @@ fun SheetScreen(file: File, dark: Boolean, onClose: () -> Unit) {
         )
     }
 
-    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {})
+    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {}, { f -> cur = f })
 
     if (delAsk) DeleteDocDialog(cur, { delAsk = false }, { delAsk = false; onClose() })
     if (confirm) AlertDialog(
@@ -1632,7 +1636,7 @@ fun SlideScreen(file: File, dark: Boolean, onClose: () -> Unit) {
         )
     }
 
-    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {})
+    if (showSaveAs) SaveAsDialog(cur, { showSaveAs = false }, {}, { f -> cur = f })
 
     if (delAsk) DeleteDocDialog(cur, { delAsk = false }, { delAsk = false; onClose() })
     if (confirm) AlertDialog(
