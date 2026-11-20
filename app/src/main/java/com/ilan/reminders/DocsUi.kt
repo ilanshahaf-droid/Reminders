@@ -297,9 +297,16 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
                         if (mode == "drive") {
                             // the name typed in the Drive picker wins over the one proposed in this dialog
                             val picked = Docs.displayName(ctx, uri)?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
-                            val copy = Docs.unique(ctx, picked ?: name, ext)
-                            file.copyTo(copy, overwrite = true)
-                            Docs.linkTo(ctx, copy, uri)
+                            // one file only: the original is renamed to the saved name (no second copy left behind)
+                            val base = picked ?: name
+                            val target = if (Docs.clean(base) == file.nameWithoutExtension) file else Docs.unique(ctx, base, ext)
+                            if (target != file) {
+                                if (file.renameTo(target)) {
+                                    Sync.markDocGone(ctx, file.name); Docs.renameFav(ctx, file.name, target.name)
+                                    Docs.renameLink(ctx, file.name, target.name); Docs.moveSource(ctx, file.name, target.name)
+                                } else file.copyTo(target, overwrite = true)
+                            }
+                            Docs.linkTo(ctx, target, uri)
                         } else {
                             ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(file.readBytes()) } ?: error("no stream")
                             true
@@ -307,7 +314,7 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
                     }.getOrDefault(false)
                 }
                 Toast.makeText(
-                    ctx, if (!ok) "השמירה נכשלה" else if (mode == "drive") "נשמר ב-Drive ☁️ (נוסף גם לרשימה כקובץ מקושר)" else "נשמר במכשיר", Toast.LENGTH_LONG
+                    ctx, if (!ok) "השמירה נכשלה" else if (mode == "drive") "נשמר ב-Drive ☁️ (הקובץ ברשימה מקושר ומשתמש באותו שם)" else "נשמר במכשיר", Toast.LENGTH_LONG
                 ).show()
                 if (ok) { onSavedLocal(); onDismiss() }
             }
