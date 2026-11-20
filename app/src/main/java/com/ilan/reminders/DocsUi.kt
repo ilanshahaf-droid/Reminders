@@ -351,7 +351,7 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit, on
         onDismissRequest = onDismiss, title = { Text("שמירה בשם") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("שם הקובץ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it }, label = { Text("שם הקובץ") }, singleLine = true, trailingIcon = { if (name.isNotEmpty()) IconButton({ name = "" }) { Icon(Icons.Default.Close, "נקה שם") } }, modifier = Modifier.fillMaxWidth())
                 Text("שמור ב:", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton({ sendTo("com.google.android.apps.docs", "Google Drive") }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive – באפליקציה (עותק)") }
                 OutlinedButton({ launchCreate("drive", DocumentsContract.buildDocumentUri("com.google.android.apps.docs.storage", "root")) }, Modifier.fillMaxWidth()) { Text("☁️ Google Drive – מקושר (בורר המערכת)") }
@@ -948,7 +948,7 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
     renaming?.let { f ->
         AlertDialog(
             onDismissRequest = { renaming = null }, title = { Text("שינוי שם") },
-            text = { OutlinedTextField(renameText, { renameText = it }, singleLine = true) },
+            text = { OutlinedTextField(renameText, { renameText = it }, singleLine = true, trailingIcon = { if (renameText.isNotEmpty()) IconButton({ renameText = "" }) { Icon(Icons.Default.Close, "נקה שם") } }) },
             confirmButton = {
                 TextButton({
                     val target = File(Docs.dir(ctx), Docs.clean(renameText) + "." + Docs.ext(f))
