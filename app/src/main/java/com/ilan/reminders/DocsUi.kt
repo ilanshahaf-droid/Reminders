@@ -170,6 +170,11 @@ object Docs {
         j.remove(from); j.put(to, o); saveLinks(c, j)
     }
     private fun recMod(c: Context, f: File) = linksJson(c).optJSONObject(f.name)?.optLong("m", 0L) ?: 0L
+    fun displayName(c: Context, uri: Uri): String? = runCatching {
+        c.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst() && !it.isNull(0)) it.getString(0) else null
+        }
+    }.getOrNull()
     fun cloudMod(c: Context, uri: Uri): Long = runCatching {
         c.contentResolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)?.use {
             if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L
@@ -290,7 +295,9 @@ fun SaveAsDialog(file: File, onDismiss: () -> Unit, onSavedLocal: () -> Unit) {
                 val ok = withContext(Dispatchers.IO) {
                     runCatching {
                         if (mode == "drive") {
-                            val copy = Docs.unique(ctx, name, ext)
+                            // the name typed in the Drive picker wins over the one proposed in this dialog
+                            val picked = Docs.displayName(ctx, uri)?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
+                            val copy = Docs.unique(ctx, picked ?: name, ext)
                             file.copyTo(copy, overwrite = true)
                             Docs.linkTo(ctx, copy, uri)
                         } else {
@@ -522,7 +529,18 @@ fun DocsHost(onReminders: () -> Unit, onNotes: () -> Unit, onDiary: () -> Unit =
         val uri = r.data?.data; val f = linkTarget; linkTarget = null
         if (r.resultCode == android.app.Activity.RESULT_OK && uri != null && f != null) {
             scope.launch {
-                val ok = withContext(Dispatchers.IO) { Docs.linkTo(ctx, f, uri) }
+                val ok = withContext(Dispatchers.IO) {
+                    val done = Docs.linkTo(ctx, f, uri)
+                    if (done) {
+                        // keep the name chosen in the Drive picker: rename the local file (and its favourite / link / source) to match
+                        val picked = Docs.displayName(ctx, uri)?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
+                        if (picked != null && Docs.clean(picked) != f.nameWithoutExtension) {
+                            val t = Docs.unique(ctx, picked, Docs.ext(f))
+                            if (f.renameTo(t)) { Sync.markDocGone(ctx, f.name); Docs.renameFav(ctx, f.name, t.name); Docs.renameLink(ctx, f.name, t.name); Docs.moveSource(ctx, f.name, t.name) }
+                        }
+                    }
+                    done
+                }
                 Toast.makeText(ctx, if (ok) "נשמר בענן ☁️ ומקושר לקובץ" else "השמירה בענן נכשלה", Toast.LENGTH_SHORT).show()
                 tick++
             }
