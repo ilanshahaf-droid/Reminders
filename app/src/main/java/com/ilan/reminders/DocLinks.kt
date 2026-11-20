@@ -158,7 +158,7 @@ private fun AddDocLinkDialog(onDismiss: () -> Unit, onPick: (DocLink) -> Unit) {
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(when (mode) { "app" -> "מסמך מהאפליקציה"; "url" -> "קישור (Drive / OneDrive)"; else -> "צירוף מסמך" }) },
+        title = { Text(when (mode) { "app" -> "מסמך מהאפליקציה"; "url" -> "הדבקת קישור"; else -> "צירוף מסמך" }) },
         text = {
             when (mode) {
                 "app" -> {
@@ -172,7 +172,7 @@ private fun AddDocLinkDialog(onDismiss: () -> Unit, onPick: (DocLink) -> Unit) {
                     }
                 }
                 "url" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("הדבק קישור לקובץ ב-Google Drive או ב-OneDrive (שיתוף ← העתק קישור).", fontSize = 13.sp, color = Color.Gray)
+                    Text("הדבק כאן כל קישור: קובץ ב-Google Drive או ב-OneDrive (שיתוף ← העתק קישור), או כתובת אינטרנט רגילה. הקישור ייפתח בדפדפן.", fontSize = 13.sp, color = Color.Gray)
                     OutlinedTextField(url, { url = it }, label = { Text("קישור") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(label, { label = it }, label = { Text("שם להצגה (לא חובה)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
