@@ -1004,6 +1004,7 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     var reading by remember { mutableStateOf(file != null) }
     val dv = remember { mutableStateOf<WebView?>(null) }
     var dvReady by remember { mutableStateOf(false) }
+    var markerSet by remember { mutableStateOf(false) }
     val reader = rememberSpeechReader()
     var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
@@ -1070,11 +1071,14 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     }
     if (showSaveAs) cur?.let { SaveAsDialog(it, { showSaveAs = false }, {}, { f -> cur = f }) }
     LaunchedEffect(dvReady, pageView) { if (dvReady) dv.value?.evaluateJavascript("DV.set($pageView)", null) }
+    fun speakJson(r: String?) { reader.start(runCatching { org.json.JSONTokener(r).nextValue() as? String }.getOrNull() ?: "") }
+    /** Reads from the orange marker (tap the text to place it) – or from the top of the screen when none was placed. */
     fun readAloud() {
         if (reader.state != 0) { reader.stop(); return }
-        if (reading) dv.value?.evaluateJavascript("DV.text()") { r ->
-            reader.start(runCatching { org.json.JSONTokener(r).nextValue() as? String }.getOrNull() ?: "")
-        } else reader.start(plain)
+        if (reading) {
+            if (!markerSet) Toast.makeText(ctx, "מתחיל מראש המסך. הקש על הטקסט כדי לסמן נקודת התחלה אחרת", Toast.LENGTH_LONG).show()
+            dv.value?.evaluateJavascript("DV.textFrom()") { speakJson(it) }
+        } else web.value?.evaluateJavascript("NE.fromCaret()") { speakJson(it) }
     }
     LaunchedEffect(loaded, pageView) {
         if (loaded) {
@@ -1086,8 +1090,8 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     Column(Modifier.fillMaxSize().background(cs.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton({ requestSave(true) }) { Icon(Icons.Default.Check, "סיום") }
-            Text(if (saving) "שומר…" else if (!loaded) "טוען…" else "", color = cs.onSurfaceVariant, fontSize = 13.sp)
-            Spacer(Modifier.weight(1f))
+            if (reading) Text(title, Modifier.weight(1f).padding(horizontal = 8.dp), fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            else { Text(if (saving) "שומר…" else if (!loaded) "טוען…" else "", color = cs.onSurfaceVariant, fontSize = 13.sp); Spacer(Modifier.weight(1f)) }
             if (reading) TextButton({ reading = false; reader.stop() }) { Text("✏️ עריכה", fontWeight = FontWeight.Bold) }
             else TextButton({
                 val ok = runCatching {
@@ -1178,8 +1182,8 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
         }
         if (delAsk) cur?.let { f -> DeleteDocDialog(f, { delAsk = false }, { delAsk = false; onClose() }) }
         ReadAloudBar(reader)
-        if (reading) Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
-        else TextField(
+        if (reading && markerSet && reader.state == 0) MarkerBar(onRead = { readAloud() }, onClear = { dv.value?.evaluateJavascript("DV.clear()", null); markerSet = false })
+        if (!reading) TextField(
             title, { title = it; edited = true }, singleLine = true,
             placeholder = { Text("שם המסמך", style = MaterialTheme.typography.headlineSmall, color = cs.onSurfaceVariant) },
             textStyle = MaterialTheme.typography.headlineSmall,
@@ -1255,7 +1259,12 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                     addJavascriptInterface(
                         DocViewBridge(
                             data = { initial }, onReady = { dvReady = true },
-                            onFailed = { reading = false; Toast.makeText(ctx, "לא ניתן להציג בתצוגת קריאה – נפתח העורך", Toast.LENGTH_SHORT).show() }
+                            onFailed = { reading = false; Toast.makeText(ctx, "לא ניתן להציג בתצוגת קריאה – נפתח העורך", Toast.LENGTH_SHORT).show() },
+                            onMarked = {
+                                markerSet = true
+                                // tapping another spot while reading jumps there
+                                if (reader.state != 0) { reader.stop(); dv.value?.evaluateJavascript("DV.textFrom()") { speakJson(it) } }
+                            }
                         ), "Android"
                     )
                     loadUrl("file:///android_asset/docx_view.html")
@@ -1269,11 +1278,12 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
 }
 
 /** JS side of the faithful Word reader (docx_view.html). */
-internal class DocViewBridge(val data: () -> String, val onReady: () -> Unit, val onFailed: () -> Unit) {
+internal class DocViewBridge(val data: () -> String, val onReady: () -> Unit, val onFailed: () -> Unit, val onMarked: () -> Unit = {}) {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     @android.webkit.JavascriptInterface fun docData(): String = data()
     @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
     @android.webkit.JavascriptInterface fun rendered() {}
+    @android.webkit.JavascriptInterface fun marked() { main.post { onMarked() } }
     @android.webkit.JavascriptInterface fun failed(e: String) { main.post { onFailed() } }
 }
 
@@ -1362,7 +1372,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                     DropdownMenuItem(text = { Text(if (reader.state != 0) "⏹ עצור הקראה" else "🔊 הקרא את הקובץ") }, onClick = {
                         moreMenu = false
-                        if (reader.state != 0) reader.stop() else web.value?.evaluateJavascript("PVtext().then(function(t){Android.text(t)})", null)
+                        if (reader.state != 0) reader.stop() else { Toast.makeText(ctx, "מתחיל מהעמוד המוצג", Toast.LENGTH_SHORT).show(); web.value?.evaluateJavascript("PVtext(PVpage()).then(function(t){Android.text(t)})", null) }
                     })
                     DropdownMenuItem(text = { Text("🔍 חיפוש בקובץ") }, onClick = { moreMenu = false; web.value?.evaluateJavascript("PV.findOpen()", null) })
                     DropdownMenuItem(text = { Text("💾 שמירה בשם…") }, onClick = {

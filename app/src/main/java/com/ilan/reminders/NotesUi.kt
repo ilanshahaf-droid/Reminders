@@ -692,7 +692,14 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                     )
                     DropdownMenuItem(text = { Text(if (reader.state != 0) "⏹ עצור הקראה" else "🔊 הקרא את הפתק") }, onClick = {
                         moreMenu = false
-                        if (reader.state != 0) reader.stop() else reader.start((if (title.isBlank()) "" else title.trim() + ".\n") + plain)
+                        if (reader.state != 0) reader.stop()
+                        else web.value?.evaluateJavascript("NE.hasCaret()") { has ->
+                            // from the cursor when one is placed in the text, otherwise the whole note with its title
+                            web.value?.evaluateJavascript("NE.fromCaret()") { r ->
+                                val body = runCatching { org.json.JSONTokener(r).nextValue() as? String }.getOrNull() ?: plain
+                                reader.start(if (has == "true" || title.isBlank()) body else title.trim() + ".\n" + body)
+                            }
+                        }
                     })
                     DropdownMenuItem(text = { Text("חיפוש בפתק") }, onClick = { moreMenu = false; finding = true })
                     DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })

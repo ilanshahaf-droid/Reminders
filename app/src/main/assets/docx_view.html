@@ -7,7 +7,7 @@ body{-webkit-text-size-adjust:none}
 #msg{padding:24px;text-align:center;font:16px system-ui,sans-serif;color:#555}
 /* reflow ("mobile") view: the document's own styles, but the text runs the full width of the phone like in the Word app */
 body.flow .docx-wrapper{background:#fff!important;padding:0!important;display:block!important}
-body.flow section.docx{width:auto!important;min-height:0!important;padding:10px 14px 24px!important;margin:0!important;box-shadow:none!important;box-sizing:border-box!important;overflow-wrap:anywhere}
+body.flow section.docx{width:auto!important;min-height:0!important;padding:4px 8px 16px!important;margin:0!important;box-shadow:none!important;box-sizing:border-box!important;overflow-wrap:anywhere}
 body.flow section.docx>article{width:auto!important}
 body.flow section.docx *{max-width:100%!important;box-sizing:border-box}
 body.flow table{width:100%!important;table-layout:auto!important}
@@ -16,6 +16,8 @@ body.flow img{max-width:100%!important;height:auto!important}
 /* page view: the real page, scaled to fit the screen */
 body.page .docx-wrapper{background:#dfe1ea!important;padding:8px 8px!important}
 body.page section.docx{box-shadow:0 1px 6px #0004!important;margin-bottom:10px!important}
+#mk{display:inline-block;width:0;height:1.15em;border-right:3px solid #ff6d00;vertical-align:text-bottom;pointer-events:none;position:relative}
+#mk::before{content:'';position:absolute;right:-6px;top:-5px;width:9px;height:9px;border-radius:50%;background:#ff6d00}
 </style>
 <script src="jszip.min.js"></script>
 <script src="docx-preview.min.js"></script>
@@ -23,7 +25,7 @@ body.page section.docx{box-shadow:0 1px 6px #0004!important;margin-bottom:10px!i
 <div id="msg">טוען…</div><div id="c"></div>
 <script>
 var DV = (function(){
-  var buf = null, mode = 'flow', scale = 1;
+  var buf = null, mode = 'flow', scale = 1, mk = null;
   function b64(s){ var bin = atob(s), n = bin.length, u = new Uint8Array(n); for (var i = 0; i < n; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
   var META = 'width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=5,user-scalable=yes';
   function fit(){
@@ -54,6 +56,9 @@ var DV = (function(){
         className: 'docx', inWrapper: true, ignoreWidth: mode === 'flow', ignoreHeight: mode === 'flow', breakPages: mode === 'page',
         ignoreLastRenderedPageBreak: true, renderHeaders: mode === 'page', renderFooters: mode === 'page', renderFootnotes: true, renderEndnotes: true
       });
+      // the Symbol-font bullets have no glyph on the phone: show a plain bullet instead
+      c.querySelectorAll('style').forEach(function(st){ st.textContent = st.textContent.replace(/content:\s*"[\uf000-\uf0ff]"/g, 'content:"\u2022"').replace(/font-family:\s*Symbol[^;}]*/gi, 'font-family:inherit'); });
+      mk = null;
       m.style.display = 'none'; fit();
       if (window.Android && Android.rendered) Android.rendered();
     } catch (e) { m.textContent = 'לא ניתן להציג את הקובץ בתצוגת קריאה'; if (window.Android && Android.failed) Android.failed(String(e)); }
@@ -62,9 +67,26 @@ var DV = (function(){
     refit: function(){ fit(); },
     set: function(page){ var nm = page ? 'page' : 'flow'; if (nm !== mode || !buf) { mode = nm; render(); } else fit(); },
     zoom: function(k){ scale = Math.max(0.6, Math.min(3, scale * k)); if (mode === 'flow') fit(); },
+    textFrom: function(){
+      var c = document.getElementById('c'), r = document.createRange();
+      if (mk && document.contains(mk)) r.setStartAfter(mk);
+      else { var t0 = document.caretRangeFromPoint(window.innerWidth - 12, 10); if (t0 && c.contains(t0.startContainer)) r.setStart(t0.startContainer, t0.startOffset); else r.setStart(c, 0); }
+      r.setEnd(c, c.childNodes.length);
+      var d = document.createElement('div'); d.style.cssText = 'position:absolute;left:-99999px;top:0;width:600px';
+      d.appendChild(r.cloneContents()); document.body.appendChild(d); var t = d.innerText; d.remove(); return t;
+    },
+    mark: function(x, y){
+      var r = document.caretRangeFromPoint(x, y); if (!r || !document.getElementById('c').contains(r.startContainer)) return false;
+      var o = document.getElementById('mk'); if (o) o.remove();
+      var sp = document.createElement('span'); sp.id = 'mk'; r.insertNode(sp); mk = sp; return true;
+    },
+    clear: function(){ var o = document.getElementById('mk'); if (o) o.remove(); mk = null; },
     text: function(){ var t = document.getElementById('c').innerText || ''; return t; }
   };
 })();
+document.addEventListener('click', function(e){
+  if (DV.mark(e.clientX, e.clientY) && window.Android && Android.marked) Android.marked();
+}, true);
 window.addEventListener('resize', function(){ try { DV.refit(); } catch (e) {} });
 if (window.Android) Android.ready();
 </script>

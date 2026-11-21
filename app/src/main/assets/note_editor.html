@@ -478,6 +478,14 @@ window.NE = {
   doc: function(on){ editor.setDoc(on); },
   view: function(mode){ editor.setView(mode); },
   zoom: function(f){ editor.pageZoom(f); },
+  fromCaret: function(){
+    var ed = document.querySelector('.ne-ed'), sel = window.getSelection(), r = document.createRange();
+    r.selectNodeContents(ed);
+    if (sel && sel.rangeCount && ed.contains(sel.anchorNode)) r.setStart(sel.anchorNode, sel.anchorOffset);
+    var d = document.createElement('div'); d.style.cssText = 'position:absolute;left:-99999px;top:0;width:600px';
+    d.appendChild(r.cloneContents()); document.body.appendChild(d); var t = d.innerText; d.remove(); return t;
+  },
+  hasCaret: function(){ var ed = document.querySelector('.ne-ed'), sel = window.getSelection(); return !!(sel && sel.rangeCount && ed.contains(sel.anchorNode)); },
   insert: function(t){ editor.focus(); document.execCommand('insertText', false, t); editor.flush(); },
   insertHtml: function(h){ editor.focus(); document.execCommand('insertHTML', false, h); editor.flush(); }
 };

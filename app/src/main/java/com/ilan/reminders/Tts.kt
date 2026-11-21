@@ -159,3 +159,16 @@ fun ReadAloudBar(r: SpeechReader) {
         }
     }
 }
+
+/** Shown when a start marker was placed in a document: read from there, or remove the marker. */
+@Composable
+fun MarkerBar(onRead: () -> Unit, onClear: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Surface(color = cs.tertiaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("📍 ההקראה תתחיל מהסימון", fontSize = 14.sp, modifier = Modifier.weight(1f).padding(horizontal = 6.dp))
+            TextButton(onRead) { Text("▶ הקרא מכאן") }
+            TextButton(onClear) { Text("✕") }
+        }
+    }
+}
