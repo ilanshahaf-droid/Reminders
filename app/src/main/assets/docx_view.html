@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=0.4,maximum-scale=5,user-scalable=yes">
+<style>
+html,body{margin:0;padding:0;background:#fff;color:#000}
+body{-webkit-text-size-adjust:none}
+#msg{padding:24px;text-align:center;font:16px system-ui,sans-serif;color:#555}
+/* reflow ("mobile") view: the document's own styles, but the text runs the full width of the phone like in the Word app */
+body.flow .docx-wrapper{background:#fff!important;padding:0!important;display:block!important}
+body.flow section.docx{width:auto!important;min-height:0!important;padding:10px 14px 24px!important;margin:0!important;box-shadow:none!important;box-sizing:border-box!important;overflow-wrap:anywhere}
+body.flow section.docx>article{width:auto!important}
+body.flow table{max-width:100%}
+body.flow img{max-width:100%!important;height:auto!important}
+/* page view: the real page, scaled to fit the screen */
+body.page .docx-wrapper{background:#dfe1ea!important;padding:8px 0!important}
+body.page section.docx{box-shadow:0 1px 6px #0004!important;margin-bottom:10px!important}
+</style>
+<script src="jszip.min.js"></script>
+<script src="docx-preview.min.js"></script>
+</head><body class="flow">
+<div id="msg">טוען…</div><div id="c"></div>
+<script>
+var DV = (function(){
+  var buf = null, mode = 'flow', scale = 1.1;
+  function b64(s){ var bin = atob(s), n = bin.length, u = new Uint8Array(n); for (var i = 0; i < n; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+  function fit(){
+    var c = document.getElementById('c');
+    c.style.zoom = ''; 
+    if (mode === 'page') {
+      var s = c.querySelector('section.docx'); if (!s) return;
+      var w = s.getBoundingClientRect().width || 794;
+      c.style.zoom = Math.min(1.6, (window.innerWidth - 4) / w);
+    } else c.style.zoom = scale;
+  }
+  async function render(){
+    var c = document.getElementById('c'), m = document.getElementById('msg');
+    if (!buf) { buf = b64(Android.docData()); }
+    document.body.className = mode;
+    c.innerHTML = ''; m.style.display = 'block'; m.textContent = 'טוען…';
+    try {
+      await docx.renderAsync(buf, c, null, {
+        className: 'docx', inWrapper: true, ignoreWidth: mode === 'flow', ignoreHeight: mode === 'flow', breakPages: mode === 'page',
+        ignoreLastRenderedPageBreak: true, renderHeaders: mode === 'page', renderFooters: mode === 'page', renderFootnotes: true, renderEndnotes: true
+      });
+      m.style.display = 'none'; fit();
+      if (window.Android && Android.rendered) Android.rendered();
+    } catch (e) { m.textContent = 'לא ניתן להציג את הקובץ בתצוגת קריאה'; if (window.Android && Android.failed) Android.failed(String(e)); }
+  }
+  return {
+    refit: function(){ fit(); },
+    set: function(page){ var nm = page ? 'page' : 'flow'; if (nm !== mode || !buf) { mode = nm; render(); } else fit(); },
+    zoom: function(k){ scale = Math.max(0.6, Math.min(3, scale * k)); if (mode === 'flow') fit(); },
+    text: function(){ var t = document.getElementById('c').innerText || ''; return t; }
+  };
+})();
+window.addEventListener('resize', function(){ try { DV.refit(); } catch (e) {} });
+if (window.Android) Android.ready();
+</script>
+</body></html>

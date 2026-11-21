@@ -1001,6 +1001,10 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
     var findQ by remember { mutableStateOf("") }
     var snipDlg by remember { mutableStateOf(false) }
     var pageView by remember { mutableStateOf(Docs.pageView(ctx)) }
+    var reading by remember { mutableStateOf(file != null) }
+    val dv = remember { mutableStateOf<WebView?>(null) }
+    var dvReady by remember { mutableStateOf(false) }
+    val reader = rememberSpeechReader()
     var showSaveAs by remember { mutableStateOf(false) }
     var linkTick by remember { mutableStateOf(0) }
     val cloudSave = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -1065,6 +1069,13 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
         }
     }
     if (showSaveAs) cur?.let { SaveAsDialog(it, { showSaveAs = false }, {}, { f -> cur = f }) }
+    LaunchedEffect(dvReady, pageView) { if (dvReady) dv.value?.evaluateJavascript("DV.set($pageView)", null) }
+    fun readAloud() {
+        if (reader.state != 0) { reader.stop(); return }
+        if (reading) dv.value?.evaluateJavascript("DV.text()") { r ->
+            reader.start(runCatching { org.json.JSONTokener(r).nextValue() as? String }.getOrNull() ?: "")
+        } else reader.start(plain)
+    }
     LaunchedEffect(loaded, pageView) {
         if (loaded) {
             delay(150)
@@ -1077,7 +1088,8 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
             IconButton({ requestSave(true) }) { Icon(Icons.Default.Check, "סיום") }
             Text(if (saving) "שומר…" else if (!loaded) "טוען…" else "", color = cs.onSurfaceVariant, fontSize = 13.sp)
             Spacer(Modifier.weight(1f))
-            TextButton({
+            if (reading) TextButton({ reading = false; reader.stop() }) { Text("✏️ עריכה", fontWeight = FontWeight.Bold) }
+            else TextButton({
                 val ok = runCatching {
                     voiceDoc.launch(
                         Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -1093,7 +1105,11 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
                     DropdownMenuItem(text = { Text(if (pageView) "📱 תצוגה מותאמת לטלפון" else "📄 תצוגת עמוד (כמו Word)") }, onClick = {
                         moreMenu = false; pageView = !pageView; Docs.setPageView(ctx, pageView)
                     })
-                    if (pageView) {
+                    DropdownMenuItem(text = { Text(if (reader.state != 0) "⏹ עצור הקראה" else "🔊 הקרא את המסמך") }, onClick = { moreMenu = false; readAloud() })
+                    if (reading) {
+                        DropdownMenuItem(text = { Text("➕ הגדל טקסט") }, onClick = { dv.value?.evaluateJavascript("DV.zoom(1.15)", null) })
+                        DropdownMenuItem(text = { Text("➖ הקטן טקסט") }, onClick = { dv.value?.evaluateJavascript("DV.zoom(0.87)", null) })
+                    } else if (pageView) {
                         DropdownMenuItem(text = { Text("➕ הגדל תצוגה") }, onClick = { web.value?.evaluateJavascript("NE.zoom(1.25)", null) })
                         DropdownMenuItem(text = { Text("➖ הקטן תצוגה") }, onClick = { web.value?.evaluateJavascript("NE.zoom(0.8)", null) })
                     }
@@ -1161,7 +1177,9 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
             TextButton({ finding = false; findQ = ""; web.value?.clearMatches() }) { Text("✕") }
         }
         if (delAsk) cur?.let { f -> DeleteDocDialog(f, { delAsk = false }, { delAsk = false; onClose() }) }
-        TextField(
+        ReadAloudBar(reader)
+        if (reading) Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
+        else TextField(
             title, { title = it; edited = true }, singleLine = true,
             placeholder = { Text("שם המסמך", style = MaterialTheme.typography.headlineSmall, color = cs.onSurfaceVariant) },
             textStyle = MaterialTheme.typography.headlineSmall,
@@ -1176,8 +1194,9 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
             fileCb?.onReceiveValue(android.webkit.WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
             fileCb = null
         }
+        Box(Modifier.fillMaxWidth().weight(1f)) {
         AndroidView(
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.fillMaxSize(),
             factory = { c ->
                 WebView(c).apply {
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -1224,18 +1243,50 @@ fun DocEditorScreen(file: File?, dark: Boolean, template: String = "", onClose: 
             },
             onRelease = { it.destroy() }
         )
+        if (reading) AndroidView(
+            modifier = Modifier.fillMaxSize().background(Color.White),
+            factory = { c ->
+                WebView(c).apply {
+                    setBackgroundColor(android.graphics.Color.WHITE)
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.useWideViewPort = true
+                    settings.setSupportZoom(true); settings.builtInZoomControls = true; settings.displayZoomControls = false
+                    addJavascriptInterface(
+                        DocViewBridge(
+                            data = { initial }, onReady = { dvReady = true },
+                            onFailed = { reading = false; Toast.makeText(ctx, "לא ניתן להציג בתצוגת קריאה – נפתח העורך", Toast.LENGTH_SHORT).show() }
+                        ), "Android"
+                    )
+                    loadUrl("file:///android_asset/docx_view.html")
+                    dv.value = this
+                }
+            },
+            onRelease = { dvReady = false; it.destroy() }
+        )
+        }
     }
+}
+
+/** JS side of the faithful Word reader (docx_view.html). */
+internal class DocViewBridge(val data: () -> String, val onReady: () -> Unit, val onFailed: () -> Unit) {
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    @android.webkit.JavascriptInterface fun docData(): String = data()
+    @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
+    @android.webkit.JavascriptInterface fun rendered() {}
+    @android.webkit.JavascriptInterface fun failed(e: String) { main.post { onFailed() } }
 }
 
 /** JS side of the PDF viewer (pdf_viewer.html). */
 internal class PdfBridge(
     val ctx: Context, val file: String, val data: () -> String, val onOpened: () -> Unit, val onSaved: (String) -> Unit, val onSaveFailed: () -> Unit,
-    val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit, val onReady: () -> Unit, val onPresent: (Boolean) -> Unit = {}
+    val onDirty: (Boolean) -> Unit, val onToast: (String) -> Unit, val onReady: () -> Unit, val onPresent: (Boolean) -> Unit = {}, val onText: (String) -> Unit = {}
 ) {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     @android.webkit.JavascriptInterface fun ready() { main.post { onReady() } }
     @android.webkit.JavascriptInterface fun docData(): String = data()
     @android.webkit.JavascriptInterface fun opened() { main.post { onOpened() } }
+    @android.webkit.JavascriptInterface fun text(t: String) { main.post { onText(t) } }
     @android.webkit.JavascriptInterface fun docSaved(b64: String) { onSaved(b64) }
     @android.webkit.JavascriptInterface fun saveFailed() { main.post { onSaveFailed() } }
     @android.webkit.JavascriptInterface fun dirty(v: Boolean) { main.post { onDirty(v) } }
@@ -1266,6 +1317,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
     var opened by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var delAsk by remember { mutableStateOf(false) }
+    val reader = rememberSpeechReader()
     var closeAfter by remember { mutableStateOf(false) }
     var asCopy by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
@@ -1308,6 +1360,10 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
             Box {
                 IconButton({ moreMenu = true }) { Icon(Icons.Default.MoreVert, "עוד") }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text(if (reader.state != 0) "⏹ עצור הקראה" else "🔊 הקרא את הקובץ") }, onClick = {
+                        moreMenu = false
+                        if (reader.state != 0) reader.stop() else web.value?.evaluateJavascript("PVtext().then(function(t){Android.text(t)})", null)
+                    })
                     DropdownMenuItem(text = { Text("🔍 חיפוש בקובץ") }, onClick = { moreMenu = false; web.value?.evaluateJavascript("PV.findOpen()", null) })
                     DropdownMenuItem(text = { Text("💾 שמירה בשם…") }, onClick = {
                         moreMenu = false
@@ -1325,6 +1381,7 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                 }
             }
         }
+        ReadAloudBar(reader)
         AndroidView(
             modifier = Modifier.fillMaxWidth().weight(1f),
             factory = { c ->
@@ -1358,7 +1415,12 @@ fun PdfViewerScreen(file: File, dark: Boolean, onClose: () -> Unit) {
                             onSaveFailed = { saving = false; closeAfter = false },
                             onDirty = { dirty = it },
                             onToast = { m -> Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show() },
-                            onReady = { evaluateJavascript("PV.open($dark)", null) }
+                            onReady = { evaluateJavascript("PV.open($dark)", null) },
+                            onText = { t ->
+                                val txt = t.ifBlank { Ocr.text(ctx, cur) ?: "" }
+                                if (txt.isBlank()) Toast.makeText(ctx, "אין טקסט בקובץ. אפשר להפעיל זיהוי טקסט (OCR) בלשונית מסמכים ← ⋮ ← 🔤 זיהוי טקסט", Toast.LENGTH_LONG).show()
+                                else reader.start(txt)
+                            }
                         ), "Android"
                     )
                     loadUrl("file:///android_asset/pdf_viewer.html")
