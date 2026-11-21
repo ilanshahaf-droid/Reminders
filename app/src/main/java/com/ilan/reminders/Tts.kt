@@ -37,6 +37,7 @@ class SpeechReader(private val ctx: Context) {
                 main.post { toast("אין קול עברי מותקן. אפשר להתקין בהגדרות ← ניהול כללי ← המרת טקסט לדיבור") }
                 return@TextToSpeech
             }
+            pickVoice()
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) { id?.removePrefix("c")?.toIntOrNull()?.let { i -> main.post { index = i } } }
                 override fun onDone(id: String?) { if (id == "c${chunks.size - 1}") main.post { state = 0; index = 0 } }
@@ -49,15 +50,47 @@ class SpeechReader(private val ctx: Context) {
 
     private fun toast(m: String) = Toast.makeText(ctx.applicationContext, m, Toast.LENGTH_LONG).show()
 
-    /** Splits into pieces the engine accepts (max ~4000 chars), at sentence ends where possible. */
-    private fun split(text: String): List<String> {
-        val out = ArrayList<String>(); val cur = StringBuilder()
-        for (part in text.replace("\r", "").split(Regex("(?<=[.!?:;\n])\\s+"))) {
-            val p = part.trim(); if (p.isEmpty()) continue
-            if (cur.length + p.length + 1 > 1500 && cur.isNotEmpty()) { out.add(cur.toString()); cur.setLength(0) }
-            if (p.length > 1500) { p.chunked(1500).forEach { out.add(it) } } else { if (cur.isNotEmpty()) cur.append(' '); cur.append(p) }
+    private val gaps = ArrayList<Long>()
+
+    /** Cleans the text so the engine reads it naturally: headings get a full stop, quotes / brackets are not read out, dashes become commas. */
+    private fun prepare(text: String): String {
+        val sb = StringBuilder()
+        for (line in text.replace("\r", "").split("\n")) {
+            var l = line.trim()
+            if (l.isEmpty()) { sb.append('\n'); continue }
+            l = l.replace(Regex("[\"\u201C\u201D\u05F4()\\[\\]{}*_#|]"), "").replace(Regex("\\s[-\u2013\u2014]+\\s"), ", ").replace(Regex("\\s{2,}"), " ")
+            if (!l.last().let { it == '.' || it == '!' || it == '?' || it == ':' || it == ';' || it == ',' }) l += "."
+            sb.append(l).append('\n')
         }
-        if (cur.isNotEmpty()) out.add(cur.toString())
+        return sb.toString()
+    }
+
+    /** One piece per sentence (the engine keeps natural intonation inside a sentence) and a measured silence after it. */
+    private fun split(text: String): List<String> {
+        val out = ArrayList<String>(); gaps.clear()
+        val src = prepare(text)
+        val cur = StringBuilder(); var i = 0
+        fun flush(para: Boolean) {
+            val p = cur.toString().trim(); cur.setLength(0)
+            if (p.isEmpty() || p.all { !it.isLetterOrDigit() }) return
+            val gap = when { para -> 650L; p.endsWith("?") || p.endsWith("!") -> 450L; p.endsWith(".") -> 380L; p.endsWith(":") -> 300L; else -> 220L }
+            if (p.length > 600) {
+                val parts = p.chunked(600)
+                parts.forEachIndexed { k, q -> out.add(q); gaps.add(if (k == parts.lastIndex) gap else 0L) }
+            } else { out.add(p); gaps.add(gap) }
+        }
+        while (i < src.length) {
+            val ch = src[i]
+            if (ch == '\n') { flush(true); i++; continue }
+            cur.append(ch)
+            if (ch in ".!?:;" && (i + 1 >= src.length || src[i + 1].isWhitespace())) {
+                var j = i + 1; var nl = false
+                while (j < src.length && src[j].isWhitespace()) { if (src[j] == '\n') nl = true; j++ }
+                flush(nl); i = j; continue
+            }
+            i++
+        }
+        flush(true)
         return out
     }
 
@@ -73,7 +106,21 @@ class SpeechReader(private val ctx: Context) {
     private fun speakFrom(i: Int) {
         val t = tts ?: return
         t.stop(); t.setSpeechRate(rate)
-        for (j in i until chunks.size) t.speak(chunks[j], TextToSpeech.QUEUE_ADD, null, "c$j")
+        for (j in i until chunks.size) {
+            t.speak(chunks[j], TextToSpeech.QUEUE_ADD, null, "c$j")
+            if (j < chunks.size - 1 && gaps.getOrElse(j) { 0L } > 0) t.playSilentUtterance((gaps[j] / rate).toLong(), TextToSpeech.QUEUE_ADD, "s$j")
+        }
+    }
+
+    /** The most natural Hebrew voice installed: highest quality first (network voices included). */
+    private fun pickVoice() {
+        val t = tts ?: return
+        runCatching {
+            val v = t.voices?.filter { it.locale.language == "he" || it.locale.language == "iw" }
+                ?.filter { !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+                ?.maxByOrNull { it.quality * 10 + (if (it.isNetworkConnectionRequired) 3 else 0) - it.latency / 100 }
+            if (v != null) t.voice = v
+        }
     }
 
     fun pause() { if (state == 1) { tts?.stop(); state = 2 } }

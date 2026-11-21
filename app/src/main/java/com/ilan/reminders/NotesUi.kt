@@ -562,6 +562,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
     var colorMenu by remember { mutableStateOf(false) }
     var catMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
+    val reader = rememberSpeechReader()
     val web = remember { mutableStateOf<WebView?>(null) }
     val titleFocus = remember { FocusRequester() }
     val bg = noteColor(color, dark) ?: cs.surface
@@ -689,6 +690,10 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                             if (locked) authenticate(ctx) { locked = false } else locked = true
                         }
                     )
+                    DropdownMenuItem(text = { Text(if (reader.state != 0) "⏹ עצור הקראה" else "🔊 הקרא את הפתק") }, onClick = {
+                        moreMenu = false
+                        if (reader.state != 0) reader.stop() else reader.start((if (title.isBlank()) "" else title.trim() + ".\n") + plain)
+                    })
                     DropdownMenuItem(text = { Text("חיפוש בפתק") }, onClick = { moreMenu = false; finding = true })
                     DropdownMenuItem(text = { Text("📋 קטעי טקסט") }, onClick = { moreMenu = false; snipDlg = true })
                     DropdownMenuItem(text = { Text("🔗 קישור למסמך") }, onClick = { moreMenu = false; linkDlg = true })
@@ -744,6 +749,7 @@ fun NoteEditorScreen(note: Note, categories: List<Category>, dark: Boolean, onCl
                 }
             }
         }
+        ReadAloudBar(reader)
         if (linkDlg) {
             val files = remember { Docs.list(ctx) }
             AlertDialog(

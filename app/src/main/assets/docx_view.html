@@ -9,7 +9,9 @@ body{-webkit-text-size-adjust:none}
 body.flow .docx-wrapper{background:#fff!important;padding:0!important;display:block!important}
 body.flow section.docx{width:auto!important;min-height:0!important;padding:10px 14px 24px!important;margin:0!important;box-shadow:none!important;box-sizing:border-box!important;overflow-wrap:anywhere}
 body.flow section.docx>article{width:auto!important}
-body.flow table{max-width:100%}
+body.flow section.docx *{max-width:100%!important;box-sizing:border-box}
+body.flow table{width:100%!important;table-layout:auto!important}
+body.flow section.docx p,body.flow section.docx td{overflow-wrap:anywhere}
 body.flow img{max-width:100%!important;height:auto!important}
 /* page view: the real page, scaled to fit the screen */
 body.page .docx-wrapper{background:#dfe1ea!important;padding:8px 0!important}
@@ -21,7 +23,7 @@ body.page section.docx{box-shadow:0 1px 6px #0004!important;margin-bottom:10px!i
 <div id="msg">טוען…</div><div id="c"></div>
 <script>
 var DV = (function(){
-  var buf = null, mode = 'flow', scale = 1.1;
+  var buf = null, mode = 'flow', scale = 1;
   function b64(s){ var bin = atob(s), n = bin.length, u = new Uint8Array(n); for (var i = 0; i < n; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
   function fit(){
     var c = document.getElementById('c');
@@ -30,7 +32,15 @@ var DV = (function(){
       var s = c.querySelector('section.docx'); if (!s) return;
       var w = s.getBoundingClientRect().width || 794;
       c.style.zoom = Math.min(1.6, (window.innerWidth - 4) / w);
-    } else c.style.zoom = scale;
+    } else {
+      c.style.zoom = scale;
+      // anything still wider than the screen (fixed-width boxes, tables) shrinks the view so no text is cut off
+      for (var k = 0; k < 4; k++) {
+        var w = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+        if (w <= window.innerWidth + 2) break;
+        c.style.zoom = Math.max(0.4, parseFloat(c.style.zoom) * window.innerWidth / w * 0.99);
+      }
+    }
   }
   async function render(){
     var c = document.getElementById('c'), m = document.getElementById('msg');
