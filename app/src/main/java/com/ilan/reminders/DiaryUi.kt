@@ -334,15 +334,14 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                         Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Text("▶", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(-1) }.padding(horizontal = 6.dp, vertical = 12.dp))
-                    Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 6.dp, vertical = 12.dp))
+                    Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 10.dp, vertical = 6.dp))
                     IconButton({ showSearch = true }, Modifier.size(38.dp)) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
                     IconButton({ startVoice() }, Modifier.size(38.dp)) { Text("🎤", fontSize = 20.sp) }
                     IconButton({ onNew(date, null) }, Modifier.size(38.dp)) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
                     Box {
                         IconButton({ menuMore = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
                         DropdownMenu(menuMore, { menuMore = false }) {
-                            DropdownMenuItem({ Text("היום") }, { menuMore = false; dayNum = today.toEpochDay() })
                             DropdownMenuItem({ Text("מעבר לתאריך…") }, {
                                 menuMore = false
                                 DatePickerDialog(ctx, { _, y, m, d -> dayNum = LocalDate.of(y, m + 1, d).toEpochDay() }, date.year, date.monthValue - 1, date.dayOfMonth).show()
