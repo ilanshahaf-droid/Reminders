@@ -30,6 +30,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -217,6 +222,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var showFont by remember { mutableStateOf(false) }
     var showDefs by remember { mutableStateOf(false) }
     var showDiag by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
     var dayEvSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     LaunchedEffect(tick) { withContext(Dispatchers.IO) { runCatching { EventNotify.run(ctx) }; runCatching { EventAtt.purge(ctx) } } }
@@ -332,6 +338,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                     Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 10.dp, vertical = 12.dp))
                     Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 10.dp, vertical = 6.dp))
+                    IconButton({ showSearch = true }) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
                     IconButton({ startVoice() }) { Text("🎤", fontSize = 20.sp) }
                     IconButton({ onNew(date, null) }) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
                     Box {
@@ -381,6 +388,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                 dismissButton = { TextButton({ remTask = null }) { Text("סגירה") } }
             )
         }
+        if (showSearch) DiarySearch(visible, zone, onPick = { e, d -> showSearch = false; onCellEv(e, d) }, onClose = { showSearch = false })
         val t = editing
         if (t != null) EventEditor(
             target = t, cals = cals, visible = visible, defaultCal = defCal, zone = zone,
@@ -1636,4 +1644,67 @@ private fun DiarySettingsHost(cals: List<Cal>, visible: Set<Long>, defCal: Long,
         },
         confirmButton = { TextButton(onClose) { Text("סגירה") } }
     )
+}
+
+
+/** Search over the diary's events (title and place), from a year back to two years ahead; upcoming events first. */
+@Composable
+private fun DiarySearch(visible: Set<Long>, zone: ZoneId, onPick: (Ev, LocalDate) -> Unit, onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    var q by remember { mutableStateOf("") }
+    var all by remember { mutableStateOf<List<Ev>?>(null) }
+    LaunchedEffect(visible) {
+        all = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            runCatching { CalRepo.events(ctx, now - 365L * 86400000, now + 2 * 365L * 86400000, visible) }.getOrDefault(emptyList())
+        }
+    }
+    val fr = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    BackHandler(onBack = onClose)
+    val term = q.trim()
+    val hits = remember(term, all) {
+        val now = System.currentTimeMillis()
+        val m = if (term.isEmpty()) emptyList() else all.orEmpty().filter { it.title.contains(term, true) || it.location.contains(term, true) }.distinctBy { it.id to it.begin }
+        m.filter { it.end >= now }.sortedBy { it.begin } + m.filter { it.end < now }.sortedByDescending { it.begin }
+    }
+    val df = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy") }
+    Surface(Modifier.fillMaxSize(), color = Color.White) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 12.dp)) {
+            Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    q, { q = it }, singleLine = true, placeholder = { Text("חיפוש באירועים ביומן") },
+                    trailingIcon = { if (q.isNotEmpty()) IconButton({ q = "" }) { Icon(Icons.Default.Close, "נקה") } },
+                    modifier = Modifier.weight(1f).focusRequester(fr), shape = RoundedCornerShape(28.dp)
+                )
+                TextButton(onClose) { Text("סגור") }
+            }
+            when {
+                all == null -> Text("טוען…", color = cs.onSurfaceVariant, modifier = Modifier.padding(16.dp))
+                term.isNotEmpty() && hits.isEmpty() -> Text("לא נמצא כלום", color = cs.onSurfaceVariant, modifier = Modifier.padding(16.dp))
+            }
+            androidx.compose.foundation.lazy.LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(hits.size) { i ->
+                    val e = hits[i]
+                    val d = e.days(zone).first
+                    Surface(
+                        shape = RoundedCornerShape(14.dp), color = cs.surface, shadowElevation = 1.dp,
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(e, d) }
+                    ) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(Color(e.color or 0xFF000000.toInt())))
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(e.title, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(df.format(d) + " · " + DAY_FULL[dayIdx(d)] + " · " + (if (e.allDay) "כל היום" else "%02d:%02d".format(e.startTime(zone).hour, e.startTime(zone).minute)),
+                                    fontSize = 13.sp, color = cs.onSurfaceVariant)
+                                if (e.location.isNotBlank()) Text("📍 " + e.location, fontSize = 12.sp, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
