@@ -835,7 +835,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v176") },
+        title = { Text("הגדרות · v177") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -845,6 +845,14 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
                 if (showWlog) AlertDialog(
                     onDismissRequest = { showWlog = false },
                     confirmButton = { TextButton({ showWlog = false }) { Text("סגור") } },
+                    dismissButton = {
+                        TextButton({
+                            val txt = ctx.getSharedPreferences("wlog", Context.MODE_PRIVATE).getString("log", "") ?: ""
+                            (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                                .setPrimaryClip(android.content.ClipData.newPlainText("log", txt))
+                            Toast.makeText(ctx, "היומן הועתק", Toast.LENGTH_SHORT).show()
+                        }) { Text("העתק") }
+                    },
                     title = { Text("פעולות שהתקבלו מהשעון") },
                     text = { Text(ctx.getSharedPreferences("wlog", Context.MODE_PRIVATE).getString("log", "")!!.ifBlank { "עוד לא התקבלו פעולות" }, modifier = Modifier.verticalScroll(rememberScrollState())) }
                 )
