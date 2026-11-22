@@ -242,6 +242,13 @@ class WearActionService : WearableListenerService() {
                 if (old.isNotEmpty()) p.edit().apply { old.forEach { remove(it) } }.apply()
             }
         }
+        // A copy that was held back (watch out of reach) and arrives after the reminder has rung again belongs to the OLD alert:
+        // applying it would silence / snooze the new one. Skip it.
+        val rid0 = j.optLong("id", -1)
+        if (ts > 0 && rid0 >= 0) {
+            val fired = getSharedPreferences("alerts", Context.MODE_PRIVATE).getLong("f$rid0", 0)
+            if (ts < fired - 5000L) { Notifier.log(this, "stale watch action ignored id=$rid0"); return }
+        }
         // Silence the phone at once, before any database work, so a locked / sleeping phone stops beeping even if the rest is slow.
         val rid = j.optLong("id", -1)
         if (rid >= 0 && j.optString("action", "SNOOZE") != "CANCEL_SNOOZE") runCatching { Notifier.dismissReminder(this, rid) }
