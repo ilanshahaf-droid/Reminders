@@ -95,6 +95,25 @@ object Notifier {
 
     /** Vibrates with ALARM usage, which Do Not Disturb lets through (notification vibration is muted there). */
     private val vh = android.os.Handler(android.os.Looper.getMainLooper())
+    private var ringtone: android.media.Ringtone? = null
+
+    /** Repeats the alert sound every few seconds until stopped (replaces the system's insistent repeat). */
+    private fun startSoundLoop(c: Context, t: Task) {
+        val snd = effectiveSound(c, t)
+        if (snd == "silent") return
+        val uri = if (snd.isBlank()) RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) else Uri.parse(snd)
+        val app = c.applicationContext
+        val until = ringUntil
+        fun tick() {
+            if (System.currentTimeMillis() >= ringUntil || ringUntil != until) return
+            runCatching {
+                ringtone?.stop()
+                ringtone = RingtoneManager.getRingtone(app, uri)?.also { it.play() }
+            }
+            vh.postDelayed({ tick() }, 6000L)
+        }
+        vh.postDelayed({ tick() }, 6000L)   // the notification itself already played the first sound
+    }
     @Volatile private var ringUntil = 0L
 
     /** Short diagnostic log (settings → watch log). */
@@ -111,8 +130,6 @@ object Notifier {
      */
     private fun vibrateNow(c: Context, t: Task) {
         val base = patternOf(t.vibration) ?: return
-        ringUntil = System.currentTimeMillis() + 600_000L
-        vh.removeCallbacksAndMessages(null)
         vibrateChunk(c.applicationContext, base)
     }
 
@@ -205,9 +222,13 @@ object Notifier {
             .addAction(snooze)
             .addAction(pick)
             .build()
-        n.flags = n.flags or Notification.FLAG_INSISTENT   // sound repeats until the notification is dismissed
+        // No FLAG_INSISTENT: that repeat is run by the system and on some phones it keeps sounding after the notification is gone.
+        // The repeat is done by startSoundLoop below, which stopVibration() ends.
         NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
+        ringUntil = System.currentTimeMillis() + 600_000L
+        vh.removeCallbacksAndMessages(null)
+        startSoundLoop(c, t)
         vibrateNow(c, t)
     }
 
