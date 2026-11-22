@@ -94,22 +94,43 @@ object Notifier {
     }
 
     /** Vibrates with ALARM usage, which Do Not Disturb lets through (notification vibration is muted there). */
-    @Suppress("DEPRECATION")
+    private val vh = android.os.Handler(android.os.Looper.getMainLooper())
+    @Volatile private var ringUntil = 0L
+
+    /** Short diagnostic log (settings → watch log). */
+    fun log(c: Context, line: String) = runCatching {
+        val p = c.getSharedPreferences("wlog", Context.MODE_PRIVATE)
+        val old = p.getString("log", "")!!.lines().filter { it.isNotBlank() }.takeLast(59)
+        p.edit().putString("log", (old + "${java.time.LocalTime.now().withNano(0)} $line").joinToString("\n")).apply()
+    }
+
+    /**
+     * Vibrates with ALARM usage, which Do Not Disturb lets through (notification vibration is muted there).
+     * Played in ~20 s pieces that re-arm themselves only while the alert is still ringing: a stop that fails to cancel the
+     * running piece (a cancel only works from the Vibrator instance that started it) still ends the buzz within seconds.
+     */
     private fun vibrateNow(c: Context, t: Task) {
         val base = patternOf(t.vibration) ?: return
-        // repeat the pattern (with a pause) for up to 10 minutes, or until an action cancels it
+        ringUntil = System.currentTimeMillis() + 600_000L
+        vh.removeCallbacksAndMessages(null)
+        vibrateChunk(c.applicationContext, base)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun vibrateChunk(c: Context, base: LongArray) {
+        if (System.currentTimeMillis() >= ringUntil) return
         val list = ArrayList<Long>()
         var total = 0L
-        while (total < 600_000L) {
+        while (total < 20_000L) {
             val chunk = base.toMutableList(); if (list.isNotEmpty()) chunk[0] = 1500L
             list.addAll(chunk); total += chunk.sum()
         }
-        val p = list.toLongArray()
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         try {
-            vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(p, -1), attrs)
+            vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(list.toLongArray(), -1), attrs)
         } catch (_: Exception) {}
+        vh.postDelayed({ vibrateChunk(c, base) }, total)
     }
 
     /** One shared Vibrator: cancel() only works on the same instance that started the vibration. */
@@ -139,6 +160,7 @@ object Notifier {
     }
 
     fun show(c: Context, t: Task) {
+        log(c, "alert id=${t.id}")
         alertPrefs(c).edit().putLong("f${t.id}", System.currentTimeMillis()).apply()
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -228,6 +250,7 @@ object Notifier {
 
     /** Every step on its own: one failing step must never leave the sound (the notification) or the buzz running. */
     fun dismissReminder(c: Context, id: Long) {
+        log(c, "dismiss id=$id")
         runCatching { NotificationManagerCompat.from(c).cancel(id.toInt()) }
         runCatching { Scheduler.cancelNag(c, id) }
         runCatching { stopVibration(c) }

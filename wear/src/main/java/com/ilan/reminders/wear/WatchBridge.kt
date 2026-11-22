@@ -39,6 +39,9 @@ object WatchBridge {
         fun retry() {
             if (tracked && ts > 0) {
                 // keep sending until the phone confirms (a locked phone in Doze may miss the first copies)
+                if (attempt == 4 && ts in pending) android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(app, "הטלפון לא אישר עדיין – ממשיך לנסות", android.widget.Toast.LENGTH_LONG).show()
+                }
                 if (ts in pending && attempt < 12) android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (ts in pending) send(app, path, payload, attempt + 1) }, 2500L * (attempt + 1).coerceAtMost(4))
                 return
             }
