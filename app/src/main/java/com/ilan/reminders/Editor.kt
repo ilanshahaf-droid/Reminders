@@ -663,7 +663,7 @@ private fun parseHm(raw: String): Int? {
 /** One place to set a moment: quick presets, today/tomorrow chips, date picker, and a time you can simply type. */
 /** A scrolling wheel; tap the centre number to type it with the keyboard. */
 @Composable
-private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTouch: () -> Unit, onView: (NumberPicker) -> Unit = {}, onChange: (Int) -> Unit) {
+private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTouch: () -> Unit, onView: (NumberPicker) -> Unit = {}, onTyped: ((Int) -> Unit)? = null, onChange: (Int) -> Unit) {
     AndroidView(
         modifier = Modifier.width(widthDp.dp).height(128.dp),
         factory = { c ->
@@ -671,7 +671,21 @@ private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTo
                 wrapSelectorWheel = true
                 setFormatter { "%02d".format(it) }
                 // the system filter would reject the zero-padded text ("08") on first draw
-                (getChildAt(0) as? android.widget.EditText)?.filters = arrayOf<android.text.InputFilter>()
+                val et = getChildAt(0) as? android.widget.EditText
+                et?.filters = arrayOf<android.text.InputFilter>()
+                // A typed number counts as soon as it is complete: before, it was only taken when the keyboard's Done / focus change
+                // committed it, so typing 22:32 and pressing Save straight away kept the hour but lost the minutes.
+                et?.addTextChangedListener(object : android.text.TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                    override fun afterTextChanged(e: android.text.Editable?) {
+                        val txt = e?.toString() ?: return
+                        val v = txt.toIntOrNull() ?: return
+                        @Suppress("UNCHECKED_CAST")
+                        val cb = tag as? ((Int) -> Unit)
+                        if (txt.length >= 2 && v in minValue..maxValue && et?.hasFocus() == true) cb?.invoke(v)
+                    }
+                })
                 onView(this)
             }
         },
@@ -684,6 +698,7 @@ private fun Wheel(value: Int, min: Int, max: Int, color: Int, widthDp: Int, onTo
                 np.textSize = 28f * np.resources.displayMetrics.scaledDensity
             }
             np.setOnValueChangedListener { _, _, v -> onChange(v) }
+            np.tag = onTyped ?: { v: Int -> onChange(v) }
             np.setOnTouchListener { _, e -> if (e.action == android.view.MotionEvent.ACTION_DOWN) onTouch(); false }
         }
     )
@@ -801,9 +816,9 @@ internal fun WhenPicker(ms: Long, quick: Boolean, onChange: (Long) -> Unit) {
                     Modifier.fillMaxWidth().bringIntoViewRequester(bring),
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Wheel(z.hour, 0, 23, color, 120, { wheelTouched = true }) { setHm(it, z.minute) }
+                    Wheel(z.hour, 0, 23, color, 120, { wheelTouched = true }, onTyped = { onChange(z.withHour(it).withSecond(0).withNano(0).toInstant().toEpochMilli()) }) { setHm(it, z.minute) }
                     Text(":", style = MaterialTheme.typography.displaySmall)
-                    Wheel(z.minute, 0, 59, color, 120, { wheelTouched = true }) { setHm(z.hour, it) }
+                    Wheel(z.minute, 0, 59, color, 120, { wheelTouched = true }, onTyped = { onChange(z.withMinute(it).withSecond(0).withNano(0).toInstant().toEpochMilli()) }) { setHm(z.hour, it) }
                 }
             }
             if (!imeUp) Text("אפשר ללחוץ על המספר ולהקליד אותו", style = MaterialTheme.typography.bodySmall,
