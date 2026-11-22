@@ -15,7 +15,7 @@ import java.time.LocalTime
 
 /** Talks to the watch app (same applicationId) through the Wearable Data Layer. */
 object WearBridge {
-    private fun send(c: Context, path: String, payload: String, attempt: Int = 0) {
+    fun send(c: Context, path: String, payload: String, attempt: Int = 0) {
         val app = c.applicationContext
         // no watch in reach (or a failed send) is retried a few times; nothing is retried once a send went through
         fun retry() {
