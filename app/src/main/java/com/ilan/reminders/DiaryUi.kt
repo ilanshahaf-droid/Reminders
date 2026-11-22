@@ -318,32 +318,31 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                         }
                     }
                     val page = pager.currentPage
-                    Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
+                    Column(Modifier.weight(1f).padding(horizontal = 4.dp).clickable { dayNum = today.toEpochDay() }) {
                         val mon = HE_MONTHS[date.monthValue - 1]
                         val wa = wkStart(date); val wb = wa.plusDays(6)
                         val title = when (page) {
-                            2 -> "${date.dayOfMonth} ב$mon ${date.year}"
+                            2 -> "${date.dayOfMonth} ב${HE_MON_SHORT[date.monthValue - 1]}"
                             1 -> if (wa.month == wb.month) mon else if (wa.year == wb.year) "${HE_MON_SHORT[wa.monthValue - 1]} / ${HE_MON_SHORT[wb.monthValue - 1]}" else "${HE_MON_SHORT[wa.monthValue - 1]} ${wa.year}"
                             else -> mon
                         }
                         val sub = when (page) {
-                            2 -> DAY_FULL[dayIdx(date)]
+                            2 -> "${DAY_FULL[dayIdx(date)]} ${date.year}"
                             1 -> if (wa.year == wb.year) "${wb.year}" else "${HE_MON_SHORT[wb.monthValue - 1]} ${wb.year}"
                             else -> "${date.year}"
                         }
-                        Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, maxLines = 1)
+                        Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Text("▶", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(-1) }.padding(horizontal = 10.dp, vertical = 12.dp))
-                    Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 10.dp, vertical = 12.dp))
-                    Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 10.dp, vertical = 6.dp))
-                    IconButton({ showSearch = true }) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
-                    IconButton({ startVoice() }) { Text("🎤", fontSize = 20.sp) }
-                    IconButton({ onNew(date, null) }) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
+                    Text("▶", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(-1) }.padding(horizontal = 6.dp, vertical = 12.dp))
+                    Text("◀", color = Color.White, fontSize = 20.sp, modifier = Modifier.clickable { shift(1) }.padding(horizontal = 6.dp, vertical = 12.dp))
+                    IconButton({ showSearch = true }, Modifier.size(38.dp)) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
+                    IconButton({ startVoice() }, Modifier.size(38.dp)) { Text("🎤", fontSize = 20.sp) }
+                    IconButton({ onNew(date, null) }, Modifier.size(38.dp)) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
                     Box {
-                        IconButton({ menuMore = true }) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
+                        IconButton({ menuMore = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
                         DropdownMenu(menuMore, { menuMore = false }) {
+                            DropdownMenuItem({ Text("היום") }, { menuMore = false; dayNum = today.toEpochDay() })
                             DropdownMenuItem({ Text("מעבר לתאריך…") }, {
                                 menuMore = false
                                 DatePickerDialog(ctx, { _, y, m, d -> dayNum = LocalDate.of(y, m + 1, d).toEpochDay() }, date.year, date.monthValue - 1, date.dayOfMonth).show()
