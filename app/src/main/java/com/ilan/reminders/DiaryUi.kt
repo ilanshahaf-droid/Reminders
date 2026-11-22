@@ -308,7 +308,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             Box(Modifier.fillMaxWidth().background(BAR).statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(62.dp).padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box {
-                        IconButton({ menuNav = true }) { Icon(Icons.Default.Menu, "תפריט", tint = Color.White) }
+                        IconButton({ menuNav = true }, Modifier.size(44.dp)) { Icon(Icons.Default.Menu, "תפריט", tint = Color.White) }
                         DropdownMenu(menuNav, { menuNav = false }) {
                             DropdownMenuItem({ Text("⏰ תזכורות") }, { menuNav = false; onReminders() })
                             DropdownMenuItem({ Text("📝 פתקים") }, { menuNav = false; onNotes() })
@@ -318,7 +318,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                         }
                     }
                     val page = pager.currentPage
-                    Column(Modifier.weight(1f).padding(horizontal = 4.dp).clickable { dayNum = today.toEpochDay() }) {
+                    Column(Modifier.widthIn(max = 92.dp).padding(horizontal = 6.dp).clickable { dayNum = today.toEpochDay() }) {
                         val mon = HE_MONTHS[date.monthValue - 1]
                         val wa = wkStart(date); val wb = wa.plusDays(6)
                         val title = when (page) {
@@ -335,12 +335,13 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                         Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 10.dp, vertical = 6.dp))
-                    IconButton({ showSearch = true }, Modifier.size(38.dp)) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
-                    IconButton({ startVoice() }, Modifier.size(38.dp)) { Text("🎤", fontSize = 20.sp) }
-                    IconButton({ onNew(date, null) }, Modifier.size(38.dp)) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
+                        modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 8.dp, vertical = 8.dp))
+                    Spacer(Modifier.weight(1f))
+                    IconButton({ showSearch = true }, Modifier.size(44.dp)) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
+                    IconButton({ startVoice() }, Modifier.size(44.dp)) { Text("🎤", fontSize = 20.sp) }
+                    IconButton({ onNew(date, null) }, Modifier.size(44.dp)) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
                     Box {
-                        IconButton({ menuMore = true }, Modifier.size(38.dp)) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
+                        IconButton({ menuMore = true }, Modifier.size(44.dp)) { Icon(Icons.Default.MoreVert, "עוד", tint = Color.White) }
                         DropdownMenu(menuMore, { menuMore = false }) {
                             DropdownMenuItem({ Text("מעבר לתאריך…") }, {
                                 menuMore = false
