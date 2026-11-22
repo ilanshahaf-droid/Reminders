@@ -102,6 +102,7 @@ object EventNotify {
     }
 
     fun post(c: Context, key: String, title: String, text: String, count: Int) {
+        Notifier.log(c, "event notify: $title")
         if (!NotificationManagerCompat.from(c).areNotificationsEnabled()) return
         val nid = 900000 + abs(key.hashCode() % 90000)
         NotificationManagerCompat.from(c).notify(nid, build(c, nid, key, title, text, false))

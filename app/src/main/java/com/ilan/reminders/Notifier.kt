@@ -109,6 +109,7 @@ object Notifier {
         val until = ringUntil
         fun tick() {
             if (System.currentTimeMillis() >= ringUntil || ringUntil != until) return
+            if (!stillShown(app)) { log(app, "buzz stopped: notification gone"); stopVibration(app); return }
             runCatching {
                 ringtone?.stop()
                 ringtone = RingtoneManager.getRingtone(app, uri)?.also { it.play() }
@@ -118,6 +119,16 @@ object Notifier {
         vh.postDelayed({ tick() }, 6000L)   // the notification itself already played the first sound
     }
     @Volatile private var ringUntil = 0L
+    @Volatile private var ringId = -1L
+    @Volatile private var ringStart = 0L
+
+    /** The buzz / sound may only go on while the reminder's own notification is still on screen. */
+    private fun stillShown(c: Context): Boolean {
+        if (System.currentTimeMillis() - ringStart < 4000L) return true   // the notification may not be listed yet
+        return try {
+            c.getSystemService(NotificationManager::class.java).activeNotifications.any { it.id == ringId.toInt() }
+        } catch (_: Exception) { true }
+    }
 
     /** Short diagnostic log (settings → watch log). */
     fun log(c: Context, line: String) = runCatching {
@@ -140,6 +151,7 @@ object Notifier {
     @Suppress("DEPRECATION")
     private fun vibrateChunk(c: Context, base: LongArray, first: Boolean = true) {
         if (System.currentTimeMillis() >= ringUntil) return
+        if (!stillShown(c)) { log(c, "buzz stopped: notification gone"); stopVibration(c); return }
         val chunk = base.copyOf(); if (!first) chunk[0] = 1500L
         val total = chunk.sum()
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
@@ -231,6 +243,7 @@ object Notifier {
         NotificationManagerCompat.from(c).cancel(resultId(t.id))
         NotificationManagerCompat.from(c).notify(t.id.toInt(), n)
         ringUntil = System.currentTimeMillis() + 600_000L
+        ringId = t.id; ringStart = System.currentTimeMillis()
         vh.removeCallbacksAndMessages(null)
         startSoundLoop(c, t)
         vibrateNow(c, t)
