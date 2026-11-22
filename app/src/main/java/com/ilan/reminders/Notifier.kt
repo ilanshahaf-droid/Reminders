@@ -119,6 +119,8 @@ object Notifier {
 
     @Suppress("DEPRECATION")
     fun stopVibration(c: Context) {
+        // a Vibrator of this process can only cancel its own vibration, so also cancel through a brand-new instance
+        try { c.applicationContext.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
         try {
             val v = vibrator(c) ?: return
             v.cancel()
@@ -224,7 +226,14 @@ object Notifier {
     /** Separate id from the reminder itself, so the watch cancelling the reminder (same package+id) can't remove it. */
     private fun resultId(id: Long) = id.toInt() xor 0x20000000
 
-    fun dismissReminder(c: Context, id: Long) { Scheduler.cancelNag(c, id); stopVibration(c); AlertActivity.finishFor(id); NotificationManagerCompat.from(c).cancel(id.toInt()) }
+    /** Every step on its own: one failing step must never leave the sound (the notification) or the buzz running. */
+    fun dismissReminder(c: Context, id: Long) {
+        runCatching { NotificationManagerCompat.from(c).cancel(id.toInt()) }
+        runCatching { Scheduler.cancelNag(c, id) }
+        runCatching { stopVibration(c) }
+        runCatching { AlertActivity.finishFor(id) }
+        runCatching { (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(id.toInt()) }
+    }
 
     fun cancel(c: Context, id: Long) {
         Scheduler.cancelNag(c, id)

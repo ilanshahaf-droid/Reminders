@@ -140,7 +140,7 @@ class WearActionService : WearableListenerService() {
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
         when (e.path) {
             "/reminder/create", "/reminder/delete", "/reminder/settime" -> { edit(e.path, j); return }
-            "/reminder/action" -> action(j)
+            "/reminder/action" -> { action(j); ack("/reminder/ack", j) }
             "/event/action" -> eventAction(j)
             "/note/create" -> addNote(j.optString("text"))
             "/event/create" -> newEvent(j.optString("text"))
@@ -149,6 +149,19 @@ class WearActionService : WearableListenerService() {
 
     private fun eventAction(j: JSONObject) {
         if (firstTime(j)) eventActionNow(j)
+        ack("/event/ack", j)
+    }
+
+    /** Tells the watch the action arrived, so it stops re-sending it. Also logged for diagnosis (settings → watch log). */
+    private fun ack(path: String, j: JSONObject) {
+        val ts = j.optLong("ts", 0)
+        runCatching {
+            val p = getSharedPreferences("wlog", Context.MODE_PRIVATE)
+            val line = "${java.time.LocalTime.now().withNano(0)} ${j.optString("action", j.optString("act"))} id=${j.optLong("id", j.optInt("nid").toLong())}"
+            val old = p.getString("log", "")!!.lines().filter { it.isNotBlank() }.takeLast(29)
+            p.edit().putString("log", (old + line).joinToString("\n")).apply()
+        }
+        if (ts > 0) WearBridge.send(this, path, JSONObject().put("ts", ts).toString())
     }
 
     /** True the first time this ts is seen (the message and the stored copy both arrive; only one may act). */
@@ -215,7 +228,7 @@ class WearActionService : WearableListenerService() {
             val json = com.google.android.gms.wearable.DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json") ?: continue
             runCatching {
                 val j = JSONObject(json)
-                if (j.has("nid")) eventAction(j) else action(j)
+                if (j.has("nid")) eventAction(j) else { action(j); ack("/reminder/ack", j) }
             }
             runCatching { Wearable.getDataClient(this).deleteDataItems(ev.dataItem.uri) }
         }

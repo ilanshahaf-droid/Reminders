@@ -17,6 +17,7 @@ class ReminderListenerService : WearableListenerService() {
     override fun onMessageReceived(e: MessageEvent) {
         val j = runCatching { JSONObject(String(e.data, Charsets.UTF_8)) }.getOrNull() ?: return
         when (e.path) {
+            "/reminder/ack", "/event/ack" -> WatchBridge.acked(j.optLong("ts"))
             "/reminder/fire" -> fire(j)
             "/reminder/dismiss" -> dismiss(j.optLong("id"), j.optBoolean("done"))
             "/event/fire" -> fireEvent(j)

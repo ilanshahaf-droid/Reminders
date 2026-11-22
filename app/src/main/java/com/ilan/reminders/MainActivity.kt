@@ -835,11 +835,19 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v165") },
+        title = { Text("הגדרות · v166") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
                 var snooze by remember { mutableIntStateOf(prefs.getInt("snoozeMin", 10)) }
+                var showWlog by remember { mutableStateOf(false) }
+                TextButton({ showWlog = true }) { Text("יומן פעולות מהשעון (לאבחון)") }
+                if (showWlog) AlertDialog(
+                    onDismissRequest = { showWlog = false },
+                    confirmButton = { TextButton({ showWlog = false }) { Text("סגור") } },
+                    title = { Text("פעולות שהתקבלו מהשעון") },
+                    text = { Text(ctx.getSharedPreferences("wlog", Context.MODE_PRIVATE).getString("log", "")!!.ifBlank { "עוד לא התקבלו פעולות" }, modifier = Modifier.verticalScroll(rememberScrollState())) }
+                )
                 Text("מראה", fontWeight = FontWeight.Bold)
                 val appCtx = LocalContext.current
                 Text("גודל טקסט (לא משפיע על סרגל הלשוניות העליון)", style = MaterialTheme.typography.bodySmall)
