@@ -169,6 +169,10 @@ object Notifier {
 
     @Suppress("DEPRECATION")
     fun stopVibration(c: Context) {
+        // end the repeating buzz / sound chains first: without this they re-arm themselves every few seconds
+        ringUntil = 0L
+        vh.removeCallbacksAndMessages(null)
+        vh.post { runCatching { ringtone?.stop() }; ringtone = null }
         // a Vibrator of this process can only cancel its own vibration, so also cancel through a brand-new instance
         try { c.applicationContext.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
         if (Build.VERSION.SDK_INT >= 31) try {
