@@ -124,6 +124,13 @@ object WearBridge {
         val body = JSONObject().put("id", id).put("done", done).toString()
         send(c, "/reminder/dismiss", body)
         val app = c.applicationContext
+        // also as a stored data item (one per reminder, changing value): reaches the watch even if every message above is lost
+        runCatching {
+            val req = com.google.android.gms.wearable.PutDataMapRequest.create("/dis/$id").apply {
+                dataMap.putLong("ts", System.currentTimeMillis()); dataMap.putBoolean("done", done)
+            }.asPutDataRequest().setUrgent()
+            Wearable.getDataClient(app).putDataItem(req)
+        }
         CoroutineScope(Dispatchers.IO).launch {
             for (d in longArrayOf(2_000, 4_000, 8_000)) {
                 kotlinx.coroutines.delay(d)

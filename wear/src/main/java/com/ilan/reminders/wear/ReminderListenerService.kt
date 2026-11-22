@@ -62,6 +62,14 @@ class ReminderListenerService : WearableListenerService() {
     override fun onDataChanged(events: DataEventBuffer) {
         for (ev in events) {
             val path = ev.dataItem.uri.path
+            if (ev.type == DataEvent.TYPE_CHANGED && path != null && path.startsWith("/dis/")) {
+                // the phone's "stop" kept as a data item: delivered even if the message was lost while out of reach
+                val dm = DataMapItem.fromDataItem(ev.dataItem).dataMap
+                val id = path.removePrefix("/dis/").toLongOrNull() ?: continue
+                val fired = getSharedPreferences("watch", MODE_PRIVATE).getLong("fireAt$id", 0)
+                if (dm.getLong("ts") >= fired - 5000L) dismiss(id, dm.getBoolean("done"))
+                continue
+            }
             if (ev.type == DataEvent.TYPE_CHANGED && path == "/agenda") {
                 DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json")?.let { WatchData.updateAgenda(this, it) }
                 runCatching { androidx.wear.tiles.TileService.getUpdater(this).requestUpdate(NextEventTileService::class.java) }
@@ -155,23 +163,31 @@ class ReminderListenerService : WearableListenerService() {
             val p = c.getSharedPreferences("watch", android.content.Context.MODE_PRIVATE)
             val set = p.getStringSet("firing", emptySet())!!.toMutableSet()
             if (on) set.add(id.toString()) else set.remove(id.toString())
-            p.edit().putStringSet("firing", set).apply()
+            p.edit().putStringSet("firing", set).apply { if (on) putLong("fireAt$id", System.currentTimeMillis()) }.apply()
         }
 
-        /** Repeats the buzz (alarm usage, so it also works in Do Not Disturb) for up to 10 minutes or until stopped. */
-        @Suppress("DEPRECATION")
+        private val vt = android.os.HandlerThread("alert-fx").apply { start() }
+        private val vh = android.os.Handler(vt.looper)
+        @Volatile private var ringUntil = 0L
+
+        /** Repeats the buzz (alarm usage, so it also works in Do Not Disturb) in single ~4 s cycles for up to 10 minutes or until stopped. */
         fun startVibration(c: android.content.Context) {
+            ringUntil = System.currentTimeMillis() + 600_000L
+            vh.removeCallbacksAndMessages(null)
+            chunk(c.applicationContext, true)
+        }
+
+        @Suppress("DEPRECATION")
+        private fun chunk(c: android.content.Context, first: Boolean) {
+            if (System.currentTimeMillis() >= ringUntil) return
             val base = longArrayOf(0, 800, 200, 800, 200, 800)
-            val list = ArrayList<Long>(); var total = 0L
-            while (total < 600_000L) {
-                val chunk = base.toMutableList(); if (list.isNotEmpty()) chunk[0] = 1500L
-                list.addAll(chunk); total += chunk.sum()
-            }
+            if (!first) base[0] = 1500L
             val attrs = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
             try {
-                vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(list.toLongArray(), -1), attrs)
+                vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(base, -1), attrs)
             } catch (_: Exception) {}
+            vh.postDelayed({ chunk(c, false) }, base.sum())
         }
 
         /** One shared Vibrator: cancel() only works on the instance that started the vibration. */
@@ -181,6 +197,8 @@ class ReminderListenerService : WearableListenerService() {
 
         @Suppress("DEPRECATION")
         fun stopVibration(c: android.content.Context) {
+            ringUntil = 0L
+            vh.removeCallbacksAndMessages(null)
             try {
                 val v = vibrator(c) ?: return
                 v.cancel()
