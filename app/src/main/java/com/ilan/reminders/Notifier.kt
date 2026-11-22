@@ -133,21 +133,18 @@ object Notifier {
         vibrateChunk(c.applicationContext, base)
     }
 
+    /** One buzz cycle at a time (about 4 s): whatever happens to a stop request, the buzz ends within one cycle. */
     @Suppress("DEPRECATION")
-    private fun vibrateChunk(c: Context, base: LongArray) {
+    private fun vibrateChunk(c: Context, base: LongArray, first: Boolean = true) {
         if (System.currentTimeMillis() >= ringUntil) return
-        val list = ArrayList<Long>()
-        var total = 0L
-        while (total < 20_000L) {
-            val chunk = base.toMutableList(); if (list.isNotEmpty()) chunk[0] = 1500L
-            list.addAll(chunk); total += chunk.sum()
-        }
+        val chunk = base.copyOf(); if (!first) chunk[0] = 1500L
+        val total = chunk.sum()
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
         try {
-            vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(list.toLongArray(), -1), attrs)
+            vibrator(c)?.vibrate(android.os.VibrationEffect.createWaveform(chunk, -1), attrs)
         } catch (_: Exception) {}
-        vh.postDelayed({ vibrateChunk(c, base) }, total)
+        vh.postDelayed({ vibrateChunk(c, base, false) }, total)
     }
 
     /** One shared Vibrator: cancel() only works on the same instance that started the vibration. */
@@ -159,6 +156,10 @@ object Notifier {
     fun stopVibration(c: Context) {
         // a Vibrator of this process can only cancel its own vibration, so also cancel through a brand-new instance
         try { c.applicationContext.getSystemService(android.os.Vibrator::class.java)?.cancel() } catch (_: Exception) {}
+        if (Build.VERSION.SDK_INT >= 31) try {
+            val vm = c.applicationContext.getSystemService(android.os.VibratorManager::class.java)
+            vm?.cancel(); vm?.defaultVibrator?.cancel()
+        } catch (_: Exception) {}
         try {
             val v = vibrator(c) ?: return
             v.cancel()
