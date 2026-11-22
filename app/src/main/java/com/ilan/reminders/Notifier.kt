@@ -94,7 +94,10 @@ object Notifier {
     }
 
     /** Vibrates with ALARM usage, which Do Not Disturb lets through (notification vibration is muted there). */
-    private val vh = android.os.Handler(android.os.Looper.getMainLooper())
+    // Sound / buzz are driven from their own thread: playing a ringtone or talking to the vibrator service on the main thread
+    // can block it (and the app then shows "not responding").
+    private val vt = android.os.HandlerThread("alert-fx").apply { start() }
+    private val vh = android.os.Handler(vt.looper)
     private var ringtone: android.media.Ringtone? = null
 
     /** Repeats the alert sound every few seconds until stopped (replaces the system's insistent repeat). */
