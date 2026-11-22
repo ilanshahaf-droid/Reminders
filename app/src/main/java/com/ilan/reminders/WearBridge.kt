@@ -162,7 +162,7 @@ class WearActionService : WearableListenerService() {
     /** Tells the watch the action arrived, so it stops re-sending it. Also logged for diagnosis (settings → watch log). */
     private fun ack(path: String, j: JSONObject) {
         val ts = j.optLong("ts", 0)
-        Notifier.log(this, "watch ${j.optString("action", j.optString("act"))} id=${j.optLong("id", j.optInt("nid").toLong())}")
+        Notifier.log(this, "watch ${j.optString("action", j.optString("act"))} id=${j.optLong("id", j.optInt("nid").toLong())}" + (if (ts > 0) " lag=${(System.currentTimeMillis() - ts) / 1000}s" else ""))
         if (ts > 0) WearBridge.send(this, path, JSONObject().put("ts", ts).toString())
     }
 
