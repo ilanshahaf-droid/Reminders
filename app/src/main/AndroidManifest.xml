@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <queries>
         <package android:name="com.google.android.apps.docs" />
@@ -54,6 +57,20 @@
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- voice-message transcription: shows up in WhatsApp's Share menu as "תמלול · סדר יום" -->
+        <activity android:name=".TranscribeActivity" android:exported="true" android:label="תמלול · סדר יום"
+            android:launchMode="singleTop" android:taskAffinity="com.ilan.reminders.transcribe" android:excludeFromRecents="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard">
+            <intent-filter android:label="תמלול · סדר יום">
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+            </intent-filter>
+        </activity>
+        <service android:name=".TranscribeService" android:exported="false" android:foregroundServiceType="dataSync" />
 
         <activity android:name=".AuthCallbackActivity" android:exported="true" android:launchMode="singleTask"
             android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">

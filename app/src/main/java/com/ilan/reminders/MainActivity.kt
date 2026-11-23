@@ -70,6 +70,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
         takeEvent(this, intent)
+        takeTranscript(this, intent)
         takeShare(this, intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,6 +78,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         enableEdgeToEdge()
         if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
         takeEvent(this, intent)
+        takeTranscript(this, intent)
         takeShare(this, intent)
         setContent { AppTheme { Home() } }
         // while the app is on screen: pull web changes right away and then every 15 seconds
@@ -93,6 +95,22 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
 /** Text received through the system "Share" menu; shown as a new note. */
 object PendingShare { var text by mutableStateOf<String?>(null) }
+
+/** A transcribed voice message sent from the transcription screen: open it as a note, a new reminder or a new event. */
+private fun takeTranscript(c: Context, i: Intent) {
+    val noteId = i.getLongExtra("trNote", Long.MIN_VALUE)
+    if (noteId != Long.MIN_VALUE) { i.removeExtra("trNote"); PendingOpen.noteId = noteId }
+    i.getStringExtra("trTask")?.let { text ->
+        i.removeExtra("trTask")
+        val defTime = runCatching { java.time.LocalTime.parse(c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("defTime", "") ?: "") }
+            .getOrDefault(java.time.LocalTime.of(9, 0))
+        val v = VoiceParse.parse(text, ZonedDateTime.now(), defTime)
+        val base = newTask(c)
+        PendingOpen.task = base.copy(title = Transcripts.shortTitle(v.title.ifBlank { text }), notes = text,
+            triggerAt = v.at?.toInstant()?.toEpochMilli() ?: base.triggerAt)
+    }
+    i.getStringExtra("trEvent")?.let { i.removeExtra("trEvent"); PendingOpen.evText = it }
+}
 
 /** A Word / PDF file opened from another app ("Open with" or Share). */
 private fun takeEvent(c: Context, i: Intent) {
@@ -111,6 +129,7 @@ object PendingOpen {
     var task by mutableStateOf<Task?>(null)
     var newNote by mutableStateOf(false)   // quick-note widget
     var template by mutableStateOf<String?>(null)   // HTML for a new Word document (note exported to Word)
+    var evText by mutableStateOf<String?>(null)     // transcribed voice message -> new diary event
 }
 
 private fun takeShare(ctx: Context, i: Intent?) {
@@ -835,12 +854,13 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v183") },
+        title = { Text("הגדרות · v184") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
                 var snooze by remember { mutableIntStateOf(prefs.getInt("snoozeMin", 10)) }
                 var showWlog by remember { mutableStateOf(false) }
+                TextButton({ ctx.startActivity(Intent(ctx, TranscribeActivity::class.java)) }) { Text("🎙️ תמלול הודעות קוליות (מודל, תמלולים אחרונים)") }
                 TextButton({ showWlog = true }) { Text("יומן פעולות מהשעון (לאבחון)") }
                 if (showWlog) AlertDialog(
                     onDismissRequest = { showWlog = false },

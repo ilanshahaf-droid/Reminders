@@ -61,11 +61,14 @@ fun Home() {
     var screen by rememberSaveable { mutableStateOf("diary") }
     val startCtx = LocalContext.current
     LaunchedEffect(Unit) {
-        if (PendingOpen.task == null && PendingOpen.noteId == null && PendingOpen.file == null && PendingShare.text == null &&
+        if (PendingOpen.task == null && PendingOpen.noteId == null && PendingOpen.file == null && PendingShare.text == null && PendingOpen.evText == null &&
             startCtx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE).getBoolean("startToday", false)) TodayView.open = true
     }
     if ((PendingShare.text != null || PendingOpen.newNote) && screen != "notes") screen = "notes"
     if (PendingOpen.evId != null && screen != "diary") screen = "diary"
+    if (PendingOpen.evText != null && screen != "diary") screen = "diary"
+    if (PendingOpen.noteId != null && screen != "notes") screen = "notes"
+    if (PendingOpen.task != null && screen != "tasks") screen = "tasks"
     if ((PendingOpen.file != null || PendingOpen.template != null) && screen != "docs") screen = "docs"
     Box(Modifier.fillMaxSize()) {
         Root(onOpenNotes = { screen = "notes" }, onOpenDocs = { screen = "docs" }, onOpenDiary = { screen = "diary" })

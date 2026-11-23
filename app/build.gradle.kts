@@ -16,6 +16,20 @@ android {
         versionCode = 1
         versionName = "1.0"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        // on-device voice transcription (whisper.cpp): 64-bit phones only, always optimized (a debug build of it would be ~20x slower)
+        externalNativeBuild {
+            cmake {
+                abiFilters += listOf("arm64-v8a")
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_static")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     // Fixed keystore so every CI build has the same signature (updates install over the old version, data kept)

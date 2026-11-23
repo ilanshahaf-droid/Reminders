@@ -17,6 +17,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
+      - name: Fetch whisper.cpp (on-device voice transcription engine)
+        run: git clone --depth 1 --branch v1.9.5 https://github.com/ggml-org/whisper.cpp app/src/main/cpp/whisper.cpp
       - name: Build phone app
         run: gradle :app:assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4

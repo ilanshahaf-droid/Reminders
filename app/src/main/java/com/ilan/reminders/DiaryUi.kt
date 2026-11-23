@@ -130,7 +130,7 @@ private fun taskOcc(t: Task, from: Long, to: Long): List<Long> {
     return out
 }
 
-class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?, val copyOf: Ev? = null, val pre: String? = null)
+class EditTarget(val ev: Ev?, val date: LocalDate, val time: LocalTime?, val copyOf: Ev? = null, val pre: String? = null, val preDesc: String? = null)
 
 @Composable
 fun DiaryHost(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -> Unit, onTask: (Task) -> Unit = {}) {
@@ -291,6 +291,16 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             val at = v.at?.withZoneSameInstant(zone)
             editing = EditTarget(null, at?.toLocalDate() ?: date, at?.toLocalTime(), null, v.title)
         }
+    }
+    // a transcribed voice message sent from the transcription screen: open a new event with its text
+    val trText = PendingOpen.evText
+    LaunchedEffect(trText) {
+        if (trText == null) return@LaunchedEffect
+        PendingOpen.evText = null
+        val ds = DS.defStart(ctx)
+        val v = VoiceParse.parse(trText, java.time.ZonedDateTime.now(), if (ds >= 0) LocalTime.of(ds / 60, ds % 60) else LocalTime.of(9, 0))
+        val at = v.at?.withZoneSameInstant(zone)
+        editing = EditTarget(null, at?.toLocalDate() ?: LocalDate.now(zone), at?.toLocalTime(), null, Transcripts.shortTitle(v.title.ifBlank { trText }), trText)
     }
     val startVoice = {
         runCatching {
@@ -1081,7 +1091,7 @@ private fun EventEditor(target: EditTarget, cals: List<Cal>, visible: Set<Long>,
     var enT by remember { mutableStateOf(end0.toLocalTime()) }
     var allDay by remember { mutableStateOf(false) }
     var loc by remember { mutableStateOf("") }
-    var desc by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf(target.preDesc.orEmpty()) }
     val isNew = ev == null && target.copyOf == null
     val rems = remember { mutableStateListOf<Int>().also { l -> if (isNew) DS.defRem(ctx).let { if (it != -2) l.add(it) } else l.add(10) } }
     var avail by remember { mutableStateOf(if (isNew) DS.defAvail(ctx) else 0) }
