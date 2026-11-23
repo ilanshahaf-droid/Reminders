@@ -98,6 +98,11 @@ object PendingShare { var text by mutableStateOf<String?>(null) }
 
 /** A transcribed voice message sent from the transcription screen: open it as a note, a new reminder or a new event. */
 private fun takeTranscript(c: Context, i: Intent) {
+    when (i.action) {
+        "com.ilan.reminders.NEW_NOTE" -> { i.action = Intent.ACTION_MAIN; PendingOpen.newNote = true }
+        "com.ilan.reminders.NEW_EVENT" -> { i.action = Intent.ACTION_MAIN; PendingOpen.evText = "" }
+        "com.ilan.reminders.NEW_TASK" -> { i.action = Intent.ACTION_MAIN; PendingOpen.task = newTask(c) }
+    }
     val noteId = i.getLongExtra("trNote", Long.MIN_VALUE)
     if (noteId != Long.MIN_VALUE) { i.removeExtra("trNote"); PendingOpen.noteId = noteId }
     i.getStringExtra("trTask")?.let { text ->
@@ -854,7 +859,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v185") },
+        title = { Text("הגדרות · v186") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }

@@ -5,4 +5,9 @@
     <string name="shortcut_voice_short">תזכורת בקול</string>
     <string name="shortcut_voice_long">הוספת תזכורת בקול</string>
     <string name="shortcut_new_short">תזכורת חדשה</string>
+    <string name="shortcut_event_short">אירוע חדש</string>
+    <string name="shortcut_event_long">הוספת אירוע חדש ליומן</string>
+    <string name="shortcut_note_short">פתק חדש</string>
+    <string name="shortcut_note_long">הוספת פתק חדש</string>
+    <string name="shortcut_task_long">הוספת תזכורת חדשה</string>
 </resources>

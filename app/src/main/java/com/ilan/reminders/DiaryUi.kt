@@ -297,6 +297,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     LaunchedEffect(trText) {
         if (trText == null) return@LaunchedEffect
         PendingOpen.evText = null
+        if (trText.isEmpty()) { editing = EditTarget(null, LocalDate.now(zone), null, null, ""); return@LaunchedEffect }
         val ds = DS.defStart(ctx)
         val v = VoiceParse.parse(trText, java.time.ZonedDateTime.now(), if (ds >= 0) LocalTime.of(ds / 60, ds % 60) else LocalTime.of(9, 0))
         val at = v.at?.withZoneSameInstant(zone)

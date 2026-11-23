@@ -11,4 +11,37 @@
             android:targetPackage="com.ilan.reminders"
             android:targetClass="com.ilan.reminders.MainActivity" />
     </shortcut>
+    <shortcut
+        android:shortcutId="new_event"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_event"
+        android:shortcutShortLabel="@string/shortcut_event_short"
+        android:shortcutLongLabel="@string/shortcut_event_long">
+        <intent
+            android:action="com.ilan.reminders.NEW_EVENT"
+            android:targetPackage="com.ilan.reminders"
+            android:targetClass="com.ilan.reminders.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_note"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_note"
+        android:shortcutShortLabel="@string/shortcut_note_short"
+        android:shortcutLongLabel="@string/shortcut_note_long">
+        <intent
+            android:action="com.ilan.reminders.NEW_NOTE"
+            android:targetPackage="com.ilan.reminders"
+            android:targetClass="com.ilan.reminders.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_task"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_task"
+        android:shortcutShortLabel="@string/shortcut_new_short"
+        android:shortcutLongLabel="@string/shortcut_task_long">
+        <intent
+            android:action="com.ilan.reminders.NEW_TASK"
+            android:targetPackage="com.ilan.reminders"
+            android:targetClass="com.ilan.reminders.MainActivity" />
+    </shortcut>
 </shortcuts>
