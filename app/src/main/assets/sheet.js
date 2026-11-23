@@ -212,6 +212,38 @@
     $('tbl').dir = s.rtl ? 'rtl' : 'ltr';
     $('tbl').innerHTML = h + '</tbody>';
     renderTabs(); paintSel(); syncBar();
+    S.fit = S.fit || {}; if (!S.fit[s.id]) { S.fit[s.id] = true; fitZoom(); }
+    spillSoon();
+  }
+  /** Like Excel on a phone: the first time a sheet is shown, zoom out so that its used columns fit the screen width
+   *  (not below 55 %, so the text stays readable; pinch / + / - still work afterwards). */
+  function fitZoom() {
+    const s = sh(); let w = 38;
+    for (let c = 1; c <= Math.min(s.maxC, 30); c++) w += colW(c);
+    const vw = ($('wrap') && $('wrap').clientWidth) || window.innerWidth;
+    setZoom(Math.max(0.55, Math.min(1, vw / w)));
+  }
+  /** Text that is longer than its cell goes on over the empty cells next to it (as in Excel) instead of being cut off. */
+  let spillT = 0;
+  function spillSoon() { clearTimeout(spillT); spillT = setTimeout(spill, 60); }
+  function spill() {
+    const t = $('tbl'); if (!t) return; const rtl = sh().rtl;
+    t.querySelectorAll('td[data-spilled]').forEach((e) => { e.removeAttribute('data-spilled'); e.style.overflow = ''; e.style.position = ''; e.style.zIndex = ''; });
+    t.querySelectorAll('td[data-under]').forEach((e) => { e.removeAttribute('data-under'); e.style.backgroundColor = e.dataset.bg || ''; });
+    const cand = [];
+    t.querySelectorAll('td').forEach((e) => {
+      if (e.classList.contains('wr') || !e.textContent || e.colSpan > 1) return;
+      const sty = e.getAttribute('style') || '', m = /text-align:(\w+)/.exec(sty);
+      if (m && m[1] !== (rtl ? 'right' : 'left')) return;
+      if (e.scrollWidth > e.clientWidth + 1) cand.push([e, e.scrollWidth]);
+    });
+    for (const [e, need] of cand) {
+      let have = e.clientWidth, n = e.nextElementSibling; const under = [];
+      while (n && n.tagName === 'TD' && have < need && !n.textContent && n.colSpan === 1 && !/background-color/.test(n.getAttribute('style') || '')) { under.push(n); have += n.clientWidth; n = n.nextElementSibling; }
+      if (!under.length) continue;
+      e.setAttribute('data-spilled', '1'); e.style.overflow = 'visible'; e.style.position = 'relative'; e.style.zIndex = '1';
+      under.forEach((u) => { u.setAttribute('data-under', '1'); u.dataset.bg = u.style.backgroundColor || ''; u.style.backgroundColor = 'transparent'; });
+    }
   }
   function td(r, c) { return $('tbl').querySelector(`td[data-r="${r}"][data-c="${c}"]`); }
   function repaintCell(r, c) {
@@ -220,7 +252,7 @@
     const tmp = document.createElement('tbody'); tmp.innerHTML = '<tr>' + tdHtml(r, c) + '</tr>';
     const n = tmp.querySelector('td'); if (n) e.replaceWith(n);
   }
-  function repaintRange(r1, c1, r2, c2) { for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) repaintCell(r, c); paintSel(); }
+  function repaintRange(r1, c1, r2, c2) { for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) repaintCell(r, c); paintSel(); spillSoon(); }
   function paintSel() {
     const t = $('tbl');
     t.querySelectorAll('td.sel,td.cur').forEach((e) => e.classList.remove('sel', 'cur'));
