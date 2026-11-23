@@ -210,6 +210,7 @@
       h += '</tr>';
     }
     $('tbl').dir = s.rtl ? 'rtl' : 'ltr';
+    { let tw = 38; for (let c = 1; c <= C; c++) tw += colW(c); $('tbl').style.width = tw + 'px'; }
     $('tbl').innerHTML = h + '</tbody>';
     renderTabs(); paintSel(); syncBar();
     S.fit = S.fit || {}; if (!S.fit[s.id]) { S.fit[s.id] = true; fitZoom(); }
