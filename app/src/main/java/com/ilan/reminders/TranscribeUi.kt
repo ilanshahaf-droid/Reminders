@@ -115,6 +115,8 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
         }
     }
     val ready = remember(tick) { WModels.usable(ctx) }
+    // whenever the screen opens or the model becomes ready: run whatever is waiting in the queue
+    LaunchedEffect(ready != null) { if (ready != null) Transcripts.kick(ctx) }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
         if (us.isNotEmpty()) addAll(ctx, us, "") { if (it != null) open = it }
     }
@@ -132,6 +134,7 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
             } else if (ready == null) {
                 ModelCard(tick, compact = false)
             }
+            Transcripts.kickError?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = cs.error) }
             if (items.isEmpty()) {
                 Column(Modifier.fillMaxWidth().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("אין עדיין תמלולים", style = MaterialTheme.typography.titleMedium)
@@ -155,6 +158,9 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
                 style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
             ModelCard(tick, compact = true)
+            Spacer(Modifier.height(10.dp))
+            Text("מנוע: " + remember { runCatching { WhisperNative.systemInfo() }.getOrDefault("לא נטען") },
+                style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
         }
     }
 }

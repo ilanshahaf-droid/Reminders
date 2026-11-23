@@ -232,7 +232,8 @@ object AudioDecode {
 /** Queue + history of voice-message transcriptions. Work runs in [TranscribeService] so it continues with the screen off. */
 object Transcripts {
     class Item(val id: Long, val path: String, val source: String, val name: String, val createdAt: Long,
-               var durationMs: Long = 0, var text: String = "", var status: String = "queued", var error: String = "")
+               var durationMs: Long = 0, var text: String = "", var status: String = "queued", var error: String = "",
+               var attempts: Int = 0, var stage: String = "")
     // status: queued, running, done, error, cancelled
 
     var items by mutableStateOf<List<Item>>(emptyList())
@@ -257,9 +258,15 @@ object Transcripts {
             val a = JSONArray(store(c).readText())
             (0 until a.length()).map { a.getJSONObject(it) }.map { o ->
                 Item(o.getLong("id"), o.getString("path"), o.optString("source"), o.optString("name"), o.getLong("createdAt"),
-                    o.optLong("dur"), o.optString("text"), o.optString("status"), o.optString("error"))
+                    o.optLong("dur"), o.optString("text"), o.optString("status"), o.optString("error"), o.optInt("attempts"), o.optString("stage"))
                     // a job that was running when the app was closed goes back to the queue
-                    .also { if (it.status == "running") it.status = "queued" }
+                    .also {
+                        // the app was closed (or crashed) in the middle of this one: retry once, then report where it stopped
+                        if (it.status == "running") {
+                            if (it.attempts >= 2) { it.status = "error"; it.error = "התמלול נעצר באמצע (בשלב: ${it.stage}). אפשר לנסות שוב." }
+                            else it.status = "queued"
+                        }
+                    }
             }
         }.getOrDefault(emptyList())
     }
@@ -267,7 +274,7 @@ object Transcripts {
     @Synchronized fun save(c: Context) {
         val a = JSONArray()
         items.forEach { a.put(JSONObject().put("id", it.id).put("path", it.path).put("source", it.source).put("name", it.name)
-            .put("createdAt", it.createdAt).put("dur", it.durationMs).put("text", it.text).put("status", it.status).put("error", it.error)) }
+            .put("createdAt", it.createdAt).put("dur", it.durationMs).put("text", it.text).put("status", it.status).put("error", it.error).put("attempts", it.attempts).put("stage", it.stage)) }
         store(c).writeText(a.toString())
     }
 
@@ -299,16 +306,19 @@ object Transcripts {
 
     fun update(c: Context, item: Item, text: String) { item.text = text; touch(c) }
 
-    fun retry(c: Context, item: Item) { item.status = "queued"; item.error = ""; touch(c); kick(c) }
+    fun retry(c: Context, item: Item) { item.status = "queued"; item.error = ""; item.attempts = 0; touch(c); kick(c) }
 
     fun cancelRunning() { if (WhisperNative.available) WhisperNative.cancel() }
 
     /** Starts the background worker if there is something to do and a model is ready. */
+    var kickError by mutableStateOf<String?>(null)
+
     fun kick(c: Context) {
         load(c)
         if (items.none { it.status == "queued" } || WModels.usable(c) == null || !WhisperNative.available) return
         val i = Intent(c, TranscribeService::class.java)
-        if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i) else c.startService(i)
+        kickError = runCatching { if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i) else c.startService(i) }
+            .exceptionOrNull()?.let { "אי אפשר להפעיל את התמלול ברקע: ${it.javaClass.simpleName}" }
     }
 
     /** Runs on the service thread: transcribes every queued item, newest first. */
@@ -319,16 +329,20 @@ object Transcripts {
         try {
             while (true) {
                 val item = items.firstOrNull { x -> x.status == "queued" } ?: break
-                item.status = "running"; touch(c); progress = 0
+                item.status = "running"; item.attempts++; progress = 0
+                fun stage(s: String, label: String) { phase = label; item.stage = s; touch(c) }
                 try {
-                    phase = "מפענח את השמע…"
+                    stage("פענוח השמע", "מפענח את השמע…")
                     val (audio, dur) = AudioDecode.decode(item.path)
                     item.durationMs = dur
-                    if (ctx == 0L) { phase = "טוען את מודל העברית…"; ctx = WhisperNative.init(WModels.fileOf(c, m).path) }
+                    if (ctx == 0L) { stage("טעינת המודל", "טוען את מודל העברית…"); ctx = WhisperNative.init(WModels.fileOf(c, m).path) }
                     require(ctx != 0L) { "model" }
-                    phase = "מתמלל…"
+                    stage("תמלול", "מתמלל…")
                     val threads = minOf(6, maxOf(2, Runtime.getRuntime().availableProcessors() / 2 + 1))
-                    val bytes = WhisperNative.transcribe(ctx, threads, "he", audio) { p -> progress = p; onProgress(item, p) }
+                    val bytes = WhisperNative.transcribe(ctx, threads, "he", audio, object : WhisperNative.Progress {
+                        override fun onProgress(p: Int) { progress = p; onProgress(item, p) }
+                    })
+                    item.attempts = 0
                     if (bytes == null) { item.status = if (item.status == "running") "cancelled" else item.status }
                     else { item.text = String(bytes, Charsets.UTF_8).trim(); item.status = "done" }
                 } catch (e: Throwable) {
