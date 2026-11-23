@@ -192,7 +192,9 @@
     const cell = sh().cells[key(r, c)], st = cell && cell.st || {};
     const span = m ? ` rowspan="${m[2] - m[0] + 1}" colspan="${m[3] - m[1] + 1}"` : '';
     const wrap = st.alignment && st.alignment.wrapText ? ' class="wr"' : '';
-    const esc = display(cell).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    let dsp = display(cell);
+    if (/^[-+(]?[\d.,]+[)%]?$|^[-+]?[\d.,]+[^\s\d]{0,3}$/.test(dsp) && /^[-+(]/.test(dsp)) dsp = '\u200E' + dsp + '\u200E';
+    const esc = dsp.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     return `<td data-r="${r}" data-c="${c}"${span}${wrap} style="${cellStyleCss(cell)}">${esc}</td>`;
   }
   function renderAll() {
