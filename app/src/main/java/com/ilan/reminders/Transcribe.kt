@@ -248,7 +248,7 @@ object Transcripts {
     // status: queued, running, done, error, cancelled
 
     // neverEqualPolicy: items are mutated in place (status, text...), so every reassignment must refresh the screen
-    var items by mutableStateOf<List<Item>>(emptyList(), neverEqualPolicy())
+    var items by mutableStateOf<List<Item>>(emptyList(), androidx.compose.runtime.neverEqualPolicy())
     var progress by mutableStateOf(0)
     var phase by mutableStateOf("")     // shown under the progress bar
     private var loaded = false
