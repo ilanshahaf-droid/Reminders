@@ -22,6 +22,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -232,6 +234,17 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
             Spacer(Modifier.height(10.dp))
             Text("מנוע: " + remember { runCatching { WhisperNative.systemInfo() }.getOrDefault("לא נטען") },
                 style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            val logTxt = remember(tick) { Transcripts.logText(ctx) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("יומן אבחון", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                TextButton({
+                    (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("log", logTxt))
+                    Toast.makeText(ctx, "הועתק", Toast.LENGTH_SHORT).show()
+                }) { Text("העתק") }
+            }
+            Text(logTxt.ifBlank { "(ריק)" }, Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState()),
+                style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
         }
     }
 }
@@ -338,6 +351,7 @@ private fun ItemCard(item: Transcripts.Item, expanded: Boolean, modelReady: Bool
                         TextButton({ Transcripts.cancelRunning() }) { Text("עצור") }
                     }
                 }
+                "queued" -> Text("⏳ ממתין בתור…", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
                 "error", "cancelled" -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(item.error.ifBlank { "התמלול הופסק" }, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = cs.error)
                     TextButton({ Transcripts.retry(ctx, item) }) { Text("נסה שוב") }
@@ -345,6 +359,7 @@ private fun ItemCard(item: Transcripts.Item, expanded: Boolean, modelReady: Bool
                 "done" -> if (!expanded) Text(item.text.ifBlank { "(לא זוהה דיבור)" }, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (expanded) {
+                if (item.diag.isNotBlank()) Text(item.diag, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
                 if (item.status == "done" && item.text.isBlank()) TextButton({ Transcripts.retry(ctx, item) }) { Text("🔁 לא זוהה דיבור — נסה לתמלל שוב") }
                 if (item.status == "done") OutlinedTextField(text, { v -> text = v }, Modifier.fillMaxWidth(),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 27.sp), minLines = 3,

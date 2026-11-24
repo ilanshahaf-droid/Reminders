@@ -51,7 +51,7 @@ Java_com_ilan_reminders_WhisperNative_systemInfo(JNIEnv *env, jobject) {
  *  [cb] gets onProgress(int 0..100). */
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_ilan_reminders_WhisperNative_transcribe(JNIEnv *env, jobject, jlong ptr, jint threads,
-                                                 jstring jlang, jfloatArray audio, jobject cb) {
+                                                 jstring jlang, jfloatArray audio, jobject cb, jint mode) {
     auto *ctx = (whisper_context *) ptr;
     if (!ctx) return nullptr;
     g_abort.store(false);
@@ -60,7 +60,8 @@ Java_com_ilan_reminders_WhisperNative_transcribe(JNIEnv *env, jobject, jlong ptr
     std::string language(lang);
     env->ReleaseStringUTFChars(jlang, lang);
 
-    whisper_full_params p = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    whisper_full_params p = (mode == 1) ? whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH) : whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    if (mode == 1) { p.beam_search.beam_size = 5; p.temperature_inc = 0.0f; }
     p.n_threads = threads;
     p.language = language.c_str();
     p.translate = false;
@@ -74,6 +75,7 @@ Java_com_ilan_reminders_WhisperNative_transcribe(JNIEnv *env, jobject, jlong ptr
     // short / quiet voice messages were dropped as "no speech": never discard a segment on the no-speech estimate
     p.no_speech_thold = 1.0f;
     p.logprob_thold = -3.0f;
+    if (mode == 1) { p.suppress_blank = false; p.logprob_thold = -100.0f; p.entropy_thold = 100.0f; }
 
     ProgressCtx pc{env, cb, nullptr};
     if (cb) {

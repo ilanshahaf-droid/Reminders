@@ -38,7 +38,7 @@ object WhisperNative {
     external fun free(ctx: Long)
     external fun cancel()
     external fun systemInfo(): String
-    external fun transcribe(ctx: Long, threads: Int, lang: String, audio: FloatArray, cb: Progress): ByteArray?
+    external fun transcribe(ctx: Long, threads: Int, lang: String, audio: FloatArray, cb: Progress, mode: Int): ByteArray?
 }
 
 /** The Hebrew speech models (ivrit.ai whisper-large-v3-turbo, quantized). Downloaded once; kept across app updates. */
@@ -244,10 +244,11 @@ object AudioDecode {
 object Transcripts {
     class Item(val id: Long, val path: String, val source: String, val name: String, val createdAt: Long,
                var durationMs: Long = 0, var text: String = "", var status: String = "queued", var error: String = "",
-               var attempts: Int = 0, var stage: String = "")
+               var attempts: Int = 0, var stage: String = "", var diag: String = "")
     // status: queued, running, done, error, cancelled
 
-    var items by mutableStateOf<List<Item>>(emptyList())
+    // neverEqualPolicy: items are mutated in place (status, text...), so every reassignment must refresh the screen
+    var items by mutableStateOf<List<Item>>(emptyList(), neverEqualPolicy())
     var progress by mutableStateOf(0)
     var phase by mutableStateOf("")     // shown under the progress bar
     private var loaded = false
@@ -269,7 +270,7 @@ object Transcripts {
             val a = JSONArray(store(c).readText())
             (0 until a.length()).map { a.getJSONObject(it) }.map { o ->
                 Item(o.getLong("id"), o.getString("path"), o.optString("source"), o.optString("name"), o.getLong("createdAt"),
-                    o.optLong("dur"), o.optString("text"), o.optString("status"), o.optString("error"), o.optInt("attempts"), o.optString("stage"))
+                    o.optLong("dur"), o.optString("text"), o.optString("status"), o.optString("error"), o.optInt("attempts"), o.optString("stage"), o.optString("diag"))
                     // a job that was running when the app was closed goes back to the queue
                     .also {
                         // the app was closed (or crashed) in the middle of this one: retry once, then report where it stopped
@@ -285,7 +286,7 @@ object Transcripts {
     @Synchronized fun save(c: Context) {
         val a = JSONArray()
         items.forEach { a.put(JSONObject().put("id", it.id).put("path", it.path).put("source", it.source).put("name", it.name)
-            .put("createdAt", it.createdAt).put("dur", it.durationMs).put("text", it.text).put("status", it.status).put("error", it.error).put("attempts", it.attempts).put("stage", it.stage)) }
+            .put("createdAt", it.createdAt).put("dur", it.durationMs).put("text", it.text).put("status", it.status).put("error", it.error).put("attempts", it.attempts).put("stage", it.stage).put("diag", it.diag)) }
         store(c).writeText(a.toString())
     }
 
@@ -319,6 +320,17 @@ object Transcripts {
 
     fun retry(c: Context, item: Item) { item.status = "queued"; item.error = ""; item.attempts = 0; touch(c); kick(c) }
 
+    /** Small diagnostic log (last 40 lines) shown in the ⚙️ sheet. */
+    fun log(c: Context, line: String) = synchronized(this) {
+        runCatching {
+            val p = c.getSharedPreferences("tlog", Context.MODE_PRIVATE)
+            val ls = (p.getString("l", "") ?: "").split("\n").filter { it.isNotBlank() }.takeLast(39) +
+                (java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date()) + " " + line)
+            p.edit().putString("l", ls.joinToString("\n")).apply()
+        }
+    }
+    fun logText(c: Context): String = c.getSharedPreferences("tlog", Context.MODE_PRIVATE).getString("l", "").orEmpty()
+
     fun cancelRunning() { if (WhisperNative.available) WhisperNative.cancel() }
 
     /** Starts the background worker if there is something to do and a model is ready. */
@@ -326,10 +338,11 @@ object Transcripts {
 
     fun kick(c: Context) {
         load(c)
-        if (items.none { it.status == "queued" } || WModels.usable(c) == null || !WhisperNative.available) return
+        if (items.none { it.status == "queued" } || WModels.usable(c) == null || !WhisperNative.available) { log(c, "kick: nothing to do (queued=${items.count { it.status == "queued" }}, model=${WModels.usable(c) != null}, native=${WhisperNative.available})"); return }
         val i = Intent(c, TranscribeService::class.java)
         kickError = runCatching { if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i) else c.startService(i) }
-            .exceptionOrNull()?.let { "אי אפשר להפעיל את התמלול ברקע: ${it.javaClass.simpleName}" }
+            .exceptionOrNull()?.let { log(c, "service start failed: $it"); "אי אפשר להפעיל את התמלול ברקע: ${it.javaClass.simpleName}" }
+        log(c, "kick: service start requested, error=$kickError")
     }
 
     /** Runs on the service thread: transcribes every queued item, newest first. */
@@ -345,20 +358,35 @@ object Transcripts {
                 try {
                     stage("פענוח השמע", "מפענח את השמע…")
                     val (audio0, dur) = AudioDecode.decode(item.path)
+                    var peak = 0f; var sq = 0.0
+                    for (v in audio0) { val a = if (v < 0) -v else v; if (a > peak) peak = a; sq += v.toDouble() * v }
+                    val rms = if (audio0.isNotEmpty()) Math.sqrt(sq / audio0.size) else 0.0
                     val audio = AudioDecode.prepare(audio0)
                     item.durationMs = dur
+                    item.diag = "אורך %.1f שנ׳ · שיא %.3f · עוצמה %.4f".format(audio0.size / 16000.0, peak, rms)
+                    log(c, "item ${item.id} ${item.source}: ${item.diag}")
                     if (ctx == 0L) { stage("טעינת המודל", "טוען את מודל העברית…"); ctx = WhisperNative.init(WModels.fileOf(c, m).path) }
                     require(ctx != 0L) { "model" }
                     stage("תמלול", "מתמלל…")
                     val threads = minOf(6, maxOf(2, Runtime.getRuntime().availableProcessors() / 2 + 1))
-                    val bytes = WhisperNative.transcribe(ctx, threads, "he", audio, object : WhisperNative.Progress {
-                        override fun onProgress(p: Int) { progress = p; onProgress(item, p) }
-                    })
+                    val cb = object : WhisperNative.Progress { override fun onProgress(p: Int) { progress = p; onProgress(item, p) } }
+                    var bytes = WhisperNative.transcribe(ctx, threads, "he", audio, cb, 0)
+                    var txt = bytes?.let { String(it, Charsets.UTF_8).trim() }.orEmpty()
+                    if (bytes != null && txt.isEmpty() && item.status == "running") {
+                        // nothing came out: try once more with beam search and no fallbacks / filters
+                        log(c, "item ${item.id}: empty result, second pass")
+                        stage("תמלול", "מנסה שוב בהגדרות אחרות…")
+                        bytes = WhisperNative.transcribe(ctx, threads, "he", audio, cb, 1)
+                        txt = bytes?.let { String(it, Charsets.UTF_8).trim() }.orEmpty()
+                        item.diag += " · ניסיון שני" + if (txt.isEmpty()) " (ריק)" else " (הצליח)"
+                    }
+                    log(c, "item ${item.id}: result ${txt.length} chars")
                     item.attempts = 0
                     if (bytes == null) { item.status = if (item.status == "running") "cancelled" else item.status }
-                    else { item.text = String(bytes, Charsets.UTF_8).trim(); item.status = "done" }
+                    else { item.text = txt; item.status = "done" }
                 } catch (e: Throwable) {
                     item.status = "error"
+                    log(c, "item ${item.id} failed: ${e.javaClass.simpleName} ${e.message}")
                     item.error = if (e.message == "model") "טעינת המודל נכשלה (נסה למחוק ולהוריד מחדש)" else "אי אפשר לקרוא את קובץ השמע"
                 }
                 touch(c)
@@ -404,6 +432,7 @@ class TranscribeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val n = Transcripts.Notif.running(this, null, 0)
         if (Build.VERSION.SDK_INT >= 29) startForeground(7299, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else startForeground(7299, n)
+        Transcripts.log(this, "service start, worker alive=${worker?.isAlive == true}")
         if (worker?.isAlive != true) {
             worker = Thread {
                 val wl = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "reminders:transcribe")
