@@ -1,6 +1,11 @@
 package com.ilan.reminders
 
+import android.Manifest
+import android.app.Activity
 import android.app.DownloadManager
+import android.content.pm.PackageManager
+import android.media.MediaRecorder
+import android.view.WindowManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -90,6 +95,34 @@ private fun addAll(c: Context, uris: List<Uri>, source: String, done: (Long?) ->
     }.start()
 }
 
+/** Records the microphone to an AAC file (cache) so it can go through the same transcription queue as a shared voice message. */
+private object Rec {
+    private var mr: MediaRecorder? = null
+    var file: File? = null
+    fun start(c: Context): Boolean = runCatching {
+        val dir = File(c.cacheDir, "rec").also { it.mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        val f = File(dir, "rec_${System.currentTimeMillis()}.m4a")
+        @Suppress("DEPRECATION")
+        val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(c) else MediaRecorder()
+        r.setAudioSource(MediaRecorder.AudioSource.MIC)
+        r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+        r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+        r.setAudioSamplingRate(16000); r.setAudioChannels(1); r.setAudioEncodingBitRate(48000)
+        r.setOutputFile(f.path)
+        r.prepare(); r.start()
+        mr = r; file = f; true
+    }.getOrDefault(false)
+    /** Returns the recorded file, or null when nothing usable was recorded. */
+    fun stop(keep: Boolean): File? {
+        val r = mr; val f = file; mr = null; file = null
+        val ok = r != null && runCatching { r.stop() }.isSuccess
+        runCatching { r?.release() }
+        if (!keep || !ok || f == null || f.length() < 2000) { f?.delete(); return null }
+        return f
+    }
+}
+
 private val HM = DateTimeFormatter.ofPattern("d.M · HH:mm")
 private fun fmtDur(ms: Long): String { val s = ms / 1000; return "%d:%02d".format(s / 60, s % 60) }
 private fun mb(b: Long) = "${(b + 500_000) / 1_000_000}MB"
@@ -117,6 +150,28 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
     val ready = remember(tick) { WModels.usable(ctx) }
     // whenever the screen opens or the model becomes ready: run whatever is waiting in the queue
     LaunchedEffect(ready != null) { if (ready != null) Transcripts.kick(ctx) }
+    var recSince by remember { mutableStateOf(0L) }          // 0 = not recording
+    var recSecs by remember { mutableIntStateOf(0) }
+    fun beginRec() {
+        if (Rec.start(ctx)) { recSince = System.currentTimeMillis(); recSecs = 0 }
+        else Toast.makeText(ctx, "אי אפשר להתחיל הקלטה", Toast.LENGTH_SHORT).show()
+    }
+    fun endRec(keep: Boolean) {
+        val f = Rec.stop(keep); recSince = 0L
+        if (f != null) addAll(ctx, listOf(Uri.fromFile(f)), "הקלטה") { if (it != null) open = it }
+        else if (keep) Toast.makeText(ctx, "ההקלטה קצרה מדי", Toast.LENGTH_SHORT).show()
+    }
+    val micPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) beginRec() else Toast.makeText(ctx, "צריך הרשאת מיקרופון כדי להקליט", Toast.LENGTH_LONG).show()
+    }
+    LaunchedEffect(recSince) { while (recSince > 0L) { recSecs = ((System.currentTimeMillis() - recSince) / 1000).toInt(); delay(500) } }
+    // keep the screen on while recording (the microphone is not available to the app once the screen is off), and never leave a recorder running
+    DisposableEffect(recSince > 0L) {
+        val w = (ctx as? Activity)?.window
+        if (recSince > 0L) w?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { w?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+    DisposableEffect(Unit) { onDispose { if (Rec.file != null) Rec.stop(true)?.let { f -> addAll(ctx.applicationContext, listOf(Uri.fromFile(f)), "הקלטה") {} } } }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { us ->
         if (us.isNotEmpty()) addAll(ctx, us, "") { if (it != null) open = it }
     }
@@ -126,6 +181,10 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
             Row(Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onFinish) { Text("✕", fontSize = 20.sp) }
                 Text("🎙️ תמלול הודעות קוליות", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton({
+                    if (recSince > 0L) return@TextButton
+                    if (ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) beginRec() else micPerm.launch(Manifest.permission.RECORD_AUDIO)
+                }) { Text("🎤", fontSize = 20.sp) }
                 TextButton({ pick.launch("audio/*") }) { Text("📂", fontSize = 20.sp) }
                 TextButton({ showModels = true }) { Text("⚙️", fontSize = 20.sp) }
             }
@@ -133,6 +192,18 @@ private fun TranscribeScreen(showId: Long?, onShown: () -> Unit, onFinish: () ->
                 Card(Modifier.padding(12.dp).fillMaxWidth()) { Text("מנוע התמלול לא נטען במכשיר הזה.", Modifier.padding(16.dp)) }
             } else if (ready == null) {
                 ModelCard(tick, compact = false)
+            }
+            if (recSince > 0L) {
+                Card(Modifier.padding(12.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = cs.errorContainer)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("🔴 מקליט  %d:%02d".format(recSecs / 60, recSecs % 60), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("המסך יישאר דלוק בזמן ההקלטה. בסיום לחץ על \"עצור ותמלל\".", fontSize = 13.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button({ endRec(true) }) { Text("עצור ותמלל") }
+                            OutlinedButton({ endRec(false) }) { Text("בטל") }
+                        }
+                    }
+                }
             }
             Transcripts.kickError?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = cs.error) }
             if (items.isEmpty()) {
