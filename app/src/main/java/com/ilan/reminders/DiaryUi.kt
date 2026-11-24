@@ -325,6 +325,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                             DropdownMenuItem({ Text("⏰ תזכורות") }, { menuNav = false; onReminders() })
                             DropdownMenuItem({ Text("📝 פתקים") }, { menuNav = false; onNotes() })
                             DropdownMenuItem({ Text("📄 מסמכים") }, { menuNav = false; onDocs() })
+                            DropdownMenuItem({ Text("🔎 חיפוש בכל האפליקציה") }, { menuNav = false; GlobalSearch.open = true })
                             HorizontalDivider()
                             DropdownMenuItem({ Text("⚙ הגדרות") }, { menuNav = false; showSettings = true })
                         }

@@ -86,7 +86,8 @@ fun Home() {
         if (GlobalSearch.open) GlobalSearchScreen(
             onTask = { PendingOpen.task = it; screen = "tasks" },
             onNote = { PendingOpen.noteId = it.id; screen = "notes" },
-            onDoc = { PendingOpen.file = it; screen = "docs" }
+            onDoc = { PendingOpen.file = it; screen = "docs" },
+            onEvent = { PendingOpen.evBegin = it.begin; PendingOpen.evId = it.id; screen = "diary" }
         )
     }
 }
