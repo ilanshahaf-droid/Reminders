@@ -214,6 +214,17 @@ object AudioDecode {
         return resample(mono, n, rate) to (if (durUs > 0) durUs / 1000 else n * 1000L / rate)
     }
 
+    /** Quiet or very short messages are often judged "no speech": bring the loudest peak up to ~0.9 (gain capped) and add half a second of silence on both sides. */
+    fun prepare(x: FloatArray): FloatArray {
+        var peak = 0f
+        for (v in x) { val a = if (v < 0) -v else v; if (a > peak) peak = a }
+        val gain = if (peak > 0.002f && peak < 0.5f) minOf(0.9f / peak, 12f) else 1f
+        val pad = 8000
+        val out = FloatArray(x.size + 2 * pad)
+        for (i in x.indices) out[pad + i] = (x[i] * gain).coerceIn(-1f, 1f)
+        return out
+    }
+
     /** Box-filter (average) resampling to 16 kHz: good enough for speech and avoids most aliasing. */
     private fun resample(x: FloatArray, n: Int, rate: Int): FloatArray {
         if (rate == 16000) return x.copyOf(n)
@@ -333,7 +344,8 @@ object Transcripts {
                 fun stage(s: String, label: String) { phase = label; item.stage = s; touch(c) }
                 try {
                     stage("פענוח השמע", "מפענח את השמע…")
-                    val (audio, dur) = AudioDecode.decode(item.path)
+                    val (audio0, dur) = AudioDecode.decode(item.path)
+                    val audio = AudioDecode.prepare(audio0)
                     item.durationMs = dur
                     if (ctx == 0L) { stage("טעינת המודל", "טוען את מודל העברית…"); ctx = WhisperNative.init(WModels.fileOf(c, m).path) }
                     require(ctx != 0L) { "model" }

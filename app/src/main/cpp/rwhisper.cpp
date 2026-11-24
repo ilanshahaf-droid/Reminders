@@ -71,6 +71,9 @@ Java_com_ilan_reminders_WhisperNative_transcribe(JNIEnv *env, jobject, jlong ptr
     p.print_timestamps = false;
     p.print_special = false;
     p.suppress_blank = true;
+    // short / quiet voice messages were dropped as "no speech": never discard a segment on the no-speech estimate
+    p.no_speech_thold = 1.0f;
+    p.logprob_thold = -3.0f;
 
     ProgressCtx pc{env, cb, nullptr};
     if (cb) {

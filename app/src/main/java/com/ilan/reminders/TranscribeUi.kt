@@ -345,6 +345,7 @@ private fun ItemCard(item: Transcripts.Item, expanded: Boolean, modelReady: Bool
                 "done" -> if (!expanded) Text(item.text.ifBlank { "(לא זוהה דיבור)" }, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (expanded) {
+                if (item.status == "done" && item.text.isBlank()) TextButton({ Transcripts.retry(ctx, item) }) { Text("🔁 לא זוהה דיבור — נסה לתמלל שוב") }
                 if (item.status == "done") OutlinedTextField(text, { v -> text = v }, Modifier.fillMaxWidth(),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 27.sp), minLines = 3,
                     placeholder = { Text("(לא זוהה דיבור)") })
