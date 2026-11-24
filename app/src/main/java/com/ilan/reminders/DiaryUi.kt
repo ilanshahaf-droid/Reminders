@@ -222,6 +222,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
     var showFont by remember { mutableStateOf(false) }
     var showDefs by remember { mutableStateOf(false) }
     var showDiag by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var dayDlg by remember { mutableStateOf<LocalDate?>(null) }
     var dayEvSel by remember { mutableStateOf<Pair<Long, Long>?>(null) }
@@ -358,6 +359,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                                 menuMore = false
                                 DatePickerDialog(ctx, { _, y, m, d -> dayNum = LocalDate.of(y, m + 1, d).toEpochDay() }, date.year, date.monthValue - 1, date.dayOfMonth).show()
                             })
+                            DropdownMenuItem({ Text("הדבקת לוח זמנים…") }, { menuMore = false; showImport = true })
                             DropdownMenuItem({ Text("רענון") }, { menuMore = false; tick++ })
                             DropdownMenuItem({ Text("אבחון היום הנוכחי") }, { menuMore = false; showDiag = true })
                         }
@@ -406,6 +408,7 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
             onDefault = { defCal = it; prefs.edit().putLong("diaryDef", it).apply() },
             onChanged = { editing = null; tick++ }
         )
+        if (showImport) ScheduleImportDialog(cals, defCal, date, onClose = { showImport = false }, onDone = { showImport = false; tick++ })
         if (showDiag) {
             val fmt = { ms: Long -> Instant.ofEpochMilli(ms).atZone(zone).let { "%02d/%02d %02d:%02d".format(it.dayOfMonth, it.monthValue, it.hour, it.minute) } }
             val txt = buildString {
