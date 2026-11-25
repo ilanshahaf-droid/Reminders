@@ -8,6 +8,7 @@ import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.LongTextComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
+import androidx.wear.watchface.complications.data.TimeRange
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
@@ -22,15 +23,15 @@ class NextEventComplicationService : SuspendingComplicationDataSourceService() {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
 
-    private fun build(type: ComplicationType, time: String, title: String): ComplicationData? = when (type) {
+    private fun build(type: ComplicationType, time: String, title: String, until: Instant? = null): ComplicationData? = when (type) {
         ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(
             PlainComplicationText.Builder(time).build(),
             PlainComplicationText.Builder("$time $title").build()
-        ).setTitle(PlainComplicationText.Builder(title.take(7)).build()).setTapAction(tap()).build()
+        ).setTitle(PlainComplicationText.Builder(title.take(7)).build()).setTapAction(tap()).also { b -> if (until != null) b.setValidTimeRange(TimeRange.between(Instant.now(), until)) }.build()
         ComplicationType.LONG_TEXT -> LongTextComplicationData.Builder(
             PlainComplicationText.Builder(title).build(),
             PlainComplicationText.Builder("$time $title").build()
-        ).setTitle(PlainComplicationText.Builder(time).build()).setTapAction(tap()).build()
+        ).setTitle(PlainComplicationText.Builder(time).build()).setTapAction(tap()).also { b -> if (until != null) b.setValidTimeRange(TimeRange.between(Instant.now(), until)) }.build()
         else -> null
     }
 
@@ -39,10 +40,11 @@ class NextEventComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         WatchData.load(this)
         val now = System.currentTimeMillis()
-        val next = WatchData.events.value.filter { !it.allDay && it.end > now }.minByOrNull { it.begin }
-        if (next == null) return build(request.complicationType, "--:--", "אין אירועים")
+        // only events that have not started yet (an event that already began is "previous", not "next")
+        val next = WatchData.events.value.filter { !it.allDay && it.begin > now }.minByOrNull { it.begin }
+        if (next == null) return build(request.complicationType, "--:--", "אין אירועים", null)
         val s = Instant.ofEpochMilli(next.begin).atZone(ZoneId.systemDefault())
-        return build(request.complicationType, "%02d:%02d".format(s.hour, s.minute), next.title)
+        return build(request.complicationType, "%02d:%02d".format(s.hour, s.minute), next.title, Instant.ofEpochMilli(next.begin))
     }
 
     companion object {
