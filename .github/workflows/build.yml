@@ -34,12 +34,17 @@ jobs:
         with:
           name: reminders-watch-apk
           path: wear/build/outputs/apk/debug/wear-debug.apk
+      - name: Build watch face
+        id: face
+        continue-on-error: true
+        run: gradle :watchface:assembleDebug --no-daemon
       - name: Publish APKs to the 'latest' release (fixed download links)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           FILES="app/build/outputs/apk/debug/app-debug.apk"
           [ -f wear/build/outputs/apk/debug/wear-debug.apk ] && FILES="$FILES wear/build/outputs/apk/debug/wear-debug.apk"
+          [ -f watchface/build/outputs/apk/debug/watchface-debug.apk ] && FILES="$FILES watchface/build/outputs/apk/debug/watchface-debug.apk"
           gh release delete latest --cleanup-tag -y || true
           sleep 5
           gh release create latest $FILES --target "${{ github.sha }}" --title "latest" --notes "Latest build: ${{ github.sha }}"

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WatchFace width="450" height="450">
+  <UserConfigurations>
+    <!-- colors: 0 time, 1 date, 2 accent (arcs / battery / steps), 3 next event, 4 dim ring -->
+    <ColorConfiguration id="theme" displayName="color_label" defaultValue="0">
+      <ColorOption id="0" displayName="c0" colors="#FFFFFF #CDBFFF #9B8CFF #FFC857 #553C8F" />
+      <ColorOption id="1" displayName="c1" colors="#FFFFFF #C8F5D0 #4CE06B #FFC857 #2F6B3A" />
+      <ColorOption id="2" displayName="c2" colors="#FFFFFF #BFE3FF #4AA8FF #FFC857 #234E7A" />
+      <ColorOption id="3" displayName="c3" colors="#FFFFFF #FFD9B0 #FF8A2B #FFFFFF #7A4217" />
+      <ColorOption id="4" displayName="c4" colors="#FFFFFF #FFC4DE #FF5FA2 #FFE08A #7A2F55" />
+      <ColorOption id="5" displayName="c5" colors="#FFFFFF #D0D0D0 #FFFFFF #FFFFFF #555555" />
+    </ColorConfiguration>
+  </UserConfigurations>
+
+  <Scene backgroundColor="#FF000000">
+
+    <!-- thin dim ring -->
+    <Group name="ring" x="0" y="0" width="450" height="450">
+      <Variant mode="AMBIENT" target="alpha" value="0" />
+      <PartDraw x="0" y="0" width="450" height="450">
+        <Ellipse x="6" y="6" width="438" height="438">
+          <Stroke thickness="2" color="[CONFIGURATION.theme.4]" />
+        </Ellipse>
+      </PartDraw>
+    </Group>
+
+    <!-- battery arc (left) and steps arc (right) -->
+    <Group name="arcs" x="0" y="0" width="450" height="450">
+      <Variant mode="AMBIENT" target="alpha" value="0" />
+      <PartDraw x="0" y="0" width="450" height="450">
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="215" endAngle="285" direction="CLOCKWISE">
+          <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
+        </Arc>
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="215" endAngle="215" direction="CLOCKWISE">
+          <Transform target="endAngle" value="215 + 70 * [BATTERY_PERCENT] / 100" />
+          <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
+        </Arc>
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="75" endAngle="145" direction="CLOCKWISE">
+          <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
+        </Arc>
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="75" endAngle="75" direction="CLOCKWISE">
+          <Transform target="endAngle" value="75 + 70 * min([STEP_PERCENT], 100) / 100" />
+          <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
+        </Arc>
+      </PartDraw>
+    </Group>
+
+    <!-- battery % -->
+    <PartText x="125" y="22" width="200" height="40">
+      <Variant mode="AMBIENT" target="alpha" value="0" />
+      <Text align="CENTER">
+        <Font family="SYNC_TO_DEVICE" size="30" color="[CONFIGURATION.theme.2]">
+          <Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+        </Font>
+      </Text>
+    </PartText>
+
+    <!-- time -->
+    <DigitalClock x="30" y="58" width="390" height="150">
+      <Variant mode="AMBIENT" target="alpha" value="70" />
+      <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+        <Font family="SYNC_TO_DEVICE" size="122" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+      </TimeText>
+    </DigitalClock>
+
+    <!-- day + date -->
+    <PartText x="60" y="208" width="330" height="48">
+      <Variant mode="AMBIENT" target="alpha" value="0" />
+      <Text align="CENTER">
+        <Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="[CONFIGURATION.theme.1]">
+          <Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+        </Font>
+      </Text>
+    </PartText>
+
+    <!-- steps -->
+    <PartText x="90" y="254" width="270" height="38">
+      <Variant mode="AMBIENT" target="alpha" value="0" />
+      <Text align="CENTER">
+        <Font family="SYNC_TO_DEVICE" size="26" color="[CONFIGURATION.theme.1]">
+          <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+        </Font>
+      </Text>
+    </PartText>
+
+    <!-- next event (title = time, text = event title) -->
+    <ComplicationSlot slotId="0" name="next_event" displayName="c0" supportedTypes="LONG_TEXT SHORT_TEXT"
+        x="60" y="292" width="330" height="54">
+      <DefaultProviderPolicy
+          defaultSystemProvider="NEXT_EVENT" defaultSystemProviderType="SHORT_TEXT"
+          primaryProvider="com.ilan.reminders/com.ilan.reminders.wear.NextEventComplicationService"
+          primaryProviderType="LONG_TEXT" />
+      <BoundingBox x="0" y="0" width="330" height="54" />
+      <Complication type="LONG_TEXT">
+        <PartText x="0" y="0" width="330" height="54">
+          <Text align="CENTER" ellipsis="TRUE">
+            <Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+              <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+            </Font>
+          </Text>
+        </PartText>
+      </Complication>
+      <Complication type="SHORT_TEXT">
+        <PartText x="0" y="0" width="330" height="54">
+          <Text align="CENTER">
+            <Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+            </Font>
+          </Text>
+        </PartText>
+      </Complication>
+    </ComplicationSlot>
+
+    <!-- four app shortcuts -->
+    <ComplicationSlot slotId="1" name="app1" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="98" y="356" width="56" height="56">
+      <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
+      <BoundingOval x="0" y="0" width="56" height="56" />
+      <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="56" height="56"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
+      <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="56" height="56" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
+    </ComplicationSlot>
+    <ComplicationSlot slotId="2" name="app2" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="164" y="356" width="56" height="56">
+      <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
+      <BoundingOval x="0" y="0" width="56" height="56" />
+      <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="56" height="56"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
+      <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="56" height="56" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
+    </ComplicationSlot>
+    <ComplicationSlot slotId="3" name="app3" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="230" y="356" width="56" height="56">
+      <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
+      <BoundingOval x="0" y="0" width="56" height="56" />
+      <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="56" height="56"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
+      <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="56" height="56" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
+    </ComplicationSlot>
+    <ComplicationSlot slotId="4" name="app4" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="296" y="356" width="56" height="56">
+      <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
+      <BoundingOval x="0" y="0" width="56" height="56" />
+      <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="56" height="56"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
+      <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="56" height="56" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
+    </ComplicationSlot>
+
+  </Scene>
+</WatchFace>

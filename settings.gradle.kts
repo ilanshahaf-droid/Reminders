@@ -11,3 +11,4 @@ dependencyResolutionManagement {
 rootProject.name = "Reminders"
 include(":app")
 include(":wear")
+include(":watchface")

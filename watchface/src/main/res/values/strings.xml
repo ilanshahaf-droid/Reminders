@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">סדר יום · פנים</string>
+    <string name="color_label">צבעים</string>
+    <string name="c0">סגול</string>
+    <string name="c1">ירוק</string>
+    <string name="c2">כחול</string>
+    <string name="c3">כתום</string>
+    <string name="c4">ורוד</string>
+    <string name="c5">לבן</string>
+</resources>
