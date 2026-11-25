@@ -32,30 +32,23 @@
 
   <Scene backgroundColor="#FF000000">
 
-    <!-- thin dim ring -->
-    <Group name="ring" x="0" y="0" width="450" height="450">
-      <Variant mode="AMBIENT" target="alpha" value="0" />
-      <PartDraw x="0" y="0" width="450" height="450">
-        <Ellipse x="6" y="6" width="438" height="438"><Stroke thickness="4" color="[CONFIGURATION.theme.2]" /></Ellipse>
-      </PartDraw>
-    </Group>
 
 <Group name="decor" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
 <Ellipse x="83" y="337" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="159" y="375" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="241" y="375" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="317" y="337" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse>
-<RoundRectangle x="98" y="230" width="24" height="22" cornerRadiusX="5" cornerRadiusY="5"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
-<Line startX="105" startY="226" endX="105" endY="231"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<Line startX="115" startY="226" endX="115" endY="231"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<RoundRectangle x="103" y="236" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="109" y="236" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="115" y="236" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="103" y="241" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="109" y="241" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="115" y="241" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="103" y="246" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="109" y="246" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="115" y="246" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="98" y="120" width="24" height="22" cornerRadiusX="5" cornerRadiusY="5"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="105" startY="116" endX="105" endY="121"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="115" startY="116" endX="115" endY="121"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="103" y="126" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="109" y="126" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="115" y="126" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="103" y="131" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="109" y="131" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="115" y="131" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="103" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="109" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="115" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
 </PartDraw>
 </Group>
 <Group name="bshowarcs" x="0" y="0" width="450" height="450">
@@ -64,11 +57,11 @@
 <Group name="arcs" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="215" endAngle="285" direction="CLOCKWISE">
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="240" endAngle="290" direction="CLOCKWISE">
           <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
         </Arc>
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="215" endAngle="215" direction="CLOCKWISE">
-          <Transform target="endAngle" value="215 + 70 * [BATTERY_PERCENT] / 100" />
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="240" endAngle="240" direction="CLOCKWISE">
+          <Transform target="endAngle" value="240 + 50 * [BATTERY_PERCENT] / 100" />
           <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
         </Arc>
 </PartDraw>
@@ -85,11 +78,11 @@
 <Group name="arcs" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="40" endAngle="150" direction="CLOCKWISE">
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="70" endAngle="120" direction="CLOCKWISE">
           <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
         </Arc>
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="40" endAngle="40" direction="CLOCKWISE">
-          <Transform target="endAngle" value="40 + 110 * min([STEP_PERCENT], 100) / 100" />
+        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="70" endAngle="70" direction="CLOCKWISE">
+          <Transform target="endAngle" value="70 + 50 * min([STEP_PERCENT], 100) / 100" />
           <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
         </Arc>
 </PartDraw>
@@ -222,7 +215,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -230,7 +223,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -238,7 +231,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -252,7 +245,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -260,7 +253,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -268,7 +261,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -282,7 +275,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="rubik_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -290,7 +283,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="rubik_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -298,7 +291,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="rubik_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -312,7 +305,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="assistant_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -320,7 +313,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="assistant_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -328,7 +321,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="18" y="116" width="390" height="150">
+<DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="assistant_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -348,7 +341,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<DigitalClock x="346" y="184" width="52" height="44">
+<DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -356,7 +349,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="heebo">
-<DigitalClock x="346" y="184" width="52" height="44">
+<DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="heebo_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -364,7 +357,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="rubik">
-<DigitalClock x="346" y="184" width="52" height="44">
+<DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="rubik_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -372,7 +365,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="assistant">
-<DigitalClock x="346" y="184" width="52" height="44">
+<DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -386,7 +379,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<DigitalClock x="358" y="184" width="52" height="44">
+<DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -394,7 +387,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="heebo">
-<DigitalClock x="358" y="184" width="52" height="44">
+<DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="heebo_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -402,7 +395,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="rubik">
-<DigitalClock x="358" y="184" width="52" height="44">
+<DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="rubik_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -410,7 +403,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="assistant">
-<DigitalClock x="358" y="184" width="52" height="44">
+<DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -424,7 +417,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<DigitalClock x="372" y="184" width="52" height="44">
+<DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="SYNC_TO_DEVICE" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -432,7 +425,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="heebo">
-<DigitalClock x="372" y="184" width="52" height="44">
+<DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="heebo_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -440,7 +433,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="rubik">
-<DigitalClock x="372" y="184" width="52" height="44">
+<DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="rubik_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -448,7 +441,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="assistant">
-<DigitalClock x="372" y="184" width="52" height="44">
+<DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -471,7 +464,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -481,7 +474,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -491,7 +484,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -501,7 +494,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -517,7 +510,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="33" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -527,7 +520,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -537,7 +530,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -547,7 +540,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="100" y="74" width="250" height="34">
+<PartText x="100" y="72" width="250" height="34">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.1]">
@@ -568,9 +561,9 @@
 <Group name="shoe" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
-<RoundRectangle x="100" y="266" width="250" height="32" cornerRadiusX="16" cornerRadiusY="16"><Stroke thickness="2" color="[CONFIGURATION.theme.4]" /></RoundRectangle>
+<RoundRectangle x="100" y="292" width="250" height="32" cornerRadiusX="16" cornerRadiusY="16"><Stroke thickness="2" color="[CONFIGURATION.theme.4]" /></RoundRectangle>
 </PartDraw>
-<PartImage x="112" y="269" width="34" height="25"><Image resource="shoe" /></PartImage>
+<PartImage x="112" y="295" width="34" height="25"><Image resource="shoe" /></PartImage>
 </Group>
 <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
@@ -578,7 +571,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -588,7 +581,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -598,7 +591,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -608,7 +601,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -624,7 +617,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -634,7 +627,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -644,7 +637,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -654,7 +647,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="152" y="267" width="190" height="28">
+<PartText x="152" y="293" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -677,7 +670,7 @@
 </Group>
     <!-- next event (title = time, text = event title) -->
     <ComplicationSlot slotId="0" name="next_event" displayName="c0" supportedTypes="LONG_TEXT SHORT_TEXT"
-        x="130" y="226" width="230" height="30">
+        x="130" y="116" width="230" height="30">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy
           defaultSystemProvider="NEXT_EVENT" defaultSystemProviderType="SHORT_TEXT"
