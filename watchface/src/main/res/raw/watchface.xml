@@ -676,7 +676,7 @@
 </Group>
     <!-- next event (title = time, text = event title) -->
     <ComplicationSlot slotId="0" name="next_event" displayName="c0" supportedTypes="LONG_TEXT SHORT_TEXT"
-        x="110" y="252" width="250" height="34">
+        x="116" y="252" width="250" height="34">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy
           defaultSystemProvider="NEXT_EVENT" defaultSystemProviderType="SHORT_TEXT"
