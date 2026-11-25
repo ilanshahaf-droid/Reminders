@@ -527,17 +527,13 @@
 <BooleanConfiguration id="showsteps">
 <BooleanOption id="TRUE">
 <Group name="stall" x="0" y="0" width="450" height="450">
-<Group name="shoe" x="0" y="0" width="450" height="450">
-<Variant mode="AMBIENT" target="alpha" value="0" />
-<PartImage x="136" y="292" width="42" height="25"><Image resource="shoe" /></PartImage>
-</Group>
 <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
 <ListOption id="n">
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -547,7 +543,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -557,7 +553,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -567,7 +563,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -583,7 +579,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -593,7 +589,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -603,7 +599,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -613,7 +609,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="188" y="293" width="140" height="28">
+<PartText x="110" y="293" width="230" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
