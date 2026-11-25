@@ -73,6 +73,7 @@ class ReminderListenerService : WearableListenerService() {
             if (ev.type == DataEvent.TYPE_CHANGED && path == "/agenda") {
                 DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("json")?.let { WatchData.updateAgenda(this, it) }
                 runCatching { androidx.wear.tiles.TileService.getUpdater(this).requestUpdate(NextEventTileService::class.java) }
+                NextEventComplicationService.refresh(this)
                 continue
             }
             if (ev.type == DataEvent.TYPE_CHANGED && path == "/notes") {
