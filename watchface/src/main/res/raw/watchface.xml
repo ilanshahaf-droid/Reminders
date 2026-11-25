@@ -68,8 +68,12 @@
 <RoundRectangle x="160" y="22" width="130" height="42" cornerRadiusX="21" cornerRadiusY="21"><Stroke thickness="2.5" color="[CONFIGURATION.theme.2]" /></RoundRectangle>
 <RoundRectangle x="178" y="32" width="18" height="24" cornerRadiusX="4" cornerRadiusY="4"><Stroke thickness="2.5" color="[CONFIGURATION.theme.2]" /></RoundRectangle>
 <RoundRectangle x="183" y="28" width="8" height="5" cornerRadiusX="2" cornerRadiusY="2"><Fill color="[CONFIGURATION.theme.2]" /></RoundRectangle>
-<RoundRectangle x="180" y="35" width="14" height="18" cornerRadiusX="2" cornerRadiusY="2"><Fill color="[CONFIGURATION.theme.2]" /><Transform target="height" value="max(2, 18 * [BATTERY_PERCENT] / 100)" /></RoundRectangle>
 </PartDraw>
+<Condition><Expressions><Expression name="p"><![CDATA[[BATTERY_PERCENT] >= 1]]></Expression></Expressions><Compare expression="p"><PartDraw x="0" y="0" width="450" height="450"><RoundRectangle x="180" y="50.0" width="14" height="3" cornerRadiusX="1" cornerRadiusY="1"><Fill color="[CONFIGURATION.theme.2]" /></RoundRectangle></PartDraw></Compare></Condition>
+<Condition><Expressions><Expression name="p"><![CDATA[[BATTERY_PERCENT] >= 21]]></Expression></Expressions><Compare expression="p"><PartDraw x="0" y="0" width="450" height="450"><RoundRectangle x="180" y="46.4" width="14" height="3" cornerRadiusX="1" cornerRadiusY="1"><Fill color="[CONFIGURATION.theme.2]" /></RoundRectangle></PartDraw></Compare></Condition>
+<Condition><Expressions><Expression name="p"><![CDATA[[BATTERY_PERCENT] >= 41]]></Expression></Expressions><Compare expression="p"><PartDraw x="0" y="0" width="450" height="450"><RoundRectangle x="180" y="42.8" width="14" height="3" cornerRadiusX="1" cornerRadiusY="1"><Fill color="[CONFIGURATION.theme.2]" /></RoundRectangle></PartDraw></Compare></Condition>
+<Condition><Expressions><Expression name="p"><![CDATA[[BATTERY_PERCENT] >= 61]]></Expression></Expressions><Compare expression="p"><PartDraw x="0" y="0" width="450" height="450"><RoundRectangle x="180" y="39.2" width="14" height="3" cornerRadiusX="1" cornerRadiusY="1"><Fill color="[CONFIGURATION.theme.2]" /></RoundRectangle></PartDraw></Compare></Condition>
+<Condition><Expressions><Expression name="p"><![CDATA[[BATTERY_PERCENT] >= 81]]></Expression></Expressions><Compare expression="p"><PartDraw x="0" y="0" width="450" height="450"><RoundRectangle x="180" y="35.6" width="14" height="3" cornerRadiusX="1" cornerRadiusY="1"><Fill color="[CONFIGURATION.theme.2]" /></RoundRectangle></PartDraw></Compare></Condition>
 </Group>
 <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
