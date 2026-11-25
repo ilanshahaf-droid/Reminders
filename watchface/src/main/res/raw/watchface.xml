@@ -10,6 +10,24 @@
       <ColorOption id="4" displayName="c4" colors="#FFFFFF #FFC4DE #FF5FA2 #FFE08A #7A2F55" />
       <ColorOption id="5" displayName="c5" colors="#FFFFFF #D0D0D0 #FFFFFF #FFFFFF #555555" />
     </ColorConfiguration>
+    <ListConfiguration id="font" displayName="font_label" defaultValue="heebo">
+      <ListOption id="sys" displayName="f0" />
+      <ListOption id="heebo" displayName="f1" />
+      <ListOption id="rubik" displayName="f2" />
+      <ListOption id="assistant" displayName="f3" />
+    </ListConfiguration>
+    <ListConfiguration id="tsize" displayName="tsize_label" defaultValue="m">
+      <ListOption id="s" displayName="sz0" />
+      <ListOption id="m" displayName="sz1" />
+      <ListOption id="l" displayName="sz2" />
+    </ListConfiguration>
+    <ListConfiguration id="tsz2" displayName="tsz2_label" defaultValue="n">
+      <ListOption id="n" displayName="sz1" />
+      <ListOption id="b" displayName="sz2" />
+    </ListConfiguration>
+    <BooleanConfiguration id="showsec" displayName="sec_label" defaultValue="TRUE" />
+    <BooleanConfiguration id="showsteps" displayName="steps_label" defaultValue="TRUE" />
+    <BooleanConfiguration id="showarcs" displayName="arcs_label" defaultValue="TRUE" />
   </UserConfigurations>
 
   <Scene backgroundColor="#FF000000">
@@ -24,10 +42,12 @@
       </PartDraw>
     </Group>
 
-    <!-- battery arc (left) and steps arc (right) -->
-    <Group name="arcs" x="0" y="0" width="450" height="450">
-      <Variant mode="AMBIENT" target="alpha" value="0" />
-      <PartDraw x="0" y="0" width="450" height="450">
+<Group name="bshowarcs" x="0" y="0" width="450" height="450">
+<BooleanConfiguration id="showarcs">
+<BooleanOption id="TRUE">
+<Group name="arcs" x="0" y="0" width="450" height="450">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<PartDraw x="0" y="0" width="450" height="450">
         <Arc centerX="225" centerY="225" width="404" height="404" startAngle="215" endAngle="285" direction="CLOCKWISE">
           <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
         </Arc>
@@ -35,6 +55,20 @@
           <Transform target="endAngle" value="215 + 70 * [BATTERY_PERCENT] / 100" />
           <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
         </Arc>
+</PartDraw>
+</Group>
+</BooleanOption>
+<BooleanOption id="FALSE">
+<Group name="off" x="0" y="0" width="1" height="1" />
+</BooleanOption>
+</BooleanConfiguration>
+</Group>
+<Group name="bshowsteps" x="0" y="0" width="450" height="450">
+<BooleanConfiguration id="showsteps">
+<BooleanOption id="TRUE">
+<Group name="arcs" x="0" y="0" width="450" height="450">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<PartDraw x="0" y="0" width="450" height="450">
         <Arc centerX="225" centerY="225" width="404" height="404" startAngle="75" endAngle="145" direction="CLOCKWISE">
           <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
         </Arc>
@@ -42,53 +76,569 @@
           <Transform target="endAngle" value="75 + 70 * min([STEP_PERCENT], 100) / 100" />
           <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
         </Arc>
-      </PartDraw>
-    </Group>
-
-    <!-- battery % -->
-    <PartText x="115" y="34" width="220" height="48">
-      <Variant mode="AMBIENT" target="alpha" value="0" />
-      <Text align="CENTER">
-        <Font family="SYNC_TO_DEVICE" size="38" weight="BOLD" color="[CONFIGURATION.theme.2]">
-          <Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
-        </Font>
-      </Text>
-    </PartText>
-
-    <!-- time (hours:minutes stay in always-on mode, dimmed; seconds only when active) -->
-    <DigitalClock x="30" y="66" width="390" height="150">
-      <Variant mode="AMBIENT" target="alpha" value="70" />
-      <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
-        <Font family="SYNC_TO_DEVICE" size="122" weight="BOLD" color="[CONFIGURATION.theme.0]" />
-      </TimeText>
-    </DigitalClock>
-    <DigitalClock x="378" y="146" width="56" height="44">
-      <Variant mode="AMBIENT" target="alpha" value="0" />
-      <TimeText format="ss" x="0" y="0" width="56" height="44" align="START">
-        <Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
-      </TimeText>
-    </DigitalClock>
-
-    <!-- day + date -->
-    <PartText x="60" y="212" width="330" height="46">
-      <Variant mode="AMBIENT" target="alpha" value="0" />
-      <Text align="CENTER">
-        <Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="[CONFIGURATION.theme.1]">
-          <Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
-        </Font>
-      </Text>
-    </PartText>
-
-    <!-- steps -->
-    <PartText x="90" y="256" width="270" height="34">
-      <Variant mode="AMBIENT" target="alpha" value="0" />
-      <Text align="CENTER">
-        <Font family="SYNC_TO_DEVICE" size="26" color="[CONFIGURATION.theme.1]">
-          <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
-        </Font>
-      </Text>
-    </PartText>
-
+</PartDraw>
+</Group>
+</BooleanOption>
+<BooleanOption id="FALSE">
+<Group name="off" x="0" y="0" width="1" height="1" />
+</BooleanOption>
+</BooleanConfiguration>
+</Group>
+<Group name="bshowarcs" x="0" y="0" width="450" height="450">
+<BooleanConfiguration id="showarcs">
+<BooleanOption id="TRUE">
+<Group name="gtsz2" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsz2">
+<ListOption id="n">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="38" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="45" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="115" y="34" width="220" height="48">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.2]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
+</BooleanOption>
+<BooleanOption id="FALSE">
+<Group name="off" x="0" y="0" width="1" height="1" />
+</BooleanOption>
+</BooleanConfiguration>
+</Group>
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<Group name="gtsize" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsize">
+<ListOption id="s">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="m">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="l">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="heebo">
+<Group name="gtsize" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsize">
+<ListOption id="s">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="heebo_b" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="m">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="heebo_b" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="l">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="heebo_b" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="rubik">
+<Group name="gtsize" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsize">
+<ListOption id="s">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="rubik_b" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="m">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="rubik_b" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="l">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="rubik_b" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="assistant">
+<Group name="gtsize" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsize">
+<ListOption id="s">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="assistant_b" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="m">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="assistant_b" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="l">
+<DigitalClock x="30" y="66" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="assistant_b" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
+<Group name="bshowsec" x="0" y="0" width="450" height="450">
+<BooleanConfiguration id="showsec">
+<BooleanOption id="TRUE">
+<Group name="gts" x="0" y="0" width="450" height="450"><ListConfiguration id="tsize">
+<ListOption id="s">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<DigitalClock x="344" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="SYNC_TO_DEVICE" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="heebo">
+<DigitalClock x="344" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="heebo_b" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="rubik">
+<DigitalClock x="344" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="rubik_b" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="assistant">
+<DigitalClock x="344" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="assistant_b" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="m">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<DigitalClock x="360" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="SYNC_TO_DEVICE" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="heebo">
+<DigitalClock x="360" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="heebo_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="rubik">
+<DigitalClock x="360" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="rubik_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="assistant">
+<DigitalClock x="360" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="assistant_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="l">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<DigitalClock x="372" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="heebo">
+<DigitalClock x="372" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="heebo_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="rubik">
+<DigitalClock x="372" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="rubik_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="assistant">
+<DigitalClock x="372" y="146" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="assistant_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration></Group>
+</BooleanOption>
+<BooleanOption id="FALSE">
+<Group name="off" x="0" y="0" width="1" height="1" />
+</BooleanOption>
+</BooleanConfiguration>
+</Group>
+<Group name="gtsz2" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsz2">
+<ListOption id="n">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="40" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_b" size="40" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_b" size="40" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="60" y="212" width="330" height="46">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_b" size="40" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
+<Group name="bshowsteps" x="0" y="0" width="450" height="450">
+<BooleanConfiguration id="showsteps">
+<BooleanOption id="TRUE">
+<Group name="gtsz2" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsz2">
+<ListOption id="n">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="26" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_r" size="26" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_r" size="26" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_r" size="26" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="31" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_r" size="31" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_r" size="31" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="90" y="256" width="270" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_r" size="31" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
+</BooleanOption>
+<BooleanOption id="FALSE">
+<Group name="off" x="0" y="0" width="1" height="1" />
+</BooleanOption>
+</BooleanConfiguration>
+</Group>
     <!-- next event (title = time, text = event title) -->
     <ComplicationSlot slotId="0" name="next_event" displayName="c0" supportedTypes="LONG_TEXT SHORT_TEXT"
         x="60" y="290" width="330" height="44">
@@ -99,22 +649,184 @@
           primaryProviderType="LONG_TEXT" />
       <BoundingBox x="0" y="0" width="330" height="44" />
       <Complication type="LONG_TEXT">
-        <PartText x="0" y="0" width="330" height="44">
-          <Text align="CENTER" ellipsis="TRUE">
-            <Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
-              <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
-            </Font>
-          </Text>
-        </PartText>
+        <Group name="gtsz2" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsz2">
+<ListOption id="n">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="heebo_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="rubik_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="assistant_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="SYNC_TO_DEVICE" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="heebo_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="rubik_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="assistant_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
       </Complication>
       <Complication type="SHORT_TEXT">
-        <PartText x="0" y="0" width="330" height="44">
-          <Text align="CENTER">
-            <Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
-              <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
-            </Font>
-          </Text>
-        </PartText>
+        <Group name="gtsz2" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsz2">
+<ListOption id="n">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="heebo_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="rubik_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="assistant_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="heebo_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="rubik_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="0" y="0" width="330" height="44">
+<Text align="CENTER">
+<Font family="assistant_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
       </Complication>
     </ComplicationSlot>
 

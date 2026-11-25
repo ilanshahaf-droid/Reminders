@@ -7,4 +7,17 @@
     <string name="c3">כתום</string>
     <string name="c4">ורוד</string>
     <string name="c5">לבן</string>
+    <string name="font_label">גופן</string>
+    <string name="f0">גופן מערכת</string>
+    <string name="f1">Heebo</string>
+    <string name="f2">Rubik</string>
+    <string name="f3">Assistant</string>
+    <string name="tsize_label">גודל שעה</string>
+    <string name="tsz2_label">גודל טקסטים</string>
+    <string name="sz0">קטן</string>
+    <string name="sz1">בינוני</string>
+    <string name="sz2">גדול</string>
+    <string name="sec_label">שניות</string>
+    <string name="steps_label">צעדים</string>
+    <string name="arcs_label">סוללה וקשתות</string>
 </resources>
