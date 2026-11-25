@@ -44,19 +44,18 @@
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
 <Ellipse x="90" y="340" width="52" height="52"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="162" y="368" width="52" height="52"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="236" y="368" width="52" height="52"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="308" y="340" width="52" height="52"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse>
-<RoundRectangle x="90" y="258" width="26" height="24" cornerRadiusX="5" cornerRadiusY="5"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
-<Line startX="97" startY="254" endX="97" endY="259"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<Line startX="109" startY="254" endX="109" endY="259"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<Line startX="126" startY="255" endX="126" endY="281"><Stroke thickness="2.5" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<RoundRectangle x="94" y="265" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="100" y="265" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="106" y="265" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="94" y="270" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="100" y="270" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="106" y="270" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="94" y="275" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="100" y="275" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="106" y="275" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="160" y="249" width="24" height="22" cornerRadiusX="5" cornerRadiusY="5"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="167" startY="245" endX="167" endY="250"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="177" startY="245" endX="177" endY="250"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="165" y="255" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="171" y="255" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="177" y="255" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="165" y="260" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="171" y="260" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="177" y="260" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="165" y="265" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="171" y="265" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="177" y="265" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
 </PartDraw>
 </Group>
 <Group name="bshowarcs" x="0" y="0" width="450" height="450">
@@ -569,9 +568,9 @@
 <Group name="shoe" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
-<RoundRectangle x="100" y="296" width="250" height="36" cornerRadiusX="18" cornerRadiusY="18"><Stroke thickness="2" color="[CONFIGURATION.theme.4]" /></RoundRectangle>
+<RoundRectangle x="100" y="300" width="250" height="32" cornerRadiusX="16" cornerRadiusY="16"><Stroke thickness="2" color="[CONFIGURATION.theme.4]" /></RoundRectangle>
 </PartDraw>
-<PartImage x="112" y="301" width="36" height="26"><Image resource="shoe" /></PartImage>
+<PartImage x="112" y="303" width="34" height="25"><Image resource="shoe" /></PartImage>
 </Group>
 <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
@@ -579,40 +578,40 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="SYNC_TO_DEVICE" size="26" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="heebo_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="heebo_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="rubik_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="rubik_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="assistant_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="assistant_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
@@ -625,40 +624,40 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="SYNC_TO_DEVICE" size="31" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="heebo_b" size="31" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="rubik_b" size="31" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="152" y="298" width="190" height="32">
+<PartText x="152" y="301" width="190" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
-<Font family="assistant_b" size="31" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
 </Font>
 </Text>
@@ -678,13 +677,13 @@
 </Group>
     <!-- next event (title = time, text = event title) -->
     <ComplicationSlot slotId="0" name="next_event" displayName="c0" supportedTypes="LONG_TEXT SHORT_TEXT"
-        x="134" y="250" width="232" height="36">
+        x="95" y="246" width="260" height="48">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy
           defaultSystemProvider="NEXT_EVENT" defaultSystemProviderType="SHORT_TEXT"
           primaryProvider="com.ilan.reminders/com.ilan.reminders.wear.NextEventComplicationService"
           primaryProviderType="LONG_TEXT" />
-      <BoundingBox x="0" y="0" width="232" height="36" />
+      <BoundingBox x="0" y="0" width="260" height="48" />
       <Complication type="LONG_TEXT">
         <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
@@ -692,17 +691,17 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="SYNC_TO_DEVICE" size="25" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="SYNC_TO_DEVICE" size="22" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="SYNC_TO_DEVICE" size="20" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -710,17 +709,17 @@
 </Group>
 </ListOption>
 <ListOption id="heebo">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="heebo_b" size="25" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="heebo_b" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="heebo_r" size="22" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="heebo_r" size="20" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -728,17 +727,17 @@
 </Group>
 </ListOption>
 <ListOption id="rubik">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="rubik_b" size="25" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="rubik_b" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="rubik_r" size="22" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="rubik_r" size="20" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -746,17 +745,17 @@
 </Group>
 </ListOption>
 <ListOption id="assistant">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="assistant_b" size="25" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="assistant_b" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="assistant_r" size="22" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="assistant_r" size="20" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -770,17 +769,17 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="SYNC_TO_DEVICE" size="26" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="SYNC_TO_DEVICE" size="24" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -788,17 +787,17 @@
 </Group>
 </ListOption>
 <ListOption id="heebo">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="heebo_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="heebo_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="heebo_r" size="26" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="heebo_r" size="24" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -806,17 +805,17 @@
 </Group>
 </ListOption>
 <ListOption id="rubik">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="rubik_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="rubik_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="rubik_r" size="26" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="rubik_r" size="24" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -824,17 +823,17 @@
 </Group>
 </ListOption>
 <ListOption id="assistant">
-<Group name="evl" x="0" y="0" width="232" height="36">
-<PartText x="0" y="0" width="72" height="36">
-<Text align="START">
-<Font family="assistant_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Group name="evl" x="0" y="0" width="260" height="48">
+<PartText x="0" y="0" width="260" height="24">
+<Text align="CENTER">
+<Font family="assistant_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TITLE]" /></Template>
 </Font>
 </Text>
 </PartText>
-<PartText x="76" y="0" width="156" height="36">
-<Text align="START" ellipsis="TRUE">
-<Font family="assistant_r" size="26" color="[CONFIGURATION.theme.0]">
+<PartText x="0" y="24" width="260" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="assistant_r" size="24" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
@@ -854,7 +853,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -863,7 +862,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="heebo_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -872,7 +871,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="rubik_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -881,7 +880,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="assistant_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -896,7 +895,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -905,7 +904,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -914,7 +913,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
@@ -923,7 +922,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="0" y="0" width="232" height="36">
+<PartText x="0" y="0" width="260" height="48">
 <Text align="CENTER">
 <Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
