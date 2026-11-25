@@ -195,7 +195,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -203,7 +203,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -211,7 +211,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -225,7 +225,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -233,7 +233,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -241,7 +241,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -255,7 +255,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="rubik_b" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -263,7 +263,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="rubik_b" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -271,7 +271,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="rubik_b" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -285,7 +285,7 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="assistant_b" size="100" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -293,7 +293,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="m">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="assistant_b" size="110" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -301,7 +301,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="l">
-<DigitalClock x="30" y="66" width="390" height="150">
+<DigitalClock x="8" y="66" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="assistant_b" size="118" weight="BOLD" color="[CONFIGURATION.theme.0]" />
@@ -321,7 +321,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<DigitalClock x="344" y="146" width="52" height="44">
+<DigitalClock x="330" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="SYNC_TO_DEVICE" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -329,7 +329,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="heebo">
-<DigitalClock x="344" y="146" width="52" height="44">
+<DigitalClock x="330" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="heebo_b" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -337,7 +337,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="rubik">
-<DigitalClock x="344" y="146" width="52" height="44">
+<DigitalClock x="330" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="rubik_b" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -345,7 +345,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="assistant">
-<DigitalClock x="344" y="146" width="52" height="44">
+<DigitalClock x="330" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="29" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -359,7 +359,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<DigitalClock x="360" y="146" width="52" height="44">
+<DigitalClock x="348" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="SYNC_TO_DEVICE" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -367,7 +367,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="heebo">
-<DigitalClock x="360" y="146" width="52" height="44">
+<DigitalClock x="348" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="heebo_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -375,7 +375,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="rubik">
-<DigitalClock x="360" y="146" width="52" height="44">
+<DigitalClock x="348" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="rubik_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -383,7 +383,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="assistant">
-<DigitalClock x="360" y="146" width="52" height="44">
+<DigitalClock x="348" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="32" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -397,7 +397,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<DigitalClock x="372" y="146" width="52" height="44">
+<DigitalClock x="362" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="SYNC_TO_DEVICE" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -405,7 +405,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="heebo">
-<DigitalClock x="372" y="146" width="52" height="44">
+<DigitalClock x="362" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="heebo_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -413,7 +413,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="rubik">
-<DigitalClock x="372" y="146" width="52" height="44">
+<DigitalClock x="362" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="rubik_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
@@ -421,7 +421,7 @@
 </DigitalClock>
 </ListOption>
 <ListOption id="assistant">
-<DigitalClock x="372" y="146" width="52" height="44">
+<DigitalClock x="362" y="120" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="34" weight="BOLD" color="[CONFIGURATION.theme.2]" />
