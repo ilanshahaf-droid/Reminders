@@ -87,7 +87,8 @@ object Backup {
     }
 
     // ---- weekly automatic backup into a folder the user picked once (Drive / OneDrive / device) ----
-    private const val AUTO_NAME = "סדר יום - גיבוי אוטומטי.zip"
+    /** One file per weekday (last 7 days kept), so a bad day never overwrites every good copy. */
+    private fun autoName() = "סדר יום - גיבוי אוטומטי - " + java.text.SimpleDateFormat("EEE", java.util.Locale.US).format(java.util.Date()) + ".zip"
     fun autoFolder(c: Context): Uri? = c.getSharedPreferences("app", Context.MODE_PRIVATE).getString("autoBackupDir", null)?.let { Uri.parse(it) }
     fun autoLast(c: Context): Long = c.getSharedPreferences("app", Context.MODE_PRIVATE).getLong("autoBackupAt", 0L)
 
@@ -100,9 +101,15 @@ object Backup {
         }
         runCatching { c.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
         p.edit().putString("autoBackupDir", tree.toString()).apply()
-        androidx.work.WorkManager.getInstance(c).enqueueUniquePeriodicWork(
+        schedule(c)
+    }
+
+    /** Daily; also called at app start so installs that had the old weekly schedule switch over. */
+    fun schedule(c: Context) {
+        if (autoFolder(c) == null) return
+        androidx.work.WorkManager.getInstance(c.applicationContext).enqueueUniquePeriodicWork(
             "autoBackup", androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
-            androidx.work.PeriodicWorkRequestBuilder<AutoBackupWorker>(7, java.util.concurrent.TimeUnit.DAYS).build()
+            androidx.work.PeriodicWorkRequestBuilder<AutoBackupWorker>(1, java.util.concurrent.TimeUnit.DAYS).build()
         )
     }
 
@@ -111,13 +118,14 @@ object Backup {
         val tree = autoFolder(c) ?: return "לא נבחרה תיקיית גיבוי"
         val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val target = withContext(Dispatchers.IO) {
+            val name = autoName()
             runCatching {
                 val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
                 var found: Uri? = null
                 c.contentResolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { q ->
-                    while (q.moveToNext()) if (q.getString(1) == AUTO_NAME) { found = DocumentsContract.buildDocumentUriUsingTree(tree, q.getString(0)); break }
+                    while (q.moveToNext()) if (q.getString(1) == name) { found = DocumentsContract.buildDocumentUriUsingTree(tree, q.getString(0)); break }
                 }
-                found ?: DocumentsContract.createDocument(c.contentResolver, parent, "application/zip", AUTO_NAME)
+                found ?: DocumentsContract.createDocument(c.contentResolver, parent, "application/zip", name)
             }.getOrNull()
         } ?: return "לא ניתן לכתוב לתיקיית הגיבוי"
         val msg = export(c, target)

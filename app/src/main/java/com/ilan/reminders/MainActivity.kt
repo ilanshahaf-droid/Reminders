@@ -76,6 +76,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        runCatching { Backup.schedule(this) }
         if (intent.getBooleanExtra("newNote", false)) { intent.removeExtra("newNote"); PendingOpen.newNote = true }
         takeEvent(this, intent)
         takeTranscript(this, intent)
@@ -859,7 +860,7 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
     val fsOk = remember(tick) { fullScreenOk(ctx) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("הגדרות · v191") },
+        title = { Text("הגדרות · v192") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val prefs = remember { ctx.getSharedPreferences("app", Context.MODE_PRIVATE) }
@@ -1028,9 +1029,9 @@ fun SettingsDialog(tick: Int, categories: List<Category>, onDismiss: () -> Unit)
                 val pickDir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { u ->
                     if (u != null) { Backup.setAutoFolder(ctx, u); autoDir = u }
                 }
-                Text("גיבוי שבועי אוטומטי", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text("גיבוי יומי אוטומטי", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 Text(
-                    if (autoDir == null) "בחר תיקייה (למשל בתוך Drive) והאפליקציה תעדכן בה קובץ גיבוי אחד פעם בשבוע."
+                    if (autoDir == null) "בחר תיקייה (למשל בתוך Drive) והאפליקציה תגבה אליה בכל יום (נשמרים 7 הימים האחרונים)."
                     else "פעיל. גיבוי אחרון: " + (if (autoAt == 0L) "עדיין לא בוצע" else java.text.SimpleDateFormat("d/M/yyyy HH:mm", java.util.Locale.US).format(java.util.Date(autoAt))),
                     style = MaterialTheme.typography.bodySmall
                 )
