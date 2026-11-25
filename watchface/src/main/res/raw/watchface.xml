@@ -32,6 +32,13 @@
 
   <Scene backgroundColor="#FF000000">
 
+    <!-- thin dim ring -->
+    <Group name="ring" x="0" y="0" width="450" height="450">
+      <Variant mode="AMBIENT" target="alpha" value="0" />
+      <PartDraw x="0" y="0" width="450" height="450">
+        <Ellipse x="6" y="6" width="438" height="438"><Stroke thickness="4" color="[CONFIGURATION.theme.2]" /></Ellipse>
+      </PartDraw>
+    </Group>
 
 <Group name="decor" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
@@ -50,48 +57,6 @@
 <RoundRectangle x="109" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
 <RoundRectangle x="115" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
 </PartDraw>
-</Group>
-<Group name="bshowarcs" x="0" y="0" width="450" height="450">
-<BooleanConfiguration id="showarcs">
-<BooleanOption id="TRUE">
-<Group name="arcs" x="0" y="0" width="450" height="450">
-<Variant mode="AMBIENT" target="alpha" value="0" />
-<PartDraw x="0" y="0" width="450" height="450">
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="240" endAngle="290" direction="CLOCKWISE">
-          <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
-        </Arc>
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="240" endAngle="240" direction="CLOCKWISE">
-          <Transform target="endAngle" value="240 + 50 * [BATTERY_PERCENT] / 100" />
-          <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
-        </Arc>
-</PartDraw>
-</Group>
-</BooleanOption>
-<BooleanOption id="FALSE">
-<Group name="off" x="0" y="0" width="1" height="1" />
-</BooleanOption>
-</BooleanConfiguration>
-</Group>
-<Group name="bshowsteps" x="0" y="0" width="450" height="450">
-<BooleanConfiguration id="showsteps">
-<BooleanOption id="TRUE">
-<Group name="arcs" x="0" y="0" width="450" height="450">
-<Variant mode="AMBIENT" target="alpha" value="0" />
-<PartDraw x="0" y="0" width="450" height="450">
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="70" endAngle="120" direction="CLOCKWISE">
-          <Stroke thickness="9" color="[CONFIGURATION.theme.4]" cap="ROUND" />
-        </Arc>
-        <Arc centerX="225" centerY="225" width="404" height="404" startAngle="70" endAngle="70" direction="CLOCKWISE">
-          <Transform target="endAngle" value="70 + 50 * min([STEP_PERCENT], 100) / 100" />
-          <Stroke thickness="9" color="[CONFIGURATION.theme.2]" cap="ROUND" />
-        </Arc>
-</PartDraw>
-</Group>
-</BooleanOption>
-<BooleanOption id="FALSE">
-<Group name="off" x="0" y="0" width="1" height="1" />
-</BooleanOption>
-</BooleanConfiguration>
 </Group>
 <Group name="bshowarcs" x="0" y="0" width="450" height="450">
 <BooleanConfiguration id="showarcs">
