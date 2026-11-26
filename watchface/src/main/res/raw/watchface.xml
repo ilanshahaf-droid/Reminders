@@ -2,14 +2,6 @@
 <WatchFace width="450" height="450">
   <UserConfigurations>
     <!-- colors: 0 time, 1 date, 2 accent (arcs / battery / steps), 3 next event, 4 dim ring -->
-    <ColorConfiguration id="theme" displayName="color_label" icon="ic_cfg_color" defaultValue="0">
-      <ColorOption id="0" displayName="c0" colors="#FFFFFF #CDBFFF #9B8CFF #FFC857 #553C8F" />
-      <ColorOption id="1" displayName="c1" colors="#FFFFFF #C8F5D0 #4CE06B #FFC857 #2F6B3A" />
-      <ColorOption id="2" displayName="c2" colors="#FFFFFF #BFE3FF #4AA8FF #FFC857 #234E7A" />
-      <ColorOption id="3" displayName="c3" colors="#FFFFFF #FFD9B0 #FF8A2B #FFFFFF #7A4217" />
-      <ColorOption id="4" displayName="c4" colors="#FFFFFF #FFC4DE #FF5FA2 #FFE08A #7A2F55" />
-      <ColorOption id="5" displayName="c5" colors="#FFFFFF #D0D0D0 #FFFFFF #FFFFFF #555555" />
-    </ColorConfiguration>
     <ListConfiguration id="font" displayName="font_label" icon="ic_cfg_font" defaultValue="heebo">
       <ListOption id="sys" displayName="f0" icon="ic_f0" />
       <ListOption id="heebo" displayName="f1" icon="ic_f1" />
@@ -28,6 +20,14 @@
     <BooleanConfiguration id="showsec" displayName="sec_label" icon="ic_cfg_sec" defaultValue="TRUE" />
     <BooleanConfiguration id="showsteps" displayName="steps_label" icon="ic_cfg_steps" defaultValue="TRUE" />
     <BooleanConfiguration id="showarcs" displayName="arcs_label" icon="ic_cfg_bat" defaultValue="TRUE" />
+    <ColorConfiguration id="theme" displayName="color_label" icon="ic_cfg_color" defaultValue="0">
+      <ColorOption id="0" displayName="c0" colors="#FFFFFF #CDBFFF #9B8CFF #FFC857 #553C8F" />
+      <ColorOption id="1" displayName="c1" colors="#FFFFFF #C8F5D0 #4CE06B #FFC857 #2F6B3A" />
+      <ColorOption id="2" displayName="c2" colors="#FFFFFF #BFE3FF #4AA8FF #FFC857 #234E7A" />
+      <ColorOption id="3" displayName="c3" colors="#FFFFFF #FFD9B0 #FF8A2B #FFFFFF #7A4217" />
+      <ColorOption id="4" displayName="c4" colors="#FFFFFF #FFC4DE #FF5FA2 #FFE08A #7A2F55" />
+      <ColorOption id="5" displayName="c5" colors="#FFFFFF #D0D0D0 #FFFFFF #FFFFFF #555555" />
+    </ColorConfiguration>
   </UserConfigurations>
 
   <Scene backgroundColor="#FF000000">
@@ -529,7 +529,7 @@
 <Group name="stall" x="0" y="0" width="450" height="450">
 <Group name="shoe" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
-<PartImage x="141" y="291" width="40" height="26"><Image resource="shoe" /></PartImage>
+<PartImage x="124" y="291" width="40" height="26"><Image resource="shoe" /></PartImage>
 </Group>
 <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
@@ -537,7 +537,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -547,7 +547,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -557,7 +557,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -567,7 +567,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -583,7 +583,7 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -593,7 +593,7 @@
 </PartText>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -603,7 +603,7 @@
 </PartText>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
@@ -613,7 +613,7 @@
 </PartText>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="191" y="293" width="130" height="28">
+<PartText x="172" y="293" width="170" height="28">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
