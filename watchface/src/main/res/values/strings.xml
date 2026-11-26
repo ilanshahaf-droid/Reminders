@@ -7,11 +7,13 @@
     <string name="c3">Orange</string>
     <string name="c4">Pink</string>
     <string name="c5">White</string>
+    <string name="c6">Silver green</string>
     <string name="font_label">Font</string>
     <string name="f0">System</string>
     <string name="f1">Heebo</string>
     <string name="f2">Rubik</string>
     <string name="f3">Assistant</string>
+    <string name="f4">Condensed</string>
     <string name="tsize_label">Time size</string>
     <string name="tsz2_label">Text size</string>
     <string name="sz0">Small</string>
@@ -21,4 +23,7 @@
     <string name="sec_label">Seconds</string>
     <string name="steps_label">Steps</string>
     <string name="arcs_label">Battery</string>
+    <string name="datemode_label">Date</string>
+    <string name="dm0">Top</string>
+    <string name="dm1">Middle, large</string>
 </resources>

@@ -7,6 +7,7 @@
       <ListOption id="heebo" displayName="f1" icon="ic_f1" />
       <ListOption id="rubik" displayName="f2" icon="ic_f2" />
       <ListOption id="assistant" displayName="f3" icon="ic_f3" />
+      <ListOption id="cond" displayName="f4" icon="ic_f4" />
     </ListConfiguration>
     <ListConfiguration id="tsize" displayName="tsize_label" icon="ic_cfg_tsize" defaultValue="m">
       <ListOption id="s" displayName="sz0" icon="ic_sz_s" />
@@ -16,6 +17,10 @@
     <ListConfiguration id="tsz2" displayName="tsz2_label" icon="ic_cfg_tsz2" defaultValue="n">
       <ListOption id="n" displayName="szn" icon="ic_sz_m" />
       <ListOption id="b" displayName="sz2" icon="ic_sz_l" />
+    </ListConfiguration>
+    <ListConfiguration id="datemode" displayName="datemode_label" icon="ic_cfg_date" defaultValue="t">
+      <ListOption id="t" displayName="dm0" icon="ic_sz_m" />
+      <ListOption id="m" displayName="dm1" icon="ic_sz_l" />
     </ListConfiguration>
     <BooleanConfiguration id="showsec" displayName="sec_label" icon="ic_cfg_sec" defaultValue="TRUE" />
     <BooleanConfiguration id="showsteps" displayName="steps_label" icon="ic_cfg_steps" defaultValue="TRUE" />
@@ -27,6 +32,7 @@
       <ColorOption id="3" displayName="c3" colors="#FFFFFF #FFD9B0 #FF8A2B #FFFFFF #7A4217" />
       <ColorOption id="4" displayName="c4" colors="#FFFFFF #FFC4DE #FF5FA2 #FFE08A #7A2F55" />
       <ColorOption id="5" displayName="c5" colors="#FFFFFF #D0D0D0 #FFFFFF #FFFFFF #555555" />
+      <ColorOption id="6" displayName="c6" colors="#F2F2F2 #FFFFFF #3DDC3D #E6E6E6 #4A4A4A" />
     </ColorConfiguration>
   </UserConfigurations>
 
@@ -44,18 +50,6 @@
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
 <Ellipse x="83" y="337" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="159" y="375" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="241" y="375" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="317" y="337" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse>
-<RoundRectangle x="98" y="120" width="24" height="22" cornerRadiusX="5" cornerRadiusY="5"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
-<Line startX="105" startY="116" endX="105" endY="121"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<Line startX="115" startY="116" endX="115" endY="121"><Stroke thickness="3" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
-<RoundRectangle x="103" y="126" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="109" y="126" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="115" y="126" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="103" y="131" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="109" y="131" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="115" y="131" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="103" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="109" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
-<RoundRectangle x="115" y="136" width="4" height="4" cornerRadiusX="1" cornerRadiusY="1"><Fill color="#FF000000" /></RoundRectangle>
 </PartDraw>
 </Group>
 <Group name="bshowarcs" x="0" y="0" width="450" height="450">
@@ -120,6 +114,16 @@
 </Text>
 </PartText>
 </ListOption>
+<ListOption id="cond">
+<PartText x="200" y="23" width="84" height="40">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_r" size="28" color="[CONFIGURATION.theme.0]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
 </ListConfiguration>
 </Group>
 </ListOption>
@@ -161,6 +165,16 @@
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_r" size="33" color="[CONFIGURATION.theme.0]">
+<Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="cond">
+<PartText x="200" y="23" width="84" height="40">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_r" size="33" color="[CONFIGURATION.theme.0]">
 <Template><![CDATA[%d%%]]><Parameter expression="[BATTERY_PERCENT]" /></Template>
 </Font>
 </Text>
@@ -300,6 +314,36 @@
 </ListConfiguration>
 </Group>
 </ListOption>
+<ListOption id="cond">
+<Group name="gtsize" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsize">
+<ListOption id="s">
+<DigitalClock x="18" y="150" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="oswald_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="m">
+<DigitalClock x="18" y="150" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="oswald_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="l">
+<DigitalClock x="18" y="150" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="70" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="oswald_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
 </ListConfiguration>
 </Group>
 <Group name="bshowsec" x="0" y="0" width="450" height="450">
@@ -341,6 +385,14 @@
 </TimeText>
 </DigitalClock>
 </ListOption>
+<ListOption id="cond">
+<DigitalClock x="346" y="218" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="oswald_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
 </ListConfiguration>
 </Group>
 </ListOption>
@@ -376,6 +428,14 @@
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
 <Font family="assistant_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
+<ListOption id="cond">
+<DigitalClock x="358" y="218" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="oswald_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -417,6 +477,14 @@
 </TimeText>
 </DigitalClock>
 </ListOption>
+<ListOption id="cond">
+<DigitalClock x="372" y="218" width="52" height="44">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
+<Font family="oswald_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+</TimeText>
+</DigitalClock>
+</ListOption>
 </ListConfiguration>
 </Group>
 </ListOption>
@@ -427,6 +495,9 @@
 </BooleanOption>
 </BooleanConfiguration>
 </Group>
+<Group name="gdm" x="0" y="0" width="450" height="450">
+<ListConfiguration id="datemode">
+<ListOption id="t">
 <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
 <ListOption id="n">
@@ -467,6 +538,16 @@
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <Text align="CENTER">
 <Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="cond">
+<PartText x="100" y="72" width="250" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.1]">
 <Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
 </Font>
 </Text>
@@ -517,6 +598,137 @@
 </Font>
 </Text>
 </PartText>
+</ListOption>
+<ListOption id="cond">
+<PartText x="100" y="72" width="250" height="34">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="m">
+<Group name="gtsz2" x="0" y="0" width="450" height="450">
+<ListConfiguration id="tsz2">
+<ListOption id="n">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="38" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="cond">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_b" size="38" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="gf" x="0" y="0" width="450" height="450">
+<ListConfiguration id="font">
+<ListOption id="sys">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="45" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="heebo">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="heebo_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="rubik">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="rubik_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="assistant">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="assistant_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+<ListOption id="cond">
+<PartText x="60" y="92" width="330" height="50">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_b" size="45" weight="BOLD" color="[CONFIGURATION.theme.1]">
+<Template><![CDATA[%s  %d.%d]]><Parameter expression="[DAY_OF_WEEK_S]" /><Parameter expression="[DAY]" /><Parameter expression="[MONTH]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
+</ListConfiguration>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -576,6 +788,16 @@
 </Text>
 </PartText>
 </ListOption>
+<ListOption id="cond">
+<PartText x="172" y="293" width="170" height="28">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
 </ListConfiguration>
 </Group>
 </ListOption>
@@ -622,6 +844,16 @@
 </Text>
 </PartText>
 </ListOption>
+<ListOption id="cond">
+<PartText x="172" y="293" width="170" height="28">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<Text align="CENTER">
+<Font family="oswald_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.0]">
+<Template><![CDATA[%d צעדים]]><Parameter expression="[STEP_COUNT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</ListOption>
 </ListConfiguration>
 </Group>
 </ListOption>
@@ -636,13 +868,13 @@
 </Group>
     <!-- next event (title = time, text = event title) -->
     <ComplicationSlot slotId="0" name="next_event" displayName="c0" supportedTypes="LONG_TEXT SHORT_TEXT"
-        x="130" y="116" width="230" height="30">
+        x="125" y="118" width="200" height="24">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy
           defaultSystemProvider="NEXT_EVENT" defaultSystemProviderType="SHORT_TEXT"
           primaryProvider="com.ilan.reminders/com.ilan.reminders.wear.NextEventComplicationService"
           primaryProviderType="LONG_TEXT" />
-      <BoundingBox x="0" y="0" width="230" height="30" />
+      <BoundingBox x="0" y="0" width="200" height="24" />
       <Complication type="LONG_TEXT">
         <Group name="gtsz2" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsz2">
@@ -650,40 +882,129 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="SYNC_TO_DEVICE" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="heebo_b" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="heebo_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="rubik_b" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="rubik_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="assistant_b" size="22" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="assistant_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
+</ListOption>
+<ListOption id="cond">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="oswald_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -692,40 +1013,129 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="SYNC_TO_DEVICE" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="SYNC_TO_DEVICE" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="heebo_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="heebo_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="rubik_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="rubik_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER" ellipsis="TRUE">
-<Font family="assistant_b" size="26" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="assistant_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
+</ListOption>
+<ListOption id="cond">
+<Group name="evl" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
+<Text align="CENTER" ellipsis="TRUE">
+<Font family="oswald_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s  %s]]><Parameter expression="[COMPLICATION.TITLE]" /><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -740,40 +1150,129 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="SYNC_TO_DEVICE" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="SYNC_TO_DEVICE" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="heebo_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="heebo_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="rubik_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="rubik_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="assistant_b" size="24" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="assistant_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
+</ListOption>
+<ListOption id="cond">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
+<Text align="CENTER">
+<Font family="oswald_b" size="18" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -782,40 +1281,129 @@
 <Group name="gf" x="0" y="0" width="450" height="450">
 <ListConfiguration id="font">
 <ListOption id="sys">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="SYNC_TO_DEVICE" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="SYNC_TO_DEVICE" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="heebo">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="heebo_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="heebo_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="rubik">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="rubik_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="rubik_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
 </ListOption>
 <ListOption id="assistant">
-<PartText x="0" y="0" width="230" height="30">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
 <Text align="CENTER">
-<Font family="assistant_b" size="28" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Font family="assistant_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
 <Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
 </Font>
 </Text>
 </PartText>
+</Group>
+</ListOption>
+<ListOption id="cond">
+<Group name="evs" x="0" y="0" width="200" height="24">
+<PartDraw x="0" y="0" width="200" height="24">
+<RoundRectangle x="1" y="5" width="18" height="16" cornerRadiusX="4" cornerRadiusY="4"><Fill color="[CONFIGURATION.theme.3]" /></RoundRectangle>
+<Line startX="6" startY="2" endX="6" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<Line startX="14" startY="2" endX="14" endY="6"><Stroke thickness="2.2" color="[CONFIGURATION.theme.3]" cap="ROUND" /></Line>
+<RoundRectangle x="5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="9" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="12.5" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="8.5" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+<RoundRectangle x="12" y="16" width="3" height="3" cornerRadiusX="0.8" cornerRadiusY="0.8"><Fill color="#FF000000" /></RoundRectangle>
+</PartDraw>
+<PartText x="26" y="0" width="174" height="24">
+<Text align="CENTER">
+<Font family="oswald_b" size="21" weight="BOLD" color="[CONFIGURATION.theme.3]">
+<Template><![CDATA[%s]]><Parameter expression="[COMPLICATION.TEXT]" /></Template>
+</Font>
+</Text>
+</PartText>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
