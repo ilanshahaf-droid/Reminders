@@ -2,7 +2,7 @@
 <WatchFace width="450" height="450">
   <UserConfigurations>
     <!-- colors: 0 time, 1 date, 2 accent (arcs / battery / steps), 3 next event, 4 dim ring -->
-    <ColorConfiguration id="theme" displayName="color_label" defaultValue="0">
+    <ColorConfiguration id="theme" displayName="color_label" icon="ic_cfg_color" defaultValue="0">
       <ColorOption id="0" displayName="c0" colors="#FFFFFF #CDBFFF #9B8CFF #FFC857 #553C8F" />
       <ColorOption id="1" displayName="c1" colors="#FFFFFF #C8F5D0 #4CE06B #FFC857 #2F6B3A" />
       <ColorOption id="2" displayName="c2" colors="#FFFFFF #BFE3FF #4AA8FF #FFC857 #234E7A" />
@@ -10,24 +10,24 @@
       <ColorOption id="4" displayName="c4" colors="#FFFFFF #FFC4DE #FF5FA2 #FFE08A #7A2F55" />
       <ColorOption id="5" displayName="c5" colors="#FFFFFF #D0D0D0 #FFFFFF #FFFFFF #555555" />
     </ColorConfiguration>
-    <ListConfiguration id="font" displayName="font_label" defaultValue="heebo">
-      <ListOption id="sys" displayName="f0" />
-      <ListOption id="heebo" displayName="f1" />
-      <ListOption id="rubik" displayName="f2" />
-      <ListOption id="assistant" displayName="f3" />
+    <ListConfiguration id="font" displayName="font_label" icon="ic_cfg_font" defaultValue="heebo">
+      <ListOption id="sys" displayName="f0" icon="ic_f0" />
+      <ListOption id="heebo" displayName="f1" icon="ic_f1" />
+      <ListOption id="rubik" displayName="f2" icon="ic_f2" />
+      <ListOption id="assistant" displayName="f3" icon="ic_f3" />
     </ListConfiguration>
-    <ListConfiguration id="tsize" displayName="tsize_label" defaultValue="m">
-      <ListOption id="s" displayName="sz0" />
-      <ListOption id="m" displayName="sz1" />
-      <ListOption id="l" displayName="sz2" />
+    <ListConfiguration id="tsize" displayName="tsize_label" icon="ic_cfg_tsize" defaultValue="m">
+      <ListOption id="s" displayName="sz0" icon="ic_sz_s" />
+      <ListOption id="m" displayName="sz1" icon="ic_sz_m" />
+      <ListOption id="l" displayName="sz2" icon="ic_sz_l" />
     </ListConfiguration>
-    <ListConfiguration id="tsz2" displayName="tsz2_label" defaultValue="n">
-      <ListOption id="n" displayName="sz1" />
-      <ListOption id="b" displayName="sz2" />
+    <ListConfiguration id="tsz2" displayName="tsz2_label" icon="ic_cfg_tsz2" defaultValue="n">
+      <ListOption id="n" displayName="szn" icon="ic_sz_m" />
+      <ListOption id="b" displayName="sz2" icon="ic_sz_l" />
     </ListConfiguration>
-    <BooleanConfiguration id="showsec" displayName="sec_label" defaultValue="TRUE" />
-    <BooleanConfiguration id="showsteps" displayName="steps_label" defaultValue="TRUE" />
-    <BooleanConfiguration id="showarcs" displayName="arcs_label" defaultValue="TRUE" />
+    <BooleanConfiguration id="showsec" displayName="sec_label" icon="ic_cfg_sec" defaultValue="TRUE" />
+    <BooleanConfiguration id="showsteps" displayName="steps_label" icon="ic_cfg_steps" defaultValue="TRUE" />
+    <BooleanConfiguration id="showarcs" displayName="arcs_label" icon="ic_cfg_bat" defaultValue="TRUE" />
   </UserConfigurations>
 
   <Scene backgroundColor="#FF000000">
