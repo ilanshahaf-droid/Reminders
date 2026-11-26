@@ -347,9 +347,9 @@ private fun DiaryMain(onReminders: () -> Unit, onNotes: () -> Unit, onDocs: () -
                         Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(sub, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    Spacer(Modifier.weight(1f))
                     Text("היום", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { dayNum = today.toEpochDay() }.padding(horizontal = 8.dp, vertical = 8.dp))
-                    Spacer(Modifier.weight(1f))
                     IconButton({ showSearch = true }, Modifier.size(44.dp)) { Icon(Icons.Default.Search, "חיפוש", tint = Color.White) }
                     IconButton({ startVoice() }, Modifier.size(44.dp)) { Text("🎤", fontSize = 20.sp) }
                     IconButton({ onNew(date, null) }, Modifier.size(44.dp)) { Icon(Icons.Default.Add, "פגישה חדשה", tint = Color.White) }
