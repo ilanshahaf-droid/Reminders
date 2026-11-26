@@ -23,6 +23,24 @@
       <ListOption id="t" displayName="dm0" icon="ic_sz_m" />
       <ListOption id="m" displayName="dm1" icon="ic_sz_l" />
     </ListConfiguration>
+    <ColorConfiguration id="tshadow" displayName="shadow_label" icon="ic_cfg_shadow" defaultValue="0">
+      <ColorOption id="0" displayName="off" colors="#00000000" />
+      <ColorOption id="1" displayName="sh1" colors="#FF8A8A8A" />
+      <ColorOption id="2" displayName="c0" colors="#FF9B8CFF" />
+      <ColorOption id="3" displayName="c1" colors="#FF3DDC3D" />
+      <ColorOption id="4" displayName="c2" colors="#FF4AA8FF" />
+      <ColorOption id="5" displayName="c3" colors="#FFFF8A2B" />
+      <ColorOption id="6" displayName="c4" colors="#FFFF5FA2" />
+    </ColorConfiguration>
+    <ColorConfiguration id="seccol" displayName="seccol_label" icon="ic_cfg_seccol" defaultValue="0">
+      <ColorOption id="0" displayName="c0" colors="#FF9B8CFF" />
+      <ColorOption id="1" displayName="c1" colors="#FF3DDC3D" />
+      <ColorOption id="2" displayName="c2" colors="#FF4AA8FF" />
+      <ColorOption id="3" displayName="c3" colors="#FFFF8A2B" />
+      <ColorOption id="4" displayName="c4" colors="#FFFF5FA2" />
+      <ColorOption id="5" displayName="c5" colors="#FFFFFFFF" />
+      <ColorOption id="6" displayName="cy" colors="#FFFFC857" />
+    </ColorConfiguration>
     <BooleanConfiguration id="showsec" displayName="sec_label" icon="ic_cfg_sec" defaultValue="TRUE" />
     <BooleanConfiguration id="showsteps" displayName="steps_label" icon="ic_cfg_steps" defaultValue="TRUE" />
     <BooleanConfiguration id="showarcs" displayName="arcs_label" icon="ic_cfg_bat" defaultValue="TRUE" />
@@ -50,7 +68,7 @@
 <Group name="decor" x="0" y="0" width="450" height="450">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <PartDraw x="0" y="0" width="450" height="450">
-<Ellipse x="74" y="306" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="149" y="357" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="251" y="357" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="324" y="306" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse>
+<Ellipse x="58" y="319" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="143" y="376" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="257" y="376" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse><Ellipse x="342" y="319" width="50" height="50"><Fill color="#1E1535" /><Stroke thickness="3" color="[CONFIGURATION.theme.2]" /></Ellipse>
 </PartDraw>
 </Group>
 <Group name="bshowarcs" x="0" y="0" width="450" height="450">
@@ -219,28 +237,52 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="92" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="m">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="104" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="l">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="SYNC_TO_DEVICE" size="114" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -249,28 +291,52 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="heebo_b" size="92" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="m">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="heebo_b" size="104" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="l">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="heebo_b" size="114" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -279,28 +345,52 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="oswald_b" size="92" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="oswald_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="m">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="oswald_b" size="104" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="oswald_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="l">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="oswald_b" size="114" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="oswald_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -309,28 +399,52 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="sans-serif-condensed" size="92" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="sans-serif-condensed" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="m">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="sans-serif-condensed" size="104" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="sans-serif-condensed" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="l">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="sans-serif-condensed" size="114" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="sans-serif-condensed" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -339,28 +453,52 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="serif" size="92" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="serif" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="m">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="serif" size="104" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="serif" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="l">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="serif" size="114" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="serif" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -369,28 +507,52 @@
 <Group name="gtsize" x="0" y="0" width="450" height="450">
 <ListConfiguration id="tsize">
 <ListOption id="s">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="monospace" size="92" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="monospace" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="m">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="monospace" size="104" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="monospace" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 <ListOption id="l">
+<Group name="tgrp" x="0" y="0" width="450" height="450">
+<DigitalClock x="21" y="154" width="390" height="150">
+<Variant mode="AMBIENT" target="alpha" value="0" />
+<TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
+<Font family="monospace" size="114" weight="BOLD" color="[CONFIGURATION.tshadow.0]" />
+</TimeText>
+</DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
 <Variant mode="AMBIENT" target="alpha" value="70" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="monospace" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
 </DigitalClock>
+</Group>
 </ListOption>
 </ListConfiguration>
 </Group>
@@ -408,7 +570,7 @@
 <DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="SYNC_TO_DEVICE" size="27" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -416,7 +578,7 @@
 <DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="heebo_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="heebo_b" size="27" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -424,7 +586,7 @@
 <DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="oswald_b" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="oswald_b" size="27" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -432,7 +594,7 @@
 <DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="sans-serif-condensed" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="sans-serif-condensed" size="27" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -440,7 +602,7 @@
 <DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="serif" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="serif" size="27" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -448,7 +610,7 @@
 <DigitalClock x="346" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="monospace" size="27" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="monospace" size="27" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -462,7 +624,7 @@
 <DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="SYNC_TO_DEVICE" size="30" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -470,7 +632,7 @@
 <DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="heebo_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="heebo_b" size="30" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -478,7 +640,7 @@
 <DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="oswald_b" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="oswald_b" size="30" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -486,7 +648,7 @@
 <DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="sans-serif-condensed" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="sans-serif-condensed" size="30" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -494,7 +656,7 @@
 <DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="serif" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="serif" size="30" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -502,7 +664,7 @@
 <DigitalClock x="358" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="monospace" size="30" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="monospace" size="30" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -516,7 +678,7 @@
 <DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="SYNC_TO_DEVICE" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="SYNC_TO_DEVICE" size="33" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -524,7 +686,7 @@
 <DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="heebo_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="heebo_b" size="33" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -532,7 +694,7 @@
 <DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="oswald_b" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="oswald_b" size="33" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -540,7 +702,7 @@
 <DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="sans-serif-condensed" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="sans-serif-condensed" size="33" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -548,7 +710,7 @@
 <DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="serif" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="serif" size="33" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -556,7 +718,7 @@
 <DigitalClock x="372" y="218" width="52" height="44">
 <Variant mode="AMBIENT" target="alpha" value="0" />
 <TimeText format="ss" x="0" y="0" width="52" height="44" align="START">
-<Font family="monospace" size="33" weight="BOLD" color="[CONFIGURATION.theme.2]" />
+<Font family="monospace" size="33" weight="BOLD" color="[CONFIGURATION.seccol.0]" />
 </TimeText>
 </DigitalClock>
 </ListOption>
@@ -1645,28 +1807,28 @@
     </ComplicationSlot>
 
     <!-- four app shortcuts -->
-    <ComplicationSlot slotId="1" name="app1" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="76" y="308" width="46" height="46">
+    <ComplicationSlot slotId="1" name="app1" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="60" y="321" width="46" height="46">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
       <BoundingOval x="0" y="0" width="46" height="46" />
       <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="46" height="46"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
       <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="46" height="46" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
     </ComplicationSlot>
-    <ComplicationSlot slotId="2" name="app2" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="151" y="359" width="46" height="46">
+    <ComplicationSlot slotId="2" name="app2" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="145" y="378" width="46" height="46">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
       <BoundingOval x="0" y="0" width="46" height="46" />
       <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="46" height="46"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
       <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="46" height="46" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
     </ComplicationSlot>
-    <ComplicationSlot slotId="3" name="app3" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="253" y="359" width="46" height="46">
+    <ComplicationSlot slotId="3" name="app3" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="259" y="378" width="46" height="46">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
       <BoundingOval x="0" y="0" width="46" height="46" />
       <Complication type="SMALL_IMAGE"><PartImage x="0" y="0" width="46" height="46"><Image resource="[COMPLICATION.SMALL_IMAGE]" /></PartImage></Complication>
       <Complication type="MONOCHROMATIC_IMAGE"><PartImage x="0" y="0" width="46" height="46" tintColor="[CONFIGURATION.theme.2]"><Image resource="[COMPLICATION.MONOCHROMATIC_IMAGE]" /></PartImage></Complication>
     </ComplicationSlot>
-    <ComplicationSlot slotId="4" name="app4" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="326" y="308" width="46" height="46">
+    <ComplicationSlot slotId="4" name="app4" displayName="c0" supportedTypes="SMALL_IMAGE MONOCHROMATIC_IMAGE EMPTY" x="344" y="321" width="46" height="46">
       <Variant mode="AMBIENT" target="alpha" value="0" />
       <DefaultProviderPolicy defaultSystemProvider="APP_SHORTCUT" defaultSystemProviderType="SMALL_IMAGE" />
       <BoundingOval x="0" y="0" width="46" height="46" />

@@ -27,4 +27,9 @@
     <string name="datemode_label">Date</string>
     <string name="dm0">Top</string>
     <string name="dm1">Middle, large</string>
+    <string name="shadow_label">Time shadow</string>
+    <string name="seccol_label">Seconds color</string>
+    <string name="off">Off</string>
+    <string name="sh1">Grey</string>
+    <string name="cy">Yellow</string>
 </resources>
