@@ -57,6 +57,12 @@
       <ColorOption id="5" displayName="c5" colors="#FFFFFFFF" />
       <ColorOption id="6" displayName="cy" colors="#FFFFC857" />
     </ColorConfiguration>
+    <ListConfiguration id="aodlevel" displayName="aod_label" icon="ic_cfg_aod" defaultValue="d">
+      <ListOption id="v" displayName="aod0" icon="ic_sz_s" />
+      <ListOption id="d" displayName="aod1" icon="ic_sz_m" />
+      <ListOption id="m" displayName="aod2" icon="ic_sz_l" />
+      <ListOption id="b" displayName="aod3" icon="ic_sz_l" />
+    </ListConfiguration>
     <BooleanConfiguration id="showsec" displayName="sec_label" icon="ic_cfg_sec" defaultValue="TRUE" />
     <BooleanConfiguration id="showsteps" displayName="steps_label" icon="ic_cfg_steps" defaultValue="TRUE" />
     <BooleanConfiguration id="showarcs" displayName="arcs_label" icon="ic_cfg_bat" defaultValue="TRUE" />
@@ -281,7 +287,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -297,7 +303,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -313,7 +319,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="SYNC_TO_DEVICE" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -335,7 +341,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -351,7 +357,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -367,7 +373,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="heebo_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -389,7 +395,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="oswald_b" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -405,7 +411,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="oswald_b" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -421,7 +427,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="oswald_b" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -437,7 +443,7 @@
 <ListOption id="s">
 <Group name="tgrp" x="0" y="0" width="450" height="450">
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <BitmapFont family="metal" size="81" color="#FFFFFF" />
 </TimeText>
@@ -447,7 +453,7 @@
 <ListOption id="m">
 <Group name="tgrp" x="0" y="0" width="450" height="450">
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <BitmapFont family="metal" size="91" color="#FFFFFF" />
 </TimeText>
@@ -457,7 +463,7 @@
 <ListOption id="l">
 <Group name="tgrp" x="0" y="0" width="450" height="450">
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <BitmapFont family="metal" size="100" color="#FFFFFF" />
 </TimeText>
@@ -479,7 +485,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="sans-serif-condensed" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -495,7 +501,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="sans-serif-condensed" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -511,7 +517,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="sans-serif-condensed" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -533,7 +539,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="serif" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -549,7 +555,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="serif" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -565,7 +571,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="serif" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -587,7 +593,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="monospace" size="92" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -603,7 +609,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="monospace" size="104" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -619,7 +625,7 @@
 </TimeText>
 </DigitalClock>
 <DigitalClock x="18" y="150" width="390" height="150">
-<Variant mode="AMBIENT" target="alpha" value="70" />
+<Variant mode="AMBIENT" target="alpha" value="255" />
 <TimeText format="hh:mm" x="0" y="0" width="390" height="150" align="CENTER">
 <Font family="monospace" size="114" weight="BOLD" color="[CONFIGURATION.theme.0]" />
 </TimeText>
@@ -627,6 +633,42 @@
 </Group>
 </ListOption>
 </ListConfiguration>
+</Group>
+</ListOption>
+</ListConfiguration>
+</Group>
+<Group name="gaod" x="0" y="0" width="450" height="450">
+<ListConfiguration id="aodlevel">
+<ListOption id="v">
+<Group name="aod_v" x="0" y="150" width="450" height="150" alpha="0">
+<Variant mode="AMBIENT" target="alpha" value="215" />
+<PartDraw x="0" y="0" width="450" height="150">
+<Rectangle x="0" y="0" width="450" height="150"><Fill color="#FF000000" /></Rectangle>
+</PartDraw>
+</Group>
+</ListOption>
+<ListOption id="d">
+<Group name="aod_d" x="0" y="150" width="450" height="150" alpha="0">
+<Variant mode="AMBIENT" target="alpha" value="185" />
+<PartDraw x="0" y="0" width="450" height="150">
+<Rectangle x="0" y="0" width="450" height="150"><Fill color="#FF000000" /></Rectangle>
+</PartDraw>
+</Group>
+</ListOption>
+<ListOption id="m">
+<Group name="aod_m" x="0" y="150" width="450" height="150" alpha="0">
+<Variant mode="AMBIENT" target="alpha" value="130" />
+<PartDraw x="0" y="0" width="450" height="150">
+<Rectangle x="0" y="0" width="450" height="150"><Fill color="#FF000000" /></Rectangle>
+</PartDraw>
+</Group>
+</ListOption>
+<ListOption id="b">
+<Group name="aod_b" x="0" y="150" width="450" height="150" alpha="0">
+<Variant mode="AMBIENT" target="alpha" value="60" />
+<PartDraw x="0" y="0" width="450" height="150">
+<Rectangle x="0" y="0" width="450" height="150"><Fill color="#FF000000" /></Rectangle>
+</PartDraw>
 </Group>
 </ListOption>
 </ListConfiguration>

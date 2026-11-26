@@ -33,4 +33,9 @@
     <string name="off">Off</string>
     <string name="sh1">Grey</string>
     <string name="cy">Yellow</string>
+    <string name="aod_label">Always-on brightness</string>
+    <string name="aod0">Very dim</string>
+    <string name="aod1">Dim</string>
+    <string name="aod2">Medium</string>
+    <string name="aod3">Bright</string>
 </resources>
