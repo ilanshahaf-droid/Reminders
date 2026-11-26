@@ -11,9 +11,10 @@
     <string name="font_label">Font</string>
     <string name="f0">System</string>
     <string name="f1">Heebo</string>
-    <string name="f2">Rubik</string>
-    <string name="f3">Assistant</string>
     <string name="f4">Condensed</string>
+    <string name="f5">Sans condensed</string>
+    <string name="f6">Serif</string>
+    <string name="f7">Mono</string>
     <string name="tsize_label">Time size</string>
     <string name="tsz2_label">Text size</string>
     <string name="sz0">Small</string>
