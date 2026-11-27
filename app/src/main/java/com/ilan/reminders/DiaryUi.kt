@@ -486,6 +486,12 @@ private fun DayDialog(
                                         Text("🕐", fontSize = 22.sp); Spacer(Modifier.width(12.dp)); Text(timeOf(e), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = INK)
                                         if (!e.allDay) Text("  ·  " + durText(((e.end - e.begin) / 60000L).coerceAtLeast(0)), fontSize = 15.sp, color = Color.Gray)
                                     }
+                                    if (!isRem) {
+                                        val rl = remember(e.id) { CalRepo.load(ctx, e.id)?.reminders.orEmpty().distinct().sorted() }
+                                        if (rl.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text("🔔", fontSize = 22.sp); Spacer(Modifier.width(12.dp)); Text(rl.joinToString(", ") { remLabel(it) }, fontSize = 17.sp, color = INK)
+                                        }
+                                    }
                                     if (e.location.isNotBlank()) Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp)) {
                                         Text("📍", fontSize = 20.sp); Spacer(Modifier.width(12.dp)); Text(e.location, fontSize = 16.sp, color = INK)
                                     }
